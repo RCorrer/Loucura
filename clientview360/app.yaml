@@ -1,2 +1,19 @@
-command: ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
-# OBO config será adicionada no ambiente do Databricks Apps
+command:
+  - uvicorn
+  - src.main:app
+  - --host
+  - 0.0.0.0
+  - --port
+  - "8000"
+
+env:
+  - name: DATABRICKS_WAREHOUSE_ID
+    valueFrom: sql-warehouse
+  - name: UC_CATALOG
+    value: "plataforma"
+  - name: OBO_ENABLED
+    value: "true"
+  - name: SERVICE_PRINCIPAL_CLIENT_ID
+    valueFrom: sp-client-id
+  - name: SERVICE_PRINCIPAL_CLIENT_SECRET
+    valueFrom: sp-client-secret
