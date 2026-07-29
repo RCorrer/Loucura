@@ -11,7 +11,8 @@ env:
     valueFrom: sql-warehouse
   - name: UC_CATALOG
     value: "plataforma"
-  - name: SERVICE_PRINCIPAL_CLIENT_ID
-    valueFrom: sp-client-id
-  - name: SERVICE_PRINCIPAL_CLIENT_SECRET
-    valueFrom: sp-client-secret
+  - name: UC_SCHEMA
+    value: "default"
+  # Opcional: se precisar usar token explicitamente (não recomendado em Apps)
+  # - name: DATABRICKS_TOKEN
+  #   valueFrom: secret-scope/databricks-token
