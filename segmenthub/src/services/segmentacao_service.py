@@ -338,3 +338,53 @@ class SegmentacaoService:
         )
         # Cria o clone
         return self.criar(create_dto, usuario)
+
+    def listar_versoes(self, seg_id: str) -> List[Dict]:
+        return self.repository.listar_versoes(seg_id)
+
+    def obter_versao(self, seg_id: str, versao: int) -> Optional[Dict]:
+        return self.repository.obter_versao(seg_id, versao)
+
+    def listar_execucoes(self, seg_id: str) -> List[Dict]:
+        return self.repository.listar_execucoes(seg_id)
+
+    def listar_estados(self, seg_id: str) -> List[Dict]:
+        return self.repository.listar_estados(seg_id)
+
+    def obter_timeline(self, seg_id: str) -> List[Dict]:
+        """Mescla versões, execuções e estados em uma única timeline ordenada."""
+        versoes = self.repository.listar_versoes(seg_id)
+        execucoes = self.repository.listar_execucoes(seg_id)
+        estados = self.repository.listar_estados(seg_id)
+
+        timeline = []
+        for v in versoes:
+            timeline.append({
+                "tipo": "versao",
+                "data": v["alterado_em"],
+                "detalhe": f"Versão {v['versao']}",
+                "motivo": v["motivo"],
+                "alterado_por": v["alterado_por"],
+                "dados": v
+            })
+        for e in execucoes:
+            timeline.append({
+                "tipo": "execucao",
+                "data": e["executado_em"],
+                "detalhe": f"Execução {e['exec_id']}",
+                "status": e["status"],
+                "dados": e
+            })
+        for est in estados:
+            timeline.append({
+                "tipo": "estado",
+                "data": est["alterado_em"],
+                "detalhe": f"{est['estado_anterior']} -> {est['estado_novo']}",
+                "motivo": est["motivo"],
+                "alterado_por": est["alterado_por"],
+                "dados": est
+            })
+
+        # Ordena por data (mais recente primeiro)
+        timeline.sort(key=lambda x: x["data"], reverse=True)
+        return timeline

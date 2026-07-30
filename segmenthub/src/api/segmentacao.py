@@ -327,3 +327,47 @@ async def enviar_para_aprovacao(
         return {"mensagem": "Segmentação enviada para aprovação"}
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
+
+@router.get("/{seg_id}/versoes", response_model=List[dict])
+async def listar_versoes(
+    seg_id: str,
+    user: dict = Depends(require_perfil(["admin", "analista"])),
+):
+    service = SegmentacaoService()
+    return service.listar_versoes(seg_id)
+
+@router.get("/{seg_id}/versoes/{versao}", response_model=dict)
+async def obter_versao(
+    seg_id: str,
+    versao: int,
+    user: dict = Depends(require_perfil(["admin", "analista"])),
+):
+    service = SegmentacaoService()
+    versao_data = service.obter_versao(seg_id, versao)
+    if not versao_data:
+        raise HTTPException(status_code=404, detail="Versão não encontrada")
+    return versao_data
+
+@router.get("/{seg_id}/execucoes", response_model=List[dict])
+async def listar_execucoes(
+    seg_id: str,
+    user: dict = Depends(require_perfil(["admin", "analista"])),
+):
+    service = SegmentacaoService()
+    return service.listar_execucoes(seg_id)
+
+@router.get("/{seg_id}/estados", response_model=List[dict])
+async def listar_estados(
+    seg_id: str,
+    user: dict = Depends(require_perfil(["admin", "analista"])),
+):
+    service = SegmentacaoService()
+    return service.listar_estados(seg_id)
+
+@router.get("/{seg_id}/timeline", response_model=List[dict])
+async def obter_timeline(
+    seg_id: str,
+    user: dict = Depends(require_perfil(["admin", "analista"])),
+):
+    service = SegmentacaoService()
+    return service.obter_timeline(seg_id)

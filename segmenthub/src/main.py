@@ -3,6 +3,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import os
 import logging
+from typing import List
 
 from src.api import metadata, segmentacao, estimativa
 from src.core.config import AppConfig

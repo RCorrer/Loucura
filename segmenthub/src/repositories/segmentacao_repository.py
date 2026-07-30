@@ -261,3 +261,39 @@ class SegmentacaoRepository:
             elif isinstance(value, (list, tuple)) and value and hasattr(value[0], "tolist"):
                 dados[key] = [v.tolist() if hasattr(v, "tolist") else v for v in value]
         return dados
+
+    def listar_versoes(self, seg_id: str) -> List[Dict]:
+        sql = """
+            SELECT versao, regras_json, motivo, alterado_por, alterado_em
+            FROM plataforma.segmentacao.seg_versao
+            WHERE seg_id = ?
+            ORDER BY versao DESC
+        """
+        return self.client.execute_query(sql, (seg_id,))
+
+    def obter_versao(self, seg_id: str, versao: int) -> Optional[Dict]:
+        sql = """
+            SELECT versao, regras_json, motivo, alterado_por, alterado_em
+            FROM plataforma.segmentacao.seg_versao
+            WHERE seg_id = ? AND versao = ?
+        """
+        result = self.client.execute_query(sql, (seg_id, versao))
+        return result[0] if result else None
+
+    def listar_execucoes(self, seg_id: str) -> List[Dict]:
+        sql = """
+            SELECT exec_id, status, qtd_clientes, origem_execucao, executado_em, job_run_url
+            FROM plataforma.segmentacao.seg_execucao
+            WHERE seg_id = ?
+            ORDER BY executado_em DESC
+        """
+        return self.client.execute_query(sql, (seg_id,))
+
+    def listar_estados(self, seg_id: str) -> List[Dict]:
+        sql = """
+            SELECT estado_anterior, estado_novo, motivo, alterado_por, alterado_em
+            FROM plataforma.segmentacao.seg_historico_estado
+            WHERE seg_id = ?
+            ORDER BY alterado_em DESC
+        """
+        return self.client.execute_query(sql, (seg_id,))
