@@ -1,0 +1,16 @@
+{
+  "publico_base": "pub_varejo",
+  "inclusao": {
+    "operator": "AND",
+    "rules": [
+      {"campo_id": "renda_mensal", "op": ">", "value": 10000},
+      {"campo_id": "possui_cartao", "op": "=", "value": true}
+    ]
+  },
+  "exclusao": {
+    "operator": "OR",
+    "rules": [
+      {"campo_id": "inadimplente", "op": "=", "value": true}
+    ]
+  }
+}
