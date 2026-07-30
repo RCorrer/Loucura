@@ -1,0 +1,43 @@
+-- ============================================
+-- TABELA: seg_versao (versões da segmentação)
+-- ============================================
+CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_versao (
+  versao_id     STRING   NOT NULL,
+  seg_id        STRING   NOT NULL,
+  versao        INT      NOT NULL,
+  regras_json   STRING,           -- JSON com as regras naquela versão
+  motivo        STRING,
+  alterado_por  STRING,
+  alterado_em   TIMESTAMP DEFAULT current_timestamp()
+) USING DELTA
+TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported')
+COMMENT 'Histórico de versões da segmentação (cada alteração de regras gera nova versão)';
+
+
+-- ============================================
+-- TABELA: seg_historico_estado (transições de status)
+-- ============================================
+CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_historico_estado (
+  hist_id          STRING   NOT NULL,
+  seg_id           STRING   NOT NULL,
+  estado_anterior  STRING,
+  estado_novo      STRING,
+  motivo           STRING,
+  alterado_por     STRING,
+  alterado_em      TIMESTAMP DEFAULT current_timestamp()
+) USING DELTA
+TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported')
+COMMENT 'Auditoria de mudanças de status da segmentação';
+
+
+-- ============================================
+-- TABELA: seg_destino (natureza do segmento – humano/digital)
+-- ============================================
+CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_destino (
+  seg_id     STRING   NOT NULL,
+  destino    STRING   NOT NULL,   -- 'sistema2' (humano) ou 'sistema3' (digital)
+  habilitado BOOLEAN  DEFAULT true,
+  criado_em  TIMESTAMP DEFAULT current_timestamp()
+) USING DELTA
+TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported')
+COMMENT 'Natureza do segmento. Contrato-chave lido por S2, S3 e S4.';
