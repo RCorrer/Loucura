@@ -110,8 +110,9 @@ class QueryEngine:
 
     def generate_estimativa_query(self, regras: RegrasJson) -> Tuple[str, List[Any]]:
         sql, params = self.generate_query(regras)
+        # Qualifica a coluna para evitar ambiguidade
         estimativa_sql = sql.replace(
             "SELECT cpf_cnpj",
-            "SELECT approx_count_distinct(cpf_cnpj) as estimativa"
+            "SELECT approx_count_distinct(p.cpf_cnpj) as estimativa"
         )
         return estimativa_sql, params
