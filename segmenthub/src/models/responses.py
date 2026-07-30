@@ -1,4 +1,4 @@
-"""
+﻿"""
 Schemas de resposta padronizados para a API do SegmentHub.
 """
 

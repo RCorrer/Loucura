@@ -4,6 +4,7 @@ from fastapi.responses import FileResponse
 import os
 import logging
 
+from src.api import metadata
 from src.core.config import AppConfig
 from src.core.security import get_current_user, require_perfil
 
@@ -34,11 +35,9 @@ async def get_me(user: dict = Depends(get_current_user)):
     return {"user": user}
 
 # ============================================================
-# Inclusão de routers (serão adicionados nos próximos cartões)
+# Inclusão de routers
 # ============================================================
-# from src.api import metadata, segmentacao, estimativa, ...
-# app.include_router(metadata.router, prefix="/api")
-# app.include_router(segmentacao.router, prefix="/api")
+app.include_router(metadata.router, prefix="/api")
 
 # ============================================================
 # Static files (frontend build)
@@ -48,7 +47,6 @@ if os.path.exists(static_dir):
     app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
 else:
     logger.warning("Pasta 'static' não encontrada. Frontend não será servido.")
-
     @app.get("/")
     async def root():
         return {"message": "SegmentHub API - Frontend não construído"}
