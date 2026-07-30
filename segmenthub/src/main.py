@@ -5,7 +5,7 @@ import os
 import logging
 from typing import List
 
-from src.api import metadata, segmentacao, estimativa
+from src.api import metadata, segmentacao, estimativa, comentario
 from src.core.config import AppConfig
 from src.core.security import get_current_user, require_perfil
 
@@ -41,6 +41,9 @@ async def get_me(user: dict = Depends(get_current_user)):
 app.include_router(metadata.router, prefix="/api")
 app.include_router(segmentacao.router, prefix="/api")
 app.include_router(estimativa.router, prefix="/api")
+app.include_router(comentario.router, prefix="/api")              
+app.include_router(comentario.comentario_router, prefix="/api")   
+app.include_router(comentario.notificacao_router, prefix="/api")  
 
 # ============================================================
 # Static files (frontend build)
