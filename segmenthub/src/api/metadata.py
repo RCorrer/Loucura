@@ -1,5 +1,8 @@
 """
-Metadata Service - Endpoints para catálogo de características e públicos.
+Metadata Service - Endpoints públicos para catálogo de características e públicos.
+ATENÇÃO: Estes endpoints NÃO expõem as flags usavel_em_visao360, usavel_em_peca, bloco_visao360.
+A administração dessas flags é feita via /api/metadata/admin/* (S1-BACK-11).
+O consumo dessas flags pelo S2/S3 é via GRANT SELECT direto na tabela (CONTRATOS 3.1).
 """
 
 from fastapi import APIRouter, Depends, HTTPException
