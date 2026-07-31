@@ -1,5 +1,5 @@
 # Databricks notebook source
-# S1-JOB-04: seg_overlap (sobreposições) - 100% PySpark
+# S1-JOB-04: seg_overlap (sobreposições) - com deduplicação de notificações
 
 # COMMAND ----------
 
@@ -10,31 +10,29 @@ from delta.tables import DeltaTable
 spark = SparkSession.builder.getOrCreate()
 
 # ============================================================
-# 1. Carrega resultado corrente dos segmentos ativos
+# 1. Carrega segmentos ativos
 # ============================================================
-# Busca apenas segmentos com status 'ativa'
-df_segmentos_ativos = spark.table("plataforma.segmentacao.seg_definicao") \
+df_segmentos = spark.table("plataforma.segmentacao.seg_definicao") \
     .filter(col("status") == "ativa") \
     .select("seg_id", "owner")
 
-# Lista de seg_ids ativos
-ids_ativos = [row.seg_id for row in df_segmentos_ativos.select("seg_id").collect()]
+# Lista de IDs ativos (para uso em joins)
+ids_ativos = [row.seg_id for row in df_segmentos.select("seg_id").collect()]
 
 if len(ids_ativos) < 2:
-    print(f"ℹ️ Apenas {len(ids_ativos)} segmento(s) ativo(s). São necessários pelo menos 2 para calcular sobreposições.")
-    dbutils.notebook.exit("Sobreposição não calculada (menos de 2 segmentos ativos)")
+    print("⚠️ Menos de 2 segmentos ativos. Nada a calcular.")
+    dbutils.notebook.exit("Sem segmentos ativos suficientes")
 
 # ============================================================
-# 2. Carrega resultado corrente (cpf_cnpj) para os segmentos ativos
+# 2. Carrega resultado corrente para os segmentos ativos
 # ============================================================
 df_result = spark.table("plataforma.segmentacao.seg_resultado_corrente") \
     .filter(col("seg_id").isin(ids_ativos)) \
     .select("seg_id", "cpf_cnpj")
 
 # ============================================================
-# 3. Calcula sobreposição por pares (self-join com condição seg_id_a < seg_id_b)
+# 3. Calcula sobreposições (auto-join)
 # ============================================================
-# Auto-join para encontrar interseções
 df_pairs = df_result.alias("a") \
     .join(df_result.alias("b"), col("a.cpf_cnpj") == col("b.cpf_cnpj")) \
     .filter(col("a.seg_id") < col("b.seg_id")) \
@@ -42,13 +40,12 @@ df_pairs = df_result.alias("a") \
     .agg(count("*").alias("clientes_em_comum"))
 
 # ============================================================
-# 4. Calcula total de clientes por segmento
+# 4. Calcula totais por segmento
 # ============================================================
-df_totals = df_result.groupBy("seg_id") \
-    .agg(count("*").alias("total"))
+df_totals = df_result.groupBy("seg_id").agg(count("*").alias("total"))
 
 # ============================================================
-# 5. Junta para calcular percentuais (pct_sobre_a e pct_sobre_b)
+# 5. Calcula percentuais
 # ============================================================
 df_overlap = df_pairs \
     .join(df_totals.alias("ta"), col("seg_id_a") == col("ta.seg_id")) \
@@ -63,19 +60,9 @@ df_overlap = df_pairs \
 # ============================================================
 delta_overlap = DeltaTable.forName(spark, "plataforma.segmentacao.seg_overlap")
 
-# Cria DataFrame com os dados a serem upsertados
-df_upsert = df_overlap.select(
-    "seg_id_a",
-    "seg_id_b",
-    "clientes_em_comum",
-    "pct_sobre_a",
-    "pct_sobre_b",
-    "calculado_em"
-)
-
 delta_overlap.alias("target") \
     .merge(
-        df_upsert.alias("source"),
+        df_overlap.alias("source"),
         "target.seg_id_a = source.seg_id_a AND target.seg_id_b = source.seg_id_b"
     ) \
     .whenMatchedUpdate(set={
@@ -94,10 +81,11 @@ delta_overlap.alias("target") \
     }) \
     .execute()
 
+print(f"✅ Overlap calculado para {df_overlap.count()} pares")
+
 # ============================================================
-# 7. Alerta de alta sobreposição (>80%)
+# 7. Identifica overlaps com alta sobreposição (> 80%)
 # ============================================================
-# Identifica pares com alta sobreposição
 df_alto_overlap = df_overlap \
     .filter((col("pct_sobre_a") > 80) | (col("pct_sobre_b") > 80)) \
     .select(
@@ -106,37 +94,55 @@ df_alto_overlap = df_overlap \
         greatest(col("pct_sobre_a"), col("pct_sobre_b")).alias("max_pct")
     )
 
-if df_alto_overlap.count() > 0:
-    # Busca owners dos segmentos envolvidos
-    df_owners = df_segmentos_ativos.select("seg_id", "owner").filter(col("owner").isNotNull())
-    
-    # Para cada par com alta sobreposição, cria notificação para o owner de seg_id_a (pode ser ajustado)
-    # Vamos criar notificações para ambos os owners? Para simplificar, apenas para o owner de seg_id_a
-    df_notif_pairs = df_alto_overlap \
-        .join(df_owners.alias("oa"), col("seg_id_a") == col("oa.seg_id")) \
-        .select(
-            col("oa.owner").alias("destinatario"),
-            lit("alerta").alias("tipo"),
-            col("seg_id_a").alias("seg_id_notif"),
-            expr("concat('⚠️ Alta sobreposição: ', seg_id_a, ' x ', seg_id_b)").alias("titulo"),
-            expr("concat('Sobreposição de ', round(max_pct, 2), '% entre ', seg_id_a, ' e ', seg_id_b)").alias("mensagem")
-        ) \
-        .select(
-            expr("concat('notif_', uuid())").alias("notif_id"),
-            "destinatario",
-            "tipo",
-            "seg_id_notif",
-            "titulo",
-            "mensagem"
-        )
-    
-    # Insere notificações
-    df_notif_pairs.write.mode("append").saveAsTable("plataforma.segmentacao.seg_notificacao")
-    print(f"🔔 {df_notif_pairs.count()} notificações de alta sobreposição enviadas")
+if df_alto_overlap.count() == 0:
+    print("ℹ️ Nenhuma sobreposição acima de 80%")
 else:
-    print("ℹ️ Nenhuma sobreposição alta (>80%) encontrada.")
+    # ============================================================
+    # 8. DEDUPLICAÇÃO: busca notificações existentes nas últimas 24h
+    # ============================================================
+    df_existing_alerts = spark.table("plataforma.segmentacao.seg_notificacao") \
+        .filter(col("tipo") == "alerta") \
+        .filter(col("titulo").like("%sobreposição%")) \
+        .filter(col("criado_em") > (current_timestamp() - expr("INTERVAL 1 DAY"))) \
+        .select(col("seg_id").alias("alerted_seg_id")) \
+        .distinct()
 
-# ============================================================
-# 8. Finaliza
-# ============================================================
-print(f"✅ Overlap calculado para {df_overlap.count()} pares de segmentos")
+    # ============================================================
+    # 9. Prepara notificações (apenas para segmentos que NÃO foram alertados recentemente)
+    # ============================================================
+    # Junta com owners (apenas seg_id_a recebe a notificação, pois é o owner do primeiro segmento)
+    df_notif_base = df_alto_overlap \
+        .join(df_segmentos.alias("d"), col("seg_id_a") == col("d.seg_id")) \
+        .filter(col("d.owner").isNotNull()) \
+        .select(
+            col("seg_id_a").alias("seg_id"),
+            col("d.owner").alias("destinatario"),
+            col("seg_id_b"),
+            col("max_pct")
+        ) \
+        .join(
+            df_existing_alerts,
+            col("seg_id") == col("alerted_seg_id"),
+            how="left_anti"
+        )
+
+    # ============================================================
+    # 10. Insere notificações (se houver novas)
+    # ============================================================
+    if df_notif_base.count() > 0:
+        df_notif = df_notif_base.select(
+            expr("concat('notif_', uuid())").alias("notif_id"),
+            col("destinatario"),
+            lit("alerta").alias("tipo"),
+            col("seg_id"),
+            expr("concat('⚠️ Alta sobreposição: ', seg_id, ' x ', seg_id_b)").alias("titulo"),
+            expr("concat('Sobreposição de ', round(max_pct, 2), '% entre ', seg_id, ' e ', seg_id_b)").alias("mensagem")
+        ).withColumn("criado_em", current_timestamp())
+
+        # Insere via append na tabela de notificações
+        df_notif.write.mode("append").saveAsTable("plataforma.segmentacao.seg_notificacao")
+        print(f"🔔 {df_notif.count()} notificações de overlap enviadas")
+    else:
+        print("ℹ️ Nenhuma notificação nova necessária (já alertado nas últimas 24h)")
+
+print("✅ Overlap calculado")
