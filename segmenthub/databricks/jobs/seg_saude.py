@@ -1,82 +1,138 @@
 # Databricks notebook source
-# S1-JOB-03: seg_saude - 100% PySpark DataFrames
+# S1-JOB-03: seg_saude (health checks) - 100% PySpark
 
-from pyspark.sql import SparkSession, functions as F
-from pyspark.sql.window import Window
-import uuid, json
+# COMMAND ----------
+
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, count, when, max, min, avg, lit, current_timestamp, expr, coalesce, greatest
+from delta.tables import DeltaTable
+
 spark = SparkSession.builder.getOrCreate()
 
-# 1. Lista segmentos ativos/pausados/aprovados
+# ============================================================
+# 1. Carrega segmentos ativos/pausados/aprovados
+# ============================================================
 df_segmentos = spark.table("plataforma.segmentacao.seg_definicao") \
-    .filter(F.col("status").isin(["ativa", "pausada", "aprovada"])) \
+    .filter(col("status").isin(["ativa", "pausada", "aprovada"])) \
     .select("seg_id", "owner")
 
-# 2. Para cada segmento, obter execuções recentes
+# ============================================================
+# 2. Carrega execuções para esses segmentos
+# ============================================================
 df_exec = spark.table("plataforma.segmentacao.seg_execucao") \
-    .filter(F.col("seg_id").isin([row.seg_id for row in df_segmentos.select("seg_id").collect()])) \
-    .withColumn("rank", F.row_number().over(Window.partitionBy("seg_id").orderBy(F.desc("executado_em")))) \
-    .filter(F.col("rank") <= 3) \
+    .filter(col("seg_id").isin([row.seg_id for row in df_segmentos.select("seg_id").collect()])) \
     .select("seg_id", "status", "qtd_clientes", "executado_em")
 
-# 3. Agrega métricas
+# ============================================================
+# 3. Calcula métricas por segmento (agg)
+# ============================================================
 df_metrics = df_exec.groupBy("seg_id").agg(
-    F.count("*").alias("total_exec"),
-    F.sum(F.when(F.col("status") == "sucesso", 1).otherwise(0)).alias("sucessos"),
-    F.sum(F.when(F.col("status").isin(["erro", "erro_metadado"]), 1).otherwise(0)).alias("falhas"),
-    F.max("qtd_clientes").alias("max_publico"),
-    F.min("qtd_clientes").alias("min_publico"),
-    F.avg("qtd_clientes").alias("media_publico"),
-    F.max("executado_em").alias("ultima_exec")
+    count("*").alias("total_exec"),
+    count(when(col("status") == "sucesso", 1)).alias("sucessos"),
+    count(when(col("status").isin(["erro", "erro_metadado"]), 1)).alias("falhas"),
+    max("qtd_clientes").alias("max_publico"),
+    min("qtd_clientes").alias("min_publico"),
+    avg("qtd_clientes").alias("media_publico"),
+    max("executado_em").alias("ultima_exec")
 )
 
-# 4. Calcula status de saúde
+# ============================================================
+# 4. Determina status de saúde (regras)
+# ============================================================
 df_saude = df_metrics.select(
-    F.col("seg_id"),
-    F.when(F.col("falhas") >= 2, F.lit("vermelho"))
-     .when((F.col("falhas") == 1) | (F.col("max_publico") == 0), F.lit("amarelo"))
-     .otherwise(F.lit("verde")).alias("health_status"),
-    F.current_timestamp().alias("ultima_verificacao"),
-    F.col("max_publico").alias("publico_atual"),
-    F.when(F.col("falhas") >= 2, F.lit(json.dumps({"tipo":"falha_recente"}))).otherwise(F.lit(None)).alias("alertas_json")
+    col("seg_id"),
+    # Regra: 2+ falhas → vermelho; 1 falha ou público zero → amarelo; senão verde
+    when(col("falhas") >= 2, lit("vermelho"))
+    .when((col("falhas") == 1) | (col("max_publico") == 0), lit("amarelo"))
+    .otherwise(lit("verde")).alias("health_status"),
+    lit(current_timestamp()).alias("ultima_verificacao"),
+    col("max_publico").alias("publico_atual"),
+    # Alerta JSON (simplificado)
+    when(col("falhas") >= 2, lit('{"tipo":"falha_recente"}'))
+    .when(col("max_publico") == 0, lit('{"tipo":"publico_zerado"}'))
+    .otherwise(lit(None)).alias("alertas_json")
 )
 
-# 5. Upsert em seg_saude (usando DeltaTable)
-from delta.tables import DeltaTable
-deltaTable = DeltaTable.forName(spark, "plataforma.segmentacao.seg_saude")
-# É necessário fazer merge manual: criar tabela temporária e usar merge
-df_saude.createOrReplaceTempView("saude_temp")
-spark.sql("""
-    MERGE INTO plataforma.segmentacao.seg_saude AS target
-    USING saude_temp AS source
-    ON target.seg_id = source.seg_id
-    WHEN MATCHED THEN
-        UPDATE SET
-            health_status = source.health_status,
-            ultima_verificacao = source.ultima_verificacao,
-            publico_atual = source.publico_atual,
-            alertas_json = source.alertas_json
-    WHEN NOT MATCHED THEN
-        INSERT (seg_id, health_status, ultima_verificacao, publico_atual, alertas_json)
-        VALUES (source.seg_id, source.health_status, source.ultima_verificacao,
-                source.publico_atual, source.alertas_json)
-""")
+# ============================================================
+# 5. Upsert em seg_saude via DeltaTable.merge
+# ============================================================
+delta_saude = DeltaTable.forName(spark, "plataforma.segmentacao.seg_saude")
 
-# 6. Notificações para vermelhos (usando DataFrame)
-df_vermelhos = spark.table("plataforma.segmentacao.seg_saude") \
-    .filter(F.col("health_status") == "vermelho") \
-    .select("seg_id") \
-    .join(spark.table("plataforma.segmentacao.seg_definicao").select("seg_id", "owner"), "seg_id") \
-    .filter(F.col("owner").isNotNull())
+# Cria DataFrame com os dados a serem inseridos/atualizados
+df_upsert = df_saude.select(
+    "seg_id",
+    "health_status",
+    "ultima_verificacao",
+    "publico_atual",
+    "alertas_json"
+)
 
-if df_vermelhos.count() > 0:
-    df_notif = df_vermelhos.select(
-        F.concat(F.lit("notif_"), F.expr("uuid()")).alias("notif_id"),
-        F.col("owner").alias("destinatario"),
-        F.lit("alerta").alias("tipo"),
-        F.col("seg_id"),
-        F.concat(F.lit("🔴 Saúde crítica: "), F.col("seg_id")).alias("titulo"),
-        F.concat(F.lit("Segmentação "), F.col("seg_id"), F.lit(" em estado vermelho. Verifique os alertas.")).alias("mensagem")
+delta_saude.alias("target") \
+    .merge(
+        df_upsert.alias("source"),
+        "target.seg_id = source.seg_id"
+    ) \
+    .whenMatchedUpdate(set={
+        "health_status": col("source.health_status"),
+        "ultima_verificacao": col("source.ultima_verificacao"),
+        "publico_atual": col("source.publico_atual"),
+        "alertas_json": col("source.alertas_json")
+    }) \
+    .whenNotMatchedInsert(values={
+        "seg_id": col("source.seg_id"),
+        "health_status": col("source.health_status"),
+        "ultima_verificacao": col("source.ultima_verificacao"),
+        "publico_atual": col("source.publico_atual"),
+        "alertas_json": col("source.alertas_json")
+    }) \
+    .execute()
+
+# ============================================================
+# 6. Notificações para segmentos vermelhos (apenas se não enviada nas últimas 24h)
+# ============================================================
+# 6a. Busca notificações existentes nas últimas 24h
+df_notif_existente = spark.table("plataforma.segmentacao.seg_notificacao") \
+    .filter(col("tipo") == "alerta") \
+    .filter(col("criado_em") > expr("current_timestamp() - interval 1 day")) \
+    .select("seg_id")
+
+# 6b. Junta com segmentos vermelhos que ainda não foram notificados
+df_vermelho = df_saude \
+    .filter(col("health_status") == "vermelho") \
+    .join(df_segmentos.select("seg_id", "owner"), on="seg_id", how="inner") \
+    .filter(col("owner").isNotNull()) \
+    .join(
+        df_notif_existente.select("seg_id").distinct(),
+        on="seg_id",
+        how="left_anti"
     )
-    df_notif.write.mode("append").saveAsTable("plataforma.segmentacao.seg_notificacao")
 
+# 6c. Gera notificações
+if df_vermelho.count() > 0:
+    # Prepara dados para notificação
+    df_notif = df_vermelho.select(
+        col("seg_id"),
+        col("owner").alias("destinatario"),
+        lit("alerta").alias("tipo"),
+        col("seg_id").alias("seg_id_notif"),  # nome diferente para evitar conflito
+        expr("concat('🔴 Saúde crítica: ', seg_id)").alias("titulo"),
+        expr("concat('Segmentação ', seg_id, ' em estado vermelho. Verifique os alertas.')").alias("mensagem")
+    ).select(
+        expr("concat('notif_', uuid())").alias("notif_id"),
+        "destinatario",
+        "tipo",
+        "seg_id_notif",
+        "titulo",
+        "mensagem"
+    )
+    
+    # Insere notificações
+    df_notif.write.mode("append").saveAsTable("plataforma.segmentacao.seg_notificacao")
+    print(f"🔔 {df_vermelho.count()} notificações enviadas para segmentos vermelhos")
+else:
+    print("ℹ️ Nenhuma notificação necessária (sem segmentos vermelhos ou já notificados)")
+
+# ============================================================
+# 7. Finaliza
+# ============================================================
 print("✅ Saúde atualizada")
