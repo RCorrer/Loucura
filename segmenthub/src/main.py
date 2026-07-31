@@ -5,7 +5,7 @@ import os
 import logging
 from typing import List
 
-from src.api import metadata, segmentacao, estimativa, comentario
+from src.api import metadata, segmentacao, estimativa, comentario, saude
 from src.core.config import AppConfig
 from src.core.security import get_current_user, require_perfil
 
@@ -43,7 +43,8 @@ app.include_router(segmentacao.router, prefix="/api")
 app.include_router(estimativa.router, prefix="/api")
 app.include_router(comentario.router, prefix="/api")              
 app.include_router(comentario.comentario_router, prefix="/api")   
-app.include_router(comentario.notificacao_router, prefix="/api")  
+app.include_router(comentario.notificacao_router, prefix="/api")
+app.include_router(saude.router, prefix="/api")  
 
 # ============================================================
 # Static files (frontend build)

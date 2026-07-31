@@ -20,3 +20,6 @@ class CampoNotFoundError(MetadataError):
 class PublicoNotFoundError(MetadataError):
     """Erro quando um público não é encontrado."""
     pass
+
+class SegmentacaoNotFoundError(Exception):
+    pass
