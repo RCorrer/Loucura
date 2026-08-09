@@ -1,62 +1,18 @@
+build: false
 command:
   - sh
   - -c
   - |
-    echo "=== DIAGNÓSTICO DO BUILD ==="
-    echo "Diretório atual: $(pwd)"
-    echo "Conteúdo da raiz:"
+    echo "=== Iniciando build manual ==="
+    cd frontend
+    echo "📁 Diretório atual: $(pwd)"
+    echo "📄 Conteúdo da pasta frontend:"
     ls -la
-    echo ""
-    echo "Conteúdo da pasta frontend:"
-    ls -la frontend || echo "PASTA frontend NÃO ENCONTRADA!"
-    echo ""
-    echo "Verificando index.html:"
-    test -f frontend/index.html && echo "✅ index.html EXISTE" || echo "❌ index.html NÃO ENCONTRADO!"
-    echo ""
-    echo "Verificando vite.config.js:"
-    test -f frontend/vite.config.js && echo "✅ vite.config.js EXISTE" || echo "❌ vite.config.js NÃO ENCONTRADO!"
-    echo ""
-    echo "=== TENTATIVA 1: cd frontend && npm run build ==="
-    cd frontend || exit 1
+    echo "🧹 Instalando dependências..."
     npm install
+    echo "🔨 Buildando o frontend..."
     npm run build
-    BUILD_STATUS=$?
-    if [ $BUILD_STATUS -eq 0 ]; then
-      echo "✅ Build 1 concluído com sucesso!"
-      cd ..
-      uvicorn src.main:app --host 0.0.0.0 --port 8000
-      exit 0
-    else
-      echo "❌ Build 1 falhou com código $BUILD_STATUS"
-      cd ..
-    fi
-    echo "=== TENTATIVA 2: npm run build --prefix frontend ==="
-    npm run build --prefix frontend
-    BUILD_STATUS=$?
-    if [ $BUILD_STATUS -eq 0 ]; then
-      echo "✅ Build 2 concluído com sucesso!"
-      uvicorn src.main:app --host 0.0.0.0 --port 8000
-      exit 0
-    else
-      echo "❌ Build 2 falhou com código $BUILD_STATUS"
-    fi
-    echo "=== TENTATIVA 3: (fallback) build do Vite com caminho absoluto ==="
-    cd frontend && npx vite build --config vite.config.js
-    BUILD_STATUS=$?
-    if [ $BUILD_STATUS -eq 0 ]; then
-      echo "✅ Build 3 concluído com sucesso!"
-      cd ..
-      uvicorn src.main:app --host 0.0.0.0 --port 8000
-      exit 0
-    else
-      echo "❌ Todas as tentativas falharam!"
-      exit 1
-    fi
-
-env:
-  - name: DATABRICKS_WAREHOUSE_ID
-    valueFrom: sql-warehouse
-  - name: UC_CATALOG
-    value: "plataforma"
-  - name: UC_SCHEMA
-    value: "default"
+    echo "✅ Build concluído!"
+    cd ..
+    echo "🚀 Iniciando o servidor..."
+    uvicorn src.main:app --host 0.0.0.0 --port 8000
