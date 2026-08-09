@@ -24,15 +24,15 @@ export default function ListaSegmentacoes() {
         ...filtros,
         busca: buscaAtiva,
       });
-      console.log('📦 Resposta da API:', response); // <-- ADICIONE AQUI
-      console.log('📊 Data:', response.data);      // <-- ADICIONE AQUI
-      console.log('📄 Meta:', response.meta);      // <-- ADICIONE AQUI
+      console.log('📦 Resposta da API:', response);
+      console.log('📊 Data:', response.data);
+      console.log('📄 Meta:', response.meta);
 
       const rowsWithId = (response.data || []).map(row => ({
         ...row,
         id: row.seg_id,
       }));
-      console.log('✅ rowsWithId:', rowsWithId);    // <-- ADICIONE AQUI
+      console.log('✅ rowsWithId:', rowsWithId);
 
       setSegmentacoes(rowsWithId);
       setMeta(response.meta || { page: 1, size: 10, total: 0, total_pages: 0 });
@@ -69,10 +69,8 @@ export default function ListaSegmentacoes() {
     setFiltros((prev) => ({ ...prev, [key]: value, page: 1 }));
   };
 
-  // ============================================================
-  // PAGINAÇÃO (usando paginationModel do DataGrid)
-  // ============================================================
   const handlePaginationModelChange = (model) => {
+    console.log('🔄 mudou paginação:', model);
     setFiltros((prev) => ({
       ...prev,
       page: model.page + 1,
@@ -135,6 +133,10 @@ export default function ListaSegmentacoes() {
       ),
     },
   ];
+
+  console.log('🔄 Render com meta:', meta);
+  console.log('🔄 rowCount sendo passado:', meta.total);
+  console.log('🔄 paginationModel:', { page: meta.page - 1, pageSize: meta.size });
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -203,6 +205,7 @@ export default function ListaSegmentacoes() {
       ) : (
         <Box sx={{ flex: 1, minHeight: 0, height: '100%' }}>
           <DataTable
+            key={`page-${meta.page}-${meta.size}`}
             rows={segmentacoes}
             columns={columns}
             loading={loading}
