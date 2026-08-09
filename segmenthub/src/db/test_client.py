@@ -1,8 +1,6 @@
 import os
 import time
 import logging
-from databricks import sql
-from databricks.sql.client import Connection
 from databricks.sdk import WorkspaceClient
 
 logger = logging.getLogger(__name__)
@@ -10,8 +8,7 @@ logger = logging.getLogger(__name__)
 
 class TestDatabricksClient:
     def __init__(self):
-        # Obtém token do Service Principal via WorkspaceClient
-        self.workspace = WorkspaceClient()
+        self.client = WorkspaceClient()
         self.warehouse_id = os.getenv("DATABRICKS_WAREHOUSE_ID")
         self.catalog = os.getenv("UC_CATALOG", "plataforma")
         self.schema = os.getenv("UC_SCHEMA", "default")
@@ -20,40 +17,40 @@ class TestDatabricksClient:
         if not self.warehouse_id:
             raise ValueError("DATABRICKS_WAREHOUSE_ID não definido")
 
-        # Token do Service Principal
-        self.token = self.workspace.config.token
-        if not self.token:
-            raise ValueError("Não foi possível obter token do Service Principal")
-        self.host = self.workspace.config.host
+        logger.info("✅ TestClient inicializado com WorkspaceClient + result_format=JSON_ARRAY")
 
-        logger.info("✅ TestClient inicializado com sql.connect (Service Principal)")
-
-    def _get_connection(self) -> Connection:
-        return sql.connect(
-            server_hostname=self.host,
-            http_path=f"/sql/1.0/warehouses/{self.warehouse_id}",
-            access_token=self.token,
-            catalog=self.catalog,
-            schema=self.schema,
-        )
-
-    def execute_query(self, sql: str, params: tuple = None, timeout: int = None):
+    def execute_query(self, sql: str, params: dict = None, timeout: int = None):
         timeout = timeout or self.timeout
+        param_list = [{"name": k, "value": v} for k, v in (params or {}).items()] if params else None
+
         try:
-            with self._get_connection() as conn:
-                with conn.cursor() as cursor:
-                    if params:
-                        cursor.execute(sql, params)
-                    else:
-                        cursor.execute(sql)
-                    rows = cursor.fetchall()
-                    # Retorna como lista de listas (sem nomes de colunas)
-                    return [list(row) for row in rows]
+            response = self.client.statement_execution.execute_statement(
+                warehouse_id=self.warehouse_id,
+                statement=sql,
+                parameters=param_list,
+                catalog=self.catalog,
+                schema=self.schema,
+                wait_timeout=timeout,
+                result_format="JSON_ARRAY",  # <-- FORÇA JSON
+            )
         except Exception as e:
-            logger.error(f"Erro na query: {e}")
+            logger.error(f"Erro ao executar statement: {e}")
             raise
 
-    def fetch_one(self, sql: str, params: tuple = None):
+        # Polling
+        for _ in range(int(timeout / 2)):
+            result = self.client.statement_execution.get_statement(response.statement_id)
+            state = str(result.status.state)
+            if "SUCCEEDED" in state:
+                return result.result.data_array if result.result else []
+            if any(x in state for x in ["FAILED", "CANCELED", "CLOSED"]):
+                error_msg = getattr(result.status, "error", "Erro desconhecido")
+                raise RuntimeError(f"Query falhou: {error_msg}")
+            time.sleep(2)
+
+        raise TimeoutError("Timeout aguardando query")
+
+    def fetch_one(self, sql: str, params: dict = None):
         rows = self.execute_query(sql, params)
         return rows[0] if rows else None
 
