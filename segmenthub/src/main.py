@@ -68,6 +68,27 @@ async def test_db_connection():
         }
 
 # ============================================================
+# Debug: testar conexão com o banco usando TestDatabricksClient
+# ============================================================
+@app.get("/api/test-simplified")
+async def test_simplified():
+    from src.db.test_client import TestDatabricksClient
+    try:
+        client = TestDatabricksClient()
+        rows = client.execute_query("SELECT 1 AS valor")
+        return {
+            "status": "success",
+            "result": rows,
+            "message": "Cliente simplificado funcionando!"
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "message": "Falha no cliente simplificado"
+        }    
+
+# ============================================================
 # Inclusão de routers
 # ============================================================
 app.include_router(metadata.router, prefix="/api")

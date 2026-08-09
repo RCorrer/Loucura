@@ -5,10 +5,9 @@ from databricks.sdk import WorkspaceClient
 
 logger = logging.getLogger(__name__)
 
-
-class DatabricksSQLClient:
+class TestDatabricksClient:
     def __init__(self):
-        self.client = WorkspaceClient()  # Service Principal automático
+        self.client = WorkspaceClient()
         self.warehouse_id = os.getenv("DATABRICKS_WAREHOUSE_ID")
         self.catalog = os.getenv("UC_CATALOG", "plataforma")
         self.schema = os.getenv("UC_SCHEMA", "default")
@@ -17,9 +16,9 @@ class DatabricksSQLClient:
         if not self.warehouse_id:
             raise ValueError("DATABRICKS_WAREHOUSE_ID não definido")
 
-        logger.info("✅ DatabricksSQLClient inicializado com WorkspaceClient")
+        logger.info("✅ TestClient inicializado com WorkspaceClient")
 
-    def execute_query(self, sql: str, params: list = None, timeout: int = None):
+    def execute_query(self, sql: str, params: dict = None, timeout: int = None):
         timeout = timeout or self.timeout
         param_list = [{"name": k, "value": v} for k, v in (params or {}).items()] if params else []
 
@@ -32,7 +31,6 @@ class DatabricksSQLClient:
             wait_timeout=timeout,
         )
 
-        # Polling
         for _ in range(int(timeout / 2)):
             result = self.client.statement_execution.get_statement(response.statement_id)
             state = str(result.status.state)
@@ -48,15 +46,3 @@ class DatabricksSQLClient:
     def fetch_one(self, sql: str, params: dict = None):
         rows = self.execute_query(sql, params)
         return rows[0] if rows else None
-
-    def fetch_all(self, sql: str, params: dict = None):
-        return self.execute_query(sql, params)
-
-
-_default_client = None
-
-def get_client() -> DatabricksSQLClient:
-    global _default_client
-    if _default_client is None:
-        _default_client = DatabricksSQLClient()
-    return _default_client
