@@ -14,43 +14,32 @@ logger = logging.getLogger(__name__)
 
 
 async def get_current_user(request: Request) -> Optional[dict]:
-    """
-    Obtém o usuário atual da requisição.
-    - Em produção (Databricks Apps): lê o cabeçalho 'X-Databricks-User' (OBO).
-    - Em desenvolvimento: usa a variável de ambiente DEV_USER.
-    Retorna um dicionário com 'usuario_id' e 'perfil' ou None se não encontrado.
-    """
-    # 1. Tenta obter do cabeçalho (produção)
-    user_id = request.headers.get("X-Databricks-User")
+    # O Databricks Apps envia o email do usuário neste cabeçalho
+    user_email = request.headers.get("X-Forwarded-Email")
     
-    # 2. Fallback para desenvolvimento
-    if not user_id:
-        user_id = os.getenv("DEV_USER")
-        if not user_id:
-            # Fallback padrão (útil para testes iniciais)
-            logger.warning("DEV_USER não definido, usando 'admin' como fallback")
-            user_id = "admin"
+    # Fallback para desenvolvimento local
+    if not user_email:
+        user_email = os.getenv("DEV_USER")
     
-    # 3. Busca o perfil do usuário na tabela de governança
+    if not user_email:
+        logger.warning("Nenhum usuário identificado na requisição")
+        return None
+    
+    # Busca o perfil do usuário no banco
     try:
         client = get_client()
         row = client.fetch_one(
-            """
-            SELECT perfil
-            FROM plataforma.governanca.usuarios_perfil
-            WHERE usuario_id = :user_id
-              AND sistema = 'segmenthub'
-              AND ativo = true
-            """,
-            {"user_id": user_id}
+            "SELECT perfil FROM plataforma.governanca.usuarios_perfil WHERE usuario_id = :user_id AND sistema = 'segmenthub' AND ativo = true",
+            {"user_id": user_email}
         )
         if row:
-            return {"usuario_id": user_id, "perfil": row["perfil"]}
+            return {"usuario_id": user_email, "perfil": row["perfil"]}
         else:
-            logger.warning(f"Usuário {user_id} não encontrado ou inativo no sistema segmenthub")
+            logger.warning(f"Usuário {user_email} não encontrado ou inativo")
             return None
     except Exception as e:
-        logger.error(f"Erro ao buscar perfil do usuário {user_id}: {e}")
+        logger.error(f"Erro ao buscar perfil do usuário {user_email}: {e}")
+        # Em produção, você pode querer retornar None ou um perfil padrão
         return None
 
 
