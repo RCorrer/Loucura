@@ -139,7 +139,7 @@ export default function ListaSegmentacoes() {
   console.log('🔄 paginationModel:', { page: meta.page - 1, pageSize: meta.size });
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <PageHeader
         title="Segmentações"
         subtitle="Gerencie suas segmentações de clientes"
@@ -203,7 +203,7 @@ export default function ListaSegmentacoes() {
           onAction={() => navigate('/segmentacoes/nova')}
         />
       ) : (
-        <Box sx={{ flex: 1, minHeight: 0, height: '100%' }}>
+        <Box sx={{ height: 500, width: '100%' }}>
           <DataTable
             key={`page-${meta.page}-${meta.size}`}
             rows={segmentacoes}
