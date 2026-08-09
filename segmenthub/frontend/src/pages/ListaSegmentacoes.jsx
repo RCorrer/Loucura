@@ -192,8 +192,8 @@ export default function ListaSegmentacoes() {
           rows={segmentacoes}
           columns={columns}
           loading={loading}
-          pagination={meta.total_pages > 1}
-          pagination
+          pagination={meta.total_pages > 1}          
+          hideFooterPagination={meta.total_pages <= 1} 
           page={meta.page}
           pageSize={meta.size}
           total={meta.total}
