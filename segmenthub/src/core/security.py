@@ -14,16 +14,20 @@ logger = logging.getLogger(__name__)
 
 
 async def get_current_user(request: Request) -> Optional[dict]:
+    # Obtém o email do usuário do cabeçalho OBO (Databricks Apps)
     user_email = request.headers.get("X-Forwarded-Email")
+    
+    # Fallback para desenvolvimento local (variável de ambiente)
     if not user_email:
         user_email = os.getenv("DEV_USER")
+    
     if not user_email:
-        logger.warning("Nenhum usuário identificado")
+        logger.warning("Nenhum usuário identificado na requisição")
         return None
-
+    
+    # Busca o perfil do usuário no banco usando o Service Principal (OAuth)
     try:
-        client = get_client()  # Service Principal (OAuth)
-        # A consulta usa o Service Principal, não o token do usuário
+        client = get_client()
         row = client.fetch_one(
             "SELECT perfil FROM plataforma.governanca.usuarios_perfil WHERE usuario_id = :user_id AND sistema = 'segmenthub' AND ativo = true",
             {"user_id": user_email}
@@ -31,10 +35,10 @@ async def get_current_user(request: Request) -> Optional[dict]:
         if row:
             return {"usuario_id": user_email, "perfil": row["perfil"]}
         else:
-            logger.warning(f"Usuário {user_email} não encontrado")
+            logger.warning(f"Usuário {user_email} não encontrado ou inativo")
             return None
     except Exception as e:
-        logger.error(f"Erro ao buscar perfil: {e}")
+        logger.error(f"Erro ao buscar perfil do usuário {user_email}: {e}")
         return None
 
 
