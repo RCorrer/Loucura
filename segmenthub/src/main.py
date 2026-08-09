@@ -1,11 +1,10 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import os
 import logging
-from typing import List
 
-from src.api import metadata, segmentacao, estimativa, comentario, saude, metadata_admin, chat
+from src.api import metadata, segmentacao, estimativa, comentario, saude, metadata_admin
 from src.core.config import AppConfig
 from src.core.security import get_current_user, require_perfil
 
@@ -36,17 +35,24 @@ async def get_me(user: dict = Depends(get_current_user)):
     return {"user": user}
 
 # ============================================================
+# Debug: visualizar cabeçalhos da requisição
+# ============================================================
+@app.get("/api/debug-headers")
+async def debug_headers(request: Request):
+    """Retorna todos os cabeçalhos da requisição (útil para diagnóstico OBO)."""
+    return {"headers": dict(request.headers)}
+
+# ============================================================
 # Inclusão de routers
 # ============================================================
 app.include_router(metadata.router, prefix="/api")
 app.include_router(segmentacao.router, prefix="/api")
 app.include_router(estimativa.router, prefix="/api")
-app.include_router(comentario.router, prefix="/api")              
-app.include_router(comentario.comentario_router, prefix="/api")   
+app.include_router(comentario.router, prefix="/api")
+app.include_router(comentario.comentario_router, prefix="/api")
 app.include_router(comentario.notificacao_router, prefix="/api")
-app.include_router(saude.router, prefix="/api")  
+app.include_router(saude.router, prefix="/api")
 app.include_router(metadata_admin.router, prefix="/api")
-app.include_router(chat.router, prefix="/api")
 
 # ============================================================
 # Static files (frontend build)
@@ -69,17 +75,8 @@ async def spa(full_path: str):
     return {"message": "Not found"}
 
 # ============================================================
-# TESTE: Endpoint para debug de headers (útil para desenvolvimento)
-# ============================================================
-@app.get("/api/debug-headers")
-async def debug_headers(request: Request):
-    return {"headers": dict(request.headers)}
-
-# ============================================================
 # Ponto de entrada (para execução local)
 # ============================================================
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-
-
