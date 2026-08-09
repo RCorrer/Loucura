@@ -56,6 +56,7 @@ export default function ListaSegmentacoes() {
   const handleLimparBusca = () => {
     setBuscaInput('');
     setBuscaAtiva('');
+    setFiltros((prev) => ({ ...prev, status: '', page: 1 }));
   };
 
   const handleFiltroChange = (key, value) => {
@@ -191,6 +192,7 @@ export default function ListaSegmentacoes() {
           rows={segmentacoes}
           columns={columns}
           loading={loading}
+          pagination={meta.total_pages > 1}
           pagination
           page={meta.page}
           pageSize={meta.size}
