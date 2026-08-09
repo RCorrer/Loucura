@@ -143,6 +143,10 @@ class SegmentacaoService:
     ) -> Dict[str, Any]:
         """Lista segmentações com paginação."""
         offset = (page - 1) * size
+
+        # 🔍 DEBUG: exibe os valores no log do app
+        print(f"🔍 listar: page={page}, size={size}, offset={offset}")
+
         resultados = self.repository.listar(
             status=status,
             objetivo=objetivo,
