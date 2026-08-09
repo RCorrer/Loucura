@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { PageHeader, DataTable, StatusBadge, LoadingState, EmptyState } from '@shared';
-import { Box, Chip, TextField, MenuItem, Button, IconButton, Tooltip, InputAdornment } from '@mui/material';
+import { PageHeader, DataTable, StatusBadge, EmptyState } from '@shared';
+import { Box, Chip, TextField, MenuItem, Button, IconButton, Tooltip, InputAdornment, Alert } from '@mui/material';
 import { useSegmentacoesApi } from '../api/segmentacoes';
 import { useNavigate } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
@@ -14,21 +14,15 @@ export default function ListaSegmentacoes() {
 
   const [segmentacoes, setSegmentacoes] = useState([]);
   const [filtros, setFiltros] = useState({ page: 1, size: 10, status: '' });
-
-  // Estados da busca
-  const [buscaInput, setBuscaInput] = useState('');   // valor digitado
-  const [buscaAtiva, setBuscaAtiva] = useState('');   // valor que será usado na requisição (só atualiza no Enter)
-
+  const [buscaInput, setBuscaInput] = useState('');
+  const [buscaAtiva, setBuscaAtiva] = useState('');
   const [meta, setMeta] = useState({ page: 1, size: 10, total: 0, total_pages: 0 });
 
-  // ============================================================
-  // 1. CARREGAR LISTA (usa buscaAtiva)
-  // ============================================================
   const carregar = async () => {
     try {
       const response = await listar({
         ...filtros,
-        busca: buscaAtiva, // usa o valor confirmado
+        busca: buscaAtiva,
       });
       const rowsWithId = (response.data || []).map(row => ({
         ...row,
@@ -41,21 +35,16 @@ export default function ListaSegmentacoes() {
     }
   };
 
-  // Carrega quando página, status ou busca ativa mudam
   useEffect(() => {
     carregar();
   }, [filtros.page, filtros.size, filtros.status, buscaAtiva]);
 
-  // Resetar página quando a busca ativa mudar
   useEffect(() => {
     setFiltros((prev) => ({ ...prev, page: 1 }));
   }, [buscaAtiva]);
 
-  // ============================================================
-  // 2. SUBMETER BUSCA (Enter ou clique no ícone)
-  // ============================================================
   const handleBuscar = () => {
-    setBuscaAtiva(buscaInput); // atualiza a busca ativa → dispara requisição
+    setBuscaAtiva(buscaInput);
   };
 
   const handleKeyDown = (e) => {
@@ -64,17 +53,11 @@ export default function ListaSegmentacoes() {
     }
   };
 
-  // ============================================================
-  // 3. LIMPAR BUSCA
-  // ============================================================
   const handleLimparBusca = () => {
     setBuscaInput('');
-    setBuscaAtiva(''); // limpa a busca ativa → volta a listar todos
+    setBuscaAtiva('');
   };
 
-  // ============================================================
-  // 4. AÇÕES
-  // ============================================================
   const handleFiltroChange = (key, value) => {
     setFiltros((prev) => ({ ...prev, [key]: value, page: 1 }));
   };
@@ -99,9 +82,6 @@ export default function ListaSegmentacoes() {
     navigate(`/segmentacoes/${id}`);
   };
 
-  // ============================================================
-  // 5. COLUNAS
-  // ============================================================
   const columns = [
     { field: 'seg_codigo', headerName: 'Código', width: 150 },
     { field: 'nome', headerName: 'Nome', width: 200 },
@@ -142,12 +122,6 @@ export default function ListaSegmentacoes() {
     },
   ];
 
-  // ============================================================
-  // 6. RENDER
-  // ============================================================
-  if (loading && segmentacoes.length === 0) return <LoadingState />;
-  if (error) return <div>Erro ao carregar: {error}</div>;
-
   return (
     <>
       <PageHeader
@@ -164,7 +138,6 @@ export default function ListaSegmentacoes() {
         </Button>
       </PageHeader>
 
-      {/* Filtros */}
       <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap' }}>
         <TextField
           label="Buscar"
@@ -205,8 +178,9 @@ export default function ListaSegmentacoes() {
         </Button>
       </Box>
 
-      {/* Tabela */}
-      {segmentacoes.length === 0 ? (
+      {error ? (
+        <Alert severity="error">Erro ao carregar: {error}</Alert>
+      ) : segmentacoes.length === 0 && !loading ? (
         <EmptyState
           title="Nenhuma segmentação encontrada"
           description="Crie sua primeira segmentação clicando em 'Nova Segmentação'"
