@@ -43,6 +43,35 @@ async def debug_headers(request: Request):
     return {"headers": dict(request.headers)}
 
 # ============================================================
+# Debug: testar conexão com o banco
+# ============================================================
+@app.get("/api/test-db")
+async def test_db_connection():
+    """
+    Endpoint de diagnóstico para testar a conexão com o SQL Warehouse.
+    Executa uma query simples (SELECT 1) e retorna o resultado.
+    """
+    from src.db.databricks_client import get_client
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        client = get_client()
+        result = client.fetch_one("SELECT 1 AS valor")
+        return {
+            "status": "success",
+            "result": result,
+            "message": "Conexão com o banco funcionando!"
+        }
+    except Exception as e:
+        logger.error(f"Erro no test-db: {e}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "message": "Falha na conexão com o banco"
+        }
+
+# ============================================================
 # Inclusão de routers
 # ============================================================
 app.include_router(metadata.router, prefix="/api")
