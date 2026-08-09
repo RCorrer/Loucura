@@ -28,7 +28,11 @@ export default function ListaSegmentacoes() {
   const carregar = async () => {
     try {
       const response = await listar(filtros);
-      setSegmentacoes(response.data || []);
+      const rowsWithId = (response.data || []).map(row => ({
+        ...row,
+        id: row.seg_id,
+      }));
+      setSegmentacoes(rowsWithId);
       setMeta(response.meta || { page: 1, size: 10, total: 0, total_pages: 0 });
     } catch (err) {
       console.error('Erro ao carregar segmentações:', err);
@@ -88,7 +92,6 @@ export default function ListaSegmentacoes() {
   ];
 
   const handleClone = async (id) => {
-    // Implementar ação de clonar
     console.log('Clonar segmentação', id);
   };
 
@@ -152,7 +155,7 @@ export default function ListaSegmentacoes() {
         />
       ) : (
         <DataTable
-          rows={segmentacoes}
+          rows={segmentacoes} 
           columns={columns}
           loading={loading}
           pagination
@@ -160,7 +163,6 @@ export default function ListaSegmentacoes() {
           pageSize={meta.size}
           total={meta.total}
           onPageChange={handlePageChange}
-          getRowId={(row) => row.seg_id}
         />
       )}
     </>
