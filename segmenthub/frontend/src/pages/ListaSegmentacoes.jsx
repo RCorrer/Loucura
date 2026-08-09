@@ -1,21 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { PageHeader, DataTable, StatusBadge, LoadingState, EmptyState } from '@shared';
-import { Box, Chip, TextField, MenuItem, Button, IconButton, Tooltip } from '@mui/material';
+import { Box, Chip, TextField, MenuItem, Button, IconButton, Tooltip, InputAdornment } from '@mui/material';
 import { useSegmentacoesApi } from '../api/segmentacoes';
 import { useNavigate } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-
-const statusColors = {
-  rascunho: 'default',
-  em_aprovacao: 'warning',
-  aprovada: 'info',
-  ativa: 'success',
-  pausada: 'warning',
-  encerrada: 'error',
-  arquivada: 'default',
-};
+import SearchIcon from '@mui/icons-material/Search';
 
 export default function ListaSegmentacoes() {
   const navigate = useNavigate();
@@ -23,28 +14,21 @@ export default function ListaSegmentacoes() {
 
   const [segmentacoes, setSegmentacoes] = useState([]);
   const [filtros, setFiltros] = useState({ page: 1, size: 10, status: '' });
-  const [buscaInput, setBuscaInput] = useState('');      // <-- valor digitado no campo
-  const [buscaDebounced, setBuscaDebounced] = useState(''); // <-- valor com debounce
+
+  // Estados da busca
+  const [buscaInput, setBuscaInput] = useState('');   // valor digitado
+  const [buscaAtiva, setBuscaAtiva] = useState('');   // valor que será usado na requisição (só atualiza no Enter)
+
   const [meta, setMeta] = useState({ page: 1, size: 10, total: 0, total_pages: 0 });
 
   // ============================================================
-  // 1. DEBOUNCE (300ms)
-  // ============================================================
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setBuscaDebounced(buscaInput);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [buscaInput]);
-
-  // ============================================================
-  // 2. CARREGAR LISTA
+  // 1. CARREGAR LISTA (usa buscaAtiva)
   // ============================================================
   const carregar = async () => {
     try {
       const response = await listar({
         ...filtros,
-        busca: buscaDebounced, // usa a versão com debounce
+        busca: buscaAtiva, // usa o valor confirmado
       });
       const rowsWithId = (response.data || []).map(row => ({
         ...row,
@@ -57,13 +41,39 @@ export default function ListaSegmentacoes() {
     }
   };
 
-  // Dispara a busca quando o debounce muda, ou status, page, size mudam
+  // Carrega quando página, status ou busca ativa mudam
   useEffect(() => {
     carregar();
-  }, [buscaDebounced, filtros.status, filtros.page, filtros.size]);
+  }, [filtros.page, filtros.size, filtros.status, buscaAtiva]);
+
+  // Resetar página quando a busca ativa mudar
+  useEffect(() => {
+    setFiltros((prev) => ({ ...prev, page: 1 }));
+  }, [buscaAtiva]);
 
   // ============================================================
-  // 3. MANIPULAÇÃO DE FILTROS
+  // 2. SUBMETER BUSCA (Enter ou clique no ícone)
+  // ============================================================
+  const handleBuscar = () => {
+    setBuscaAtiva(buscaInput); // atualiza a busca ativa → dispara requisição
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      handleBuscar();
+    }
+  };
+
+  // ============================================================
+  // 3. LIMPAR BUSCA
+  // ============================================================
+  const handleLimparBusca = () => {
+    setBuscaInput('');
+    setBuscaAtiva(''); // limpa a busca ativa → volta a listar todos
+  };
+
+  // ============================================================
+  // 4. AÇÕES
   // ============================================================
   const handleFiltroChange = (key, value) => {
     setFiltros((prev) => ({ ...prev, [key]: value, page: 1 }));
@@ -73,14 +83,10 @@ export default function ListaSegmentacoes() {
     setFiltros((prev) => ({ ...prev, page: newPage }));
   };
 
-  // ============================================================
-  // 4. AÇÃO DE CLONAR
-  // ============================================================
   const handleClone = async (id) => {
     try {
       const response = await clonar(id, { owner: 'admin' });
-      await carregar(); // recarrega a lista
-      // Opcional: redirecionar para a nova segmentação
+      await carregar();
       if (response && response.seg_id) {
         navigate(`/segmentacoes/${response.seg_id}`);
       }
@@ -89,15 +95,12 @@ export default function ListaSegmentacoes() {
     }
   };
 
-  // ============================================================
-  // 5. AÇÃO DE VISUALIZAR (redireciona para detalhe - ainda será implementado)
-  // ============================================================
   const handleVisualizar = (id) => {
     navigate(`/segmentacoes/${id}`);
   };
 
   // ============================================================
-  // 6. COLUNAS DA TABELA
+  // 5. COLUNAS
   // ============================================================
   const columns = [
     { field: 'seg_codigo', headerName: 'Código', width: 150 },
@@ -140,7 +143,7 @@ export default function ListaSegmentacoes() {
   ];
 
   // ============================================================
-  // 7. RENDER
+  // 6. RENDER
   // ============================================================
   if (loading && segmentacoes.length === 0) return <LoadingState />;
   if (error) return <div>Erro ao carregar: {error}</div>;
@@ -168,7 +171,17 @@ export default function ListaSegmentacoes() {
           size="small"
           value={buscaInput}
           onChange={(e) => setBuscaInput(e.target.value)}
+          onKeyDown={handleKeyDown}
           sx={{ minWidth: 200 }}
+          InputProps={{
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton onClick={handleBuscar} size="small">
+                  <SearchIcon />
+                </IconButton>
+              </InputAdornment>
+            ),
+          }}
         />
         <TextField
           select
@@ -187,11 +200,7 @@ export default function ListaSegmentacoes() {
           <MenuItem value="encerrada">Encerrada</MenuItem>
           <MenuItem value="arquivada">Arquivada</MenuItem>
         </TextField>
-        <Button variant="outlined" onClick={() => {
-          setFiltros({ page: 1, size: 10, status: '' });
-          setBuscaInput('');
-          setBuscaDebounced('');
-        }}>
+        <Button variant="outlined" onClick={handleLimparBusca}>
           Limpar
         </Button>
       </Box>
