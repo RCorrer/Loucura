@@ -12,11 +12,13 @@ export default function DataTable({
   pagination = true,
   hideFooterPagination = false,
   getRowId,
-  rowCount,          // <-- NOVA PROP
+  rowCount,
+  paginationModel,
+  onPaginationModelChange,
   ...props
 }) {
   return (
-    <Box sx={{ height: 400, width: '100%' }}>
+    <Box sx={{ height: '100%', width: '100%' }}>
       <DataGrid
         rows={rows}
         columns={columns}
@@ -25,7 +27,9 @@ export default function DataTable({
         pagination={pagination}
         hideFooterPagination={hideFooterPagination}
         getRowId={getRowId}
-        rowCount={rowCount}         // <-- USA O TOTAL REAL
+        rowCount={rowCount}
+        paginationModel={paginationModel}
+        onPaginationModelChange={onPaginationModelChange}
         initialState={{ pagination: { paginationModel: { pageSize } } }}
         pageSizeOptions={[5, 10, 25, 50]}
         disableRowSelectionOnClick

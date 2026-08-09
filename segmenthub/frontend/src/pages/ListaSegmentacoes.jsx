@@ -63,8 +63,15 @@ export default function ListaSegmentacoes() {
     setFiltros((prev) => ({ ...prev, [key]: value, page: 1 }));
   };
 
-  const handlePageChange = (newPage) => {
-    setFiltros((prev) => ({ ...prev, page: newPage }));
+  // ============================================================
+  // PAGINAÇÃO (usando paginationModel do DataGrid)
+  // ============================================================
+  const handlePaginationModelChange = (model) => {
+    setFiltros((prev) => ({
+      ...prev,
+      page: model.page + 1,
+      size: model.pageSize,
+    }));
   };
 
   const handleClone = async (id) => {
@@ -196,10 +203,9 @@ export default function ListaSegmentacoes() {
             pagination={meta.total_pages > 1}
             hideFooterPagination={meta.total_pages <= 1}
             rowCount={meta.total}
-            page={meta.page}
-            pageSize={meta.size}
-            total={meta.total}
-            onPageChange={handlePageChange}
+            paginationModel={{ page: meta.page - 1, pageSize: meta.size }}
+            onPaginationModelChange={handlePaginationModelChange}
+            getRowId={(row) => row.seg_id}
           />
         </Box>
       )}
