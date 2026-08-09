@@ -46,23 +46,13 @@ async def debug_headers(request: Request):
 # Debug: testar conexão com o banco
 # ============================================================
 @app.get("/api/test-db")
-async def test_db_connection(request: Request):
+async def test_db_connection():
     from src.db.databricks_client import get_client
     import logging
     logger = logging.getLogger(__name__)
 
-    # 1. Tenta obter token OBO do cabeçalho
-    user_token = request.headers.get("X-Forwarded-Access-Token")
-    
-    # 2. Fallback para PAT (caso não tenha OBO)
-    if not user_token:
-        user_token = os.getenv("DATABRICKS_TOKEN")
-        logger.info("Usando PAT como fallback")
-    else:
-        logger.info("Usando token OBO do usuário")
-
     try:
-        client = get_client(user_token=user_token)
+        client = get_client()  # <-- sem argumentos
         result = client.fetch_one("SELECT 1 AS valor")
         return {
             "status": "success",
