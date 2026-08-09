@@ -17,7 +17,6 @@ class TestDatabricksClient:
         if not self.warehouse_id:
             raise ValueError("DATABRICKS_WAREHOUSE_ID não definido")
 
-        # Remove protocolo do host
         self.host = self.cfg.host.replace("https://", "").replace("http://", "")
 
         logger.info(f"✅ TestClient inicializado com Config() + credentials_provider")
@@ -26,7 +25,7 @@ class TestDatabricksClient:
 
     def _get_connection(self) -> Connection:
         return sql.connect(
-            server_hostname=self.host,  # <-- sem https://
+            server_hostname=self.host,
             http_path=f"/sql/1.0/warehouses/{self.warehouse_id}",
             catalog=self.catalog,
             schema=self.schema,
@@ -41,8 +40,25 @@ class TestDatabricksClient:
                         cursor.execute(sql, params)
                     else:
                         cursor.execute(sql)
-                    rows = cursor.fetchall()
-                    return [list(row) for row in rows]
+
+                    # Tenta fetchall_arrow primeiro (PyArrow)
+                    try:
+                        arrow_table = cursor.fetchall_arrow()
+                        # Converte para lista de listas
+                        if arrow_table.num_rows == 0:
+                            return []
+                        # Obtém nomes das colunas e converte cada linha
+                        columns = arrow_table.column_names
+                        rows = []
+                        for i in range(arrow_table.num_rows):
+                            row = [arrow_table[col][i].as_py() for col in columns]
+                            rows.append(row)
+                        return rows
+                    except AttributeError:
+                        # Fallback: fetchall normal (pode causar erro com nulos)
+                        rows = cursor.fetchall()
+                        return [list(row) for row in rows]
+
         except Exception as e:
             logger.error(f"Erro na query: {e}")
             raise
