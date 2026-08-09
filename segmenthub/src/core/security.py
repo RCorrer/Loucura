@@ -16,15 +16,13 @@ logger = logging.getLogger(__name__)
 async def get_current_user(request: Request) -> Optional[dict]:
     """
     Obtém o usuário atual a partir do cabeçalho OBO (Databricks Apps).
-    - Em produção: lê X-Forwarded-Email e opcionalmente X-Forwarded-Access-Token.
+    - Em produção: lê X-Forwarded-Email.
     - Em desenvolvimento: usa DEV_USER.
     - Valida o perfil no banco via Service Principal (OAuth).
-    - Fallback para admin apenas em desenvolvimento (ENV != production).
+    - Fallback apenas em desenvolvimento (ENV != production).
     """
     # 1. Identifica o usuário
     user_email = request.headers.get("X-Forwarded-Email")
-    user_token = request.headers.get("X-Forwarded-Access-Token")  # opcional
-
     if not user_email:
         user_email = os.getenv("DEV_USER")
         if user_email:
@@ -34,32 +32,28 @@ async def get_current_user(request: Request) -> Optional[dict]:
         logger.warning("Nenhum usuário identificado na requisição")
         return None
 
-    # 2. Valida o perfil no banco (usando Service Principal)
+    # 2. Valida o perfil no banco (placeholders posicionais)
     try:
         client = get_client()
-        # O cliente agora retorna listas (não dicionários)
+        # SQL com placeholders '?' e parâmetros como tupla
         row = client.fetch_one(
             "SELECT perfil FROM plataforma.governanca.usuarios_perfil "
             "WHERE usuario_id = ? AND sistema = 'segmenthub' AND ativo = true",
             (user_email,)
         )
-
         if row:
-            perfil = row[0]  # <-- acesso por índice (lista)
+            perfil = row[0]  # lista, acesso por índice
             logger.info(f"✅ Usuário {user_email} autenticado com perfil '{perfil}'")
             return {"usuario_id": user_email, "perfil": perfil}
         else:
             logger.warning(f"⚠️ Usuário {user_email} não encontrado ou inativo")
             return None
-
     except Exception as e:
         logger.error(f"❌ Erro ao buscar perfil do usuário {user_email}: {e}")
-
         # Fallback apenas para desenvolvimento (não em produção)
         if os.getenv("ENV") == "production":
             logger.warning("🚫 Fallback desativado em produção. Acesso negado.")
             return None
-
         logger.warning(f"🔧 Fallback: assumindo perfil 'admin' para {user_email} (modo desenvolvimento)")
         return {"usuario_id": user_email, "perfil": "admin"}
 
@@ -88,7 +82,6 @@ def require_perfil(perfis_permitidos: Optional[List[str]] = None):
 async def get_user_or_raise(request: Request) -> dict:
     """
     Obtém o usuário ou levanta 401 se não autenticado.
-    Útil para endpoints que não precisam de autorização específica, apenas de autenticação.
     """
     user = await get_current_user(request)
     if not user:
