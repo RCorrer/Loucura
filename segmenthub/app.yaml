@@ -13,3 +13,5 @@ env:
     value: "plataforma"
   - name: UC_SCHEMA
     value: "default"
+  - name: ENV
+    value: "production"

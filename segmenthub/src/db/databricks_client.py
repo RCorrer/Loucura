@@ -1,22 +1,23 @@
 """
 Databricks SQL Warehouse client for SegmentHub (S1).
-Stateless client using WorkspaceClient + statement_execution.
+Stateless client using databricks-sql-connector with OAuth token.
 """
 
 import os
 import time
 import logging
 from typing import Dict, Any, List, Optional
+from databricks import sql
+from databricks.sql.client import Connection
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.errors import NotFound, PermissionDenied
 
 logger = logging.getLogger(__name__)
 
 
 class DatabricksSQLClient:
     def __init__(self):
-        # WorkspaceClient usa automaticamente as credenciais do ambiente (OAuth)
-        self.client = WorkspaceClient()
+        # Obtém token OAuth via WorkspaceClient (Service Principal)
+        self.workspace = WorkspaceClient()
         self.warehouse_id = os.getenv("DATABRICKS_WAREHOUSE_ID")
         self.catalog = os.getenv("UC_CATALOG", "plataforma")
         self.schema = os.getenv("UC_SCHEMA", "default")
@@ -24,92 +25,67 @@ class DatabricksSQLClient:
         self.max_retries = int(os.getenv("MAX_RETRIES", "3"))
         self.backoff = int(os.getenv("RETRY_BACKOFF_SECONDS", "1"))
         self.backoff_factor = float(os.getenv("RETRY_BACKOFF_FACTOR", "2"))
-        self.poll_interval = int(os.getenv("POLL_INTERVAL_SECONDS", "2"))
 
         if not self.warehouse_id:
             raise ValueError("DATABRICKS_WAREHOUSE_ID não definido")
 
+        # Obtém o token OAuth do WorkspaceClient
+        self.token = self.workspace.config.token
+
+    def _get_connection(self) -> Connection:
+        """Cria conexão usando databricks-sql-connector com token OAuth."""
+        return sql.connect(
+            server_hostname=self.workspace.config.host,
+            http_path=f"/sql/1.0/warehouses/{self.warehouse_id}",
+            access_token=self.token,
+            catalog=self.catalog,
+            schema=self.schema,
+        )
+
     def execute_query(
         self,
-        sql: str,
-        params: Optional[Dict[str, Any]] = None,
-        timeout: Optional[int] = None,
+        sql_query: str,
+        params: Optional[tuple] = None,
+        fetch: bool = True,
     ) -> List[Dict[str, Any]]:
-        timeout = timeout or self.timeout
-        param_list = [{"name": k, "value": v} for k, v in (params or {}).items()]
-
+        """Executa query com placeholders '?' (posicional)."""
         for attempt in range(self.max_retries):
             try:
-                response = self.client.statement_execution.execute_statement(
-                    warehouse_id=self.warehouse_id,
-                    statement=sql,
-                    parameters=param_list if param_list else None,
-                    catalog=self.catalog,
-                    schema=self.schema,
-                    wait_timeout=timeout,
-                )
-                result = self.client.statement_execution.get_statement(response.statement_id)
-                state = str(result.status.state)
+                with self._get_connection() as conn:
+                    with conn.cursor() as cursor:
+                        if params:
+                            cursor.execute(sql_query, params)
+                        else:
+                            cursor.execute(sql_query)
 
-                if state == "SUCCEEDED":
-                    rows = result.result.data_array if result.result else []
-                    if rows and result.result.column_names:
-                        columns = result.result.column_names
-                        return [dict(zip(columns, row)) for row in rows]
-                    return []
-                elif state in ["FAILED", "CANCELED", "CLOSED"]:
-                    error_msg = getattr(result.status, "error", "Erro desconhecido")
-                    raise RuntimeError(f"Query falhou: {error_msg}")
-                else:
-                    return self._poll_query(response.statement_id, timeout)
+                        if fetch:
+                            columns = [desc[0] for desc in cursor.description] if cursor.description else []
+                            rows = cursor.fetchall()
+                            return [dict(zip(columns, row)) for row in rows]
+                        else:
+                            return cursor.rowcount or 0
 
-            except (TimeoutError, PermissionDenied, NotFound) as e:
+            except Exception as e:
+                logger.warning(f"Tentativa {attempt+1} falhou: {e}")
                 if attempt < self.max_retries - 1:
                     wait = self.backoff * (self.backoff_factor ** attempt)
-                    logger.warning(f"Tentativa {attempt+1} falhou: {e}. Re-tentando em {wait}s...")
+                    logger.info(f"Re-tentando em {wait}s...")
                     time.sleep(wait)
                 else:
                     raise RuntimeError(f"Falha após {self.max_retries} tentativas: {e}") from e
 
-        raise RuntimeError("Falha inesperada")
+        return []
 
-    def _poll_query(self, statement_id: str, timeout: int) -> List[Dict]:
-        start = time.time()
-        while time.time() - start < timeout:
-            result = self.client.statement_execution.get_statement(statement_id)
-            state = str(result.status.state)
-            if state == "SUCCEEDED":
-                rows = result.result.data_array if result.result else []
-                if rows and result.result.column_names:
-                    columns = result.result.column_names
-                    return [dict(zip(columns, row)) for row in rows]
-                return []
-            if state in ["FAILED", "CANCELED", "CLOSED"]:
-                error_msg = getattr(result.status, "error", "Erro desconhecido")
-                raise RuntimeError(f"Query falhou: {error_msg}")
-            time.sleep(self.poll_interval)
-        raise TimeoutError(f"Timeout após {timeout}s aguardando query")
-
-    def fetch_one(self, sql: str, params: Optional[Dict] = None) -> Optional[Dict]:
+    def fetch_one(self, sql: str, params: Optional[tuple] = None) -> Optional[Dict]:
         results = self.execute_query(sql, params)
         return results[0] if results else None
 
-    def fetch_value(self, sql: str, params: Optional[Dict] = None):
+    def fetch_value(self, sql: str, params: Optional[tuple] = None):
         row = self.fetch_one(sql, params)
         return list(row.values())[0] if row else None
 
-    def execute_insert(self, sql: str, params: Optional[Dict] = None) -> int:
-        param_list = [{"name": k, "value": v} for k, v in (params or {}).items()]
-        response = self.client.statement_execution.execute_statement(
-            warehouse_id=self.warehouse_id,
-            statement=sql,
-            parameters=param_list if param_list else None,
-            catalog=self.catalog,
-            schema=self.schema,
-            wait_timeout=self.timeout,
-        )
-        result = self.client.statement_execution.get_statement(response.statement_id)
-        return result.status.row_count or 0
+    def execute_insert(self, sql: str, params: Optional[tuple] = None) -> int:
+        return self.execute_query(sql, params, fetch=False)
 
 
 _default_client = None
