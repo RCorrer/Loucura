@@ -1,21 +1,15 @@
 import os
-import time
 import logging
-from typing import Dict, Any, List, Optional, Tuple
-from databricks import sql
-from databricks.sql.client import Connection
+from typing import Dict, Any, List, Optional
+from databricks.sdk import WorkspaceClient
 
 logger = logging.getLogger(__name__)
 
 
 class DatabricksSQLClient:
-    def __init__(self, user_token: Optional[str] = None):
-        """
-        Inicializa o cliente.
-        - Se `user_token` for fornecido, usa OAuth do usuário.
-        - Caso contrário, tenta usar DATABRICKS_TOKEN do ambiente (fallback).
-        """
-        self.host = os.getenv("DATABRICKS_HOST", "").replace("https://", "")
+    def __init__(self):
+        # Usa Service Principal injetado automaticamente
+        self.client = WorkspaceClient()
         self.warehouse_id = os.getenv("DATABRICKS_WAREHOUSE_ID")
         self.catalog = os.getenv("UC_CATALOG", "plataforma")
         self.schema = os.getenv("UC_SCHEMA", "default")
@@ -24,85 +18,93 @@ class DatabricksSQLClient:
         self.backoff = int(os.getenv("RETRY_BACKOFF_SECONDS", "1"))
         self.backoff_factor = float(os.getenv("RETRY_BACKOFF_FACTOR", "2"))
 
-        # Define o token: prioriza o token do usuário, senão usa o PAT
-        if user_token:
-            self.token = user_token
-            logger.info("✅ Cliente inicializado com token do usuário (OBO)")
-        else:
-            self.token = os.getenv("DATABRICKS_TOKEN")
-            if not self.token:
-                raise ValueError(
-                    "Token não disponível (forneça user_token ou defina DATABRICKS_TOKEN)"
-                )
-            logger.info("✅ Cliente inicializado com PAT (fallback)")
-
-        if not self.host:
-            raise ValueError("DATABRICKS_HOST não definido")
         if not self.warehouse_id:
             raise ValueError("DATABRICKS_WAREHOUSE_ID não definido")
 
-    def _get_connection(self) -> Connection:
-        return sql.connect(
-            server_hostname=self.host,
-            http_path=f"/sql/1.0/warehouses/{self.warehouse_id}",
-            access_token=self.token,
-            catalog=self.catalog,
-            schema=self.schema,
-        )
+        logger.info("✅ DatabricksSQLClient inicializado com Service Principal")
 
-    def execute_query(
-        self, sql_query: str, params: Optional[Tuple] = None, fetch: bool = True
-    ) -> List[Dict]:
+    def execute_query(self, sql: str, params: Optional[Dict] = None, timeout: Optional[int] = None) -> List[Dict]:
+        timeout = timeout or self.timeout
+        param_list = [{"name": k, "value": v} for k, v in (params or {}).items()]
+
         for attempt in range(self.max_retries):
             try:
-                with self._get_connection() as conn:
-                    with conn.cursor() as cursor:
-                        if params:
-                            cursor.execute(sql_query, params)
-                        else:
-                            cursor.execute(sql_query)
+                response = self.client.statement_execution.execute_statement(
+                    warehouse_id=self.warehouse_id,
+                    statement=sql,
+                    parameters=param_list if param_list else None,
+                    catalog=self.catalog,
+                    schema=self.schema,
+                    wait_timeout=timeout,
+                )
+                result = self.client.statement_execution.get_statement(response.statement_id)
+                state = str(result.status.state)
 
-                        if fetch:
-                            columns = [desc[0] for desc in cursor.description] if cursor.description else []
-                            rows = cursor.fetchall()
-                            return [dict(zip(columns, row)) for row in rows]
-                        else:
-                            return cursor.rowcount or 0
+                if state == "SUCCEEDED":
+                    rows = result.result.data_array if result.result else []
+                    if rows and result.result.column_names:
+                        columns = result.result.column_names
+                        return [dict(zip(columns, row)) for row in rows]
+                    return []
+                elif state in ["FAILED", "CANCELED", "CLOSED"]:
+                    error_msg = getattr(result.status, "error", "Erro desconhecido")
+                    raise RuntimeError(f"Query falhou: {error_msg}")
+                else:
+                    # Polling manual (fallback)
+                    return self._poll_query(response.statement_id, timeout)
+
             except Exception as e:
-                logger.warning(f"Tentativa {attempt+1} falhou: {e}")
                 if attempt < self.max_retries - 1:
                     wait = self.backoff * (self.backoff_factor ** attempt)
-                    logger.info(f"Re-tentando em {wait}s...")
+                    logger.warning(f"Tentativa {attempt+1} falhou: {e}. Re-tentando em {wait}s...")
                     time.sleep(wait)
                 else:
                     raise RuntimeError(f"Falha após {self.max_retries} tentativas: {e}")
-        return []
 
-    def fetch_one(self, sql: str, params: Optional[Tuple] = None) -> Optional[Dict]:
+        raise RuntimeError("Falha inesperada")
+
+    def _poll_query(self, statement_id: str, timeout: int) -> List[Dict]:
+        start = time.time()
+        while time.time() - start < timeout:
+            result = self.client.statement_execution.get_statement(statement_id)
+            state = str(result.status.state)
+            if state == "SUCCEEDED":
+                rows = result.result.data_array if result.result else []
+                if rows and result.result.column_names:
+                    columns = result.result.column_names
+                    return [dict(zip(columns, row)) for row in rows]
+                return []
+            if state in ["FAILED", "CANCELED", "CLOSED"]:
+                error_msg = getattr(result.status, "error", "Erro desconhecido")
+                raise RuntimeError(f"Query falhou: {error_msg}")
+            time.sleep(2)
+        raise TimeoutError(f"Timeout após {timeout}s")
+
+    def fetch_one(self, sql: str, params: Optional[Dict] = None) -> Optional[Dict]:
         results = self.execute_query(sql, params)
         return results[0] if results else None
 
-    def fetch_value(self, sql: str, params: Optional[Tuple] = None):
+    def fetch_value(self, sql: str, params: Optional[Dict] = None):
         row = self.fetch_one(sql, params)
         return list(row.values())[0] if row else None
 
-    def execute_insert(self, sql: str, params: Optional[Tuple] = None) -> int:
-        return self.execute_query(sql, params, fetch=False)
+    def execute_insert(self, sql: str, params: Optional[Dict] = None) -> int:
+        param_list = [{"name": k, "value": v} for k, v in (params or {}).items()]
+        response = self.client.statement_execution.execute_statement(
+            warehouse_id=self.warehouse_id,
+            statement=sql,
+            parameters=param_list if param_list else None,
+            catalog=self.catalog,
+            schema=self.schema,
+            wait_timeout=self.timeout,
+        )
+        result = self.client.statement_execution.get_statement(response.statement_id)
+        return result.status.row_count or 0
 
 
-# ============================================================
-# Singleton com suporte a token
-# ============================================================
 _default_client = None
 
-def get_client(user_token: Optional[str] = None) -> DatabricksSQLClient:
-    """
-    Retorna um cliente.
-    - Se `user_token` for fornecido, cria uma nova instância (OBO).
-    - Caso contrário, retorna o singleton (PAT).
-    """
-    if user_token:
-        return DatabricksSQLClient(user_token=user_token)
+def get_client() -> DatabricksSQLClient:
     global _default_client
     if _default_client is None:
         _default_client = DatabricksSQLClient()

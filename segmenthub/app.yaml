@@ -7,11 +7,11 @@ command:
   - "8000"
 
 env:
-  - name: DATABRICKS_HOST
-    value: "https://dbc-2efb8509-0de6.cloud.databricks.com"
   - name: DATABRICKS_WAREHOUSE_ID
     valueFrom: sql-warehouse
   - name: UC_CATALOG
     value: "plataforma"
   - name: UC_SCHEMA
     value: "default"
+  - name: ENV
+    value: "production"
