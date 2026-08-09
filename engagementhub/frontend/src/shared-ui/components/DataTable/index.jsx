@@ -22,6 +22,7 @@ export default function DataTable({
       <DataGrid
         rows={rows}
         columns={columns}
+        rowCount={rowCount}
         loading={loading}
         onRowClick={onRowClick}
         pagination={pagination}
