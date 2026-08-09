@@ -1,9 +1,10 @@
+// segmenthub/frontend/vite.config.js
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
 export default defineConfig({
-  root: './',
+  root: './', // <-- força a raiz como a pasta atual
   plugins: [react()],
   build: {
     outDir: '../static',
@@ -12,7 +13,6 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': 'http://localhost:8000',
-      '/health': 'http://localhost:8000',
     },
   },
   resolve: {
