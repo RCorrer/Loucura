@@ -17,45 +17,31 @@ async def get_current_user(request: Request) -> Optional[dict]:
         return None
 
     try:
-        client = get_client()  # Service Principal (sem token)
+        client = get_client()
         row = client.fetch_one(
             "SELECT perfil FROM plataforma.governanca.usuarios_perfil "
             "WHERE usuario_id = :user_id AND sistema = 'segmenthub' AND ativo = true",
-            {"user_id": user_email}
+            [user_email]  # lista para parâmetros
         )
         if row:
-            logger.info(f"Usuário {user_email} autenticado com perfil {row['perfil']}")
             return {"usuario_id": user_email, "perfil": row["perfil"]}
         else:
-            logger.warning(f"Usuário {user_email} não encontrado ou inativo")
+            logger.warning(f"Usuário {user_email} não encontrado")
             return None
     except Exception as e:
         logger.error(f"Erro ao buscar perfil: {e}")
         if os.getenv("ENV") == "production":
             return None
-        logger.warning(f"Fallback: assumindo 'admin' para {user_email} (modo desenvolvimento)")
         return {"usuario_id": user_email, "perfil": "admin"}
 
 
 def require_perfil(perfis_permitidos: List[str] = None):
     if perfis_permitidos is None:
         perfis_permitidos = ["admin", "analista"]
-
     async def dependency(user: dict = Depends(get_current_user)):
         if not user:
             raise HTTPException(status_code=401, detail="Não autenticado")
         if user["perfil"] not in perfis_permitidos:
-            raise HTTPException(
-                status_code=403,
-                detail=f"Acesso negado. Perfil '{user['perfil']}' não permitido. Permitidos: {perfis_permitidos}"
-            )
+            raise HTTPException(status_code=403, detail="Acesso negado")
         return user
-
     return dependency
-
-
-async def get_user_or_raise(request: Request) -> dict:
-    user = await get_current_user(request)
-    if not user:
-        raise HTTPException(status_code=401, detail="Não autenticado")
-    return user
