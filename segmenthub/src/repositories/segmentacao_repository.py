@@ -155,8 +155,8 @@ class SegmentacaoRepository:
             sql += " AND owner = ?"
             params.append(owner)
         if busca:
-            sql += " AND (nome LIKE ? OR seg_codigo LIKE ? OR descricao LIKE ?)"
-            busca_param = f"%{busca}%"
+            sql += " AND (LOWER(nome) LIKE ? OR LOWER(seg_codigo) LIKE ? OR LOWER(descricao) LIKE ?)"
+            busca_param = f"%{busca.lower()}%"
             params.extend([busca_param, busca_param, busca_param])
 
         sql += " ORDER BY criado_em DESC LIMIT ? OFFSET ?"

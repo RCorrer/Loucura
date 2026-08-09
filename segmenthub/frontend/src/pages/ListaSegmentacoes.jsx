@@ -19,15 +19,33 @@ const statusColors = {
 
 export default function ListaSegmentacoes() {
   const navigate = useNavigate();
-  const { listar, loading, error } = useSegmentacoesApi();
+  const { listar, clonar, loading, error } = useSegmentacoesApi();
 
   const [segmentacoes, setSegmentacoes] = useState([]);
-  const [filtros, setFiltros] = useState({ page: 1, size: 10, status: '', busca: '' });
+  const [filtros, setFiltros] = useState({ page: 1, size: 10, status: '' });
+  const [buscaInput, setBuscaInput] = useState('');      // <-- valor digitado no campo
+  const [buscaDebounced, setBuscaDebounced] = useState(''); // <-- valor com debounce
   const [meta, setMeta] = useState({ page: 1, size: 10, total: 0, total_pages: 0 });
 
+  // ============================================================
+  // 1. DEBOUNCE (300ms)
+  // ============================================================
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setBuscaDebounced(buscaInput);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [buscaInput]);
+
+  // ============================================================
+  // 2. CARREGAR LISTA
+  // ============================================================
   const carregar = async () => {
     try {
-      const response = await listar(filtros);
+      const response = await listar({
+        ...filtros,
+        busca: buscaDebounced, // usa a versão com debounce
+      });
       const rowsWithId = (response.data || []).map(row => ({
         ...row,
         id: row.seg_id,
@@ -39,10 +57,14 @@ export default function ListaSegmentacoes() {
     }
   };
 
+  // Dispara a busca quando o debounce muda, ou status, page, size mudam
   useEffect(() => {
     carregar();
-  }, [filtros]);
+  }, [buscaDebounced, filtros.status, filtros.page, filtros.size]);
 
+  // ============================================================
+  // 3. MANIPULAÇÃO DE FILTROS
+  // ============================================================
   const handleFiltroChange = (key, value) => {
     setFiltros((prev) => ({ ...prev, [key]: value, page: 1 }));
   };
@@ -51,6 +73,32 @@ export default function ListaSegmentacoes() {
     setFiltros((prev) => ({ ...prev, page: newPage }));
   };
 
+  // ============================================================
+  // 4. AÇÃO DE CLONAR
+  // ============================================================
+  const handleClone = async (id) => {
+    try {
+      const response = await clonar(id, { owner: 'admin' });
+      await carregar(); // recarrega a lista
+      // Opcional: redirecionar para a nova segmentação
+      if (response && response.seg_id) {
+        navigate(`/segmentacoes/${response.seg_id}`);
+      }
+    } catch (err) {
+      console.error('Erro ao clonar:', err);
+    }
+  };
+
+  // ============================================================
+  // 5. AÇÃO DE VISUALIZAR (redireciona para detalhe - ainda será implementado)
+  // ============================================================
+  const handleVisualizar = (id) => {
+    navigate(`/segmentacoes/${id}`);
+  };
+
+  // ============================================================
+  // 6. COLUNAS DA TABELA
+  // ============================================================
   const columns = [
     { field: 'seg_codigo', headerName: 'Código', width: 150 },
     { field: 'nome', headerName: 'Nome', width: 200 },
@@ -77,7 +125,7 @@ export default function ListaSegmentacoes() {
       renderCell: (params) => (
         <Box>
           <Tooltip title="Visualizar">
-            <IconButton size="small" onClick={() => navigate(`/segmentacoes/${params.row.seg_id}`)}>
+            <IconButton size="small" onClick={() => handleVisualizar(params.row.seg_id)}>
               <VisibilityIcon fontSize="small" />
             </IconButton>
           </Tooltip>
@@ -91,10 +139,9 @@ export default function ListaSegmentacoes() {
     },
   ];
 
-  const handleClone = async (id) => {
-    console.log('Clonar segmentação', id);
-  };
-
+  // ============================================================
+  // 7. RENDER
+  // ============================================================
   if (loading && segmentacoes.length === 0) return <LoadingState />;
   if (error) return <div>Erro ao carregar: {error}</div>;
 
@@ -119,8 +166,8 @@ export default function ListaSegmentacoes() {
         <TextField
           label="Buscar"
           size="small"
-          value={filtros.busca}
-          onChange={(e) => handleFiltroChange('busca', e.target.value)}
+          value={buscaInput}
+          onChange={(e) => setBuscaInput(e.target.value)}
           sx={{ minWidth: 200 }}
         />
         <TextField
@@ -140,7 +187,11 @@ export default function ListaSegmentacoes() {
           <MenuItem value="encerrada">Encerrada</MenuItem>
           <MenuItem value="arquivada">Arquivada</MenuItem>
         </TextField>
-        <Button variant="outlined" onClick={() => setFiltros({ page: 1, size: 10, status: '', busca: '' })}>
+        <Button variant="outlined" onClick={() => {
+          setFiltros({ page: 1, size: 10, status: '' });
+          setBuscaInput('');
+          setBuscaDebounced('');
+        }}>
           Limpar
         </Button>
       </Box>
@@ -155,7 +206,7 @@ export default function ListaSegmentacoes() {
         />
       ) : (
         <DataTable
-          rows={segmentacoes} 
+          rows={segmentacoes}
           columns={columns}
           loading={loading}
           pagination
