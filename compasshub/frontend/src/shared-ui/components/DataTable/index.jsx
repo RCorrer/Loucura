@@ -28,10 +28,9 @@ export default function DataTable({
         pagination={pagination}
         hideFooterPagination={hideFooterPagination}
         getRowId={getRowId}
-        rowCount={rowCount}
         paginationModel={paginationModel}
         onPaginationModelChange={onPaginationModelChange}
-        initialState={{ pagination: { paginationModel: { pageSize } } }}
+        paginationMode="server"   // <-- ESSENCIAL
         pageSizeOptions={[5, 10, 25, 50]}
         disableRowSelectionOnClick
         localeText={ptBR.components.MuiDataGrid.defaultProps.localeText}
