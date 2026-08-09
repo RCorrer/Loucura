@@ -124,7 +124,7 @@ export default function ListaSegmentacoes() {
   ];
 
   return (
-    <>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <PageHeader
         title="Segmentações"
         subtitle="Gerencie suas segmentações de clientes"
@@ -188,18 +188,21 @@ export default function ListaSegmentacoes() {
           onAction={() => navigate('/segmentacoes/nova')}
         />
       ) : (
-        <DataTable
-          rows={segmentacoes}
-          columns={columns}
-          loading={loading}
-          pagination={meta.total_pages > 1}          
-          hideFooterPagination={meta.total_pages <= 1} 
-          page={meta.page}
-          pageSize={meta.size}
-          total={meta.total}
-          onPageChange={handlePageChange}
-        />
+        <Box sx={{ flex: 1, minHeight: 0, height: '100%' }}>
+          <DataTable
+            rows={segmentacoes}
+            columns={columns}
+            loading={loading}
+            pagination={meta.total_pages > 1}
+            hideFooterPagination={meta.total_pages <= 1}
+            rowCount={meta.total}
+            page={meta.page}
+            pageSize={meta.size}
+            total={meta.total}
+            onPageChange={handlePageChange}
+          />
+        </Box>
       )}
-    </>
+    </Box>
   );
 }

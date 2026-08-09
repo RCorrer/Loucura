@@ -9,9 +9,10 @@ export default function DataTable({
   loading,
   onRowClick,
   pageSize = 10,
-  pagination = true,               
-  hideFooterPagination = false,    
-  getRowId,                        
+  pagination = true,
+  hideFooterPagination = false,
+  getRowId,
+  rowCount,          // <-- NOVA PROP
   ...props
 }) {
   return (
@@ -24,6 +25,7 @@ export default function DataTable({
         pagination={pagination}
         hideFooterPagination={hideFooterPagination}
         getRowId={getRowId}
+        rowCount={rowCount}         // <-- USA O TOTAL REAL
         initialState={{ pagination: { paginationModel: { pageSize } } }}
         pageSizeOptions={[5, 10, 25, 50]}
         disableRowSelectionOnClick
