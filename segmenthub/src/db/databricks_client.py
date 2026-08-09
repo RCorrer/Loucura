@@ -9,38 +9,37 @@ logger = logging.getLogger(__name__)
 
 
 class DatabricksSQLClient:
-    """
-    Cliente stateless para executar queries no SQL Warehouse.
-    Pode usar token do usuário (OBO) ou token fixo (PAT) como fallback.
-    """
-
     def __init__(self, user_token: Optional[str] = None):
         """
         Inicializa o cliente.
-        Se `user_token` for fornecido, ele será usado no sql.connect.
-        Caso contrário, usa DATABRICKS_TOKEN do ambiente (fallback).
+        - Se `user_token` for fornecido, usa OAuth do usuário.
+        - Caso contrário, tenta usar DATABRICKS_TOKEN do ambiente (fallback).
         """
         self.host = os.getenv("DATABRICKS_HOST", "").replace("https://", "")
         self.warehouse_id = os.getenv("DATABRICKS_WAREHOUSE_ID")
         self.catalog = os.getenv("UC_CATALOG", "plataforma")
         self.schema = os.getenv("UC_SCHEMA", "default")
-
-        # Token: prioriza o token do usuário (OBO), senão usa PAT do ambiente
-        self.token = user_token or os.getenv("DATABRICKS_TOKEN")
-
         self.timeout = int(os.getenv("QUERY_TIMEOUT_SECONDS", "120"))
         self.max_retries = int(os.getenv("MAX_RETRIES", "3"))
         self.backoff = int(os.getenv("RETRY_BACKOFF_SECONDS", "1"))
         self.backoff_factor = float(os.getenv("RETRY_BACKOFF_FACTOR", "2"))
 
+        # Define o token: prioriza o token do usuário, senão usa o PAT
+        if user_token:
+            self.token = user_token
+            logger.info("✅ Cliente inicializado com token do usuário (OBO)")
+        else:
+            self.token = os.getenv("DATABRICKS_TOKEN")
+            if not self.token:
+                raise ValueError(
+                    "Token não disponível (forneça user_token ou defina DATABRICKS_TOKEN)"
+                )
+            logger.info("✅ Cliente inicializado com PAT (fallback)")
+
         if not self.host:
             raise ValueError("DATABRICKS_HOST não definido")
-        if not self.token:
-            raise ValueError("Token não disponível (forneça user_token ou defina DATABRICKS_TOKEN)")
         if not self.warehouse_id:
             raise ValueError("DATABRICKS_WAREHOUSE_ID não definido")
-
-        logger.info("✅ DatabricksSQLClient inicializado com sql.connect (token dinâmico)")
 
     def _get_connection(self) -> Connection:
         return sql.connect(
@@ -52,11 +51,8 @@ class DatabricksSQLClient:
         )
 
     def execute_query(
-        self,
-        sql_query: str,
-        params: Optional[Tuple[Any, ...]] = None,
-        fetch: bool = True,
-    ) -> List[Dict[str, Any]]:
+        self, sql_query: str, params: Optional[Tuple] = None, fetch: bool = True
+    ) -> List[Dict]:
         for attempt in range(self.max_retries):
             try:
                 with self._get_connection() as conn:
@@ -94,14 +90,16 @@ class DatabricksSQLClient:
         return self.execute_query(sql, params, fetch=False)
 
 
-# Singleton com token fixo (para fallback)
+# ============================================================
+# Singleton com suporte a token
+# ============================================================
 _default_client = None
 
 def get_client(user_token: Optional[str] = None) -> DatabricksSQLClient:
     """
     Retorna um cliente.
-    Se `user_token` for fornecido (OBO), cria uma nova instância com ele.
-    Caso contrário, retorna o singleton com PAT (fallback).
+    - Se `user_token` for fornecido, cria uma nova instância (OBO).
+    - Caso contrário, retorna o singleton (PAT).
     """
     if user_token:
         return DatabricksSQLClient(user_token=user_token)
