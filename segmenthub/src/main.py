@@ -74,3 +74,11 @@ async def spa(full_path: str):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+# ============================================================
+# TESTE: Endpoint para debug de headers (útil para desenvolvimento)
+# ============================================================
+@app.get("/api/debug-headers")
+async def debug_headers(request: Request):
+    return {"headers": dict(request.headers)}
