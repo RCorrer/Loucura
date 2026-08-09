@@ -9,7 +9,6 @@ logger = logging.getLogger(__name__)
 
 class TestDatabricksClient:
     def __init__(self):
-        # Config detecta automaticamente as credenciais do ambiente
         self.cfg = Config()
         self.warehouse_id = os.getenv("DATABRICKS_WAREHOUSE_ID")
         self.catalog = os.getenv("UC_CATALOG", "plataforma")
@@ -18,15 +17,20 @@ class TestDatabricksClient:
         if not self.warehouse_id:
             raise ValueError("DATABRICKS_WAREHOUSE_ID não definido")
 
-        logger.info("✅ TestClient inicializado com Config() + credentials_provider")
+        # Remove protocolo do host
+        self.host = self.cfg.host.replace("https://", "").replace("http://", "")
+
+        logger.info(f"✅ TestClient inicializado com Config() + credentials_provider")
+        logger.info(f"   Host: {self.host}")
+        logger.info(f"   Warehouse: {self.warehouse_id}")
 
     def _get_connection(self) -> Connection:
         return sql.connect(
-            server_hostname=self.cfg.host,
+            server_hostname=self.host,  # <-- sem https://
             http_path=f"/sql/1.0/warehouses/{self.warehouse_id}",
             catalog=self.catalog,
             schema=self.schema,
-            credentials_provider=lambda: self.cfg.authenticate,  # <-- método correto
+            credentials_provider=lambda: self.cfg.authenticate,
         )
 
     def execute_query(self, sql: str, params: tuple = None) -> list:
