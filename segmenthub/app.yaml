@@ -9,6 +9,8 @@ command:
 env:
   - name: DATABRICKS_WAREHOUSE_ID
     valueFrom: sql-warehouse
+  - name: DATABRICKS_HOST
+    value: "dbc-2efb8509-0de6.cloud.databricks.com"
   - name: UC_CATALOG
     value: "plataforma"
   - name: UC_SCHEMA
