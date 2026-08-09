@@ -33,12 +33,13 @@ class DatabricksSQLClient:
         try:
             with self._get_connection() as conn:
                 with conn.cursor() as cursor:
-                    # Converte placeholders ? para %s (compatível com databricks-sql-connector)
+                    # Mantém ? como placeholder (não converte!)
+                    logger.info(f"SQL: {sql}")
+                    logger.info(f"Params: {params}")
                     if params:
-                        # Substitui ? por %s (mantém a ordem)
-                        sql = sql.replace("?", "%s")
-                        logger.debug(f"SQL ajustada: {sql}")
-                        logger.debug(f"Params: {params}")
+                        # Garante que params é uma tupla
+                        if not isinstance(params, tuple):
+                            params = tuple(params)
                         cursor.execute(sql, params)
                     else:
                         cursor.execute(sql)
@@ -73,7 +74,8 @@ class DatabricksSQLClient:
         with self._get_connection() as conn:
             with conn.cursor() as cursor:
                 if params:
-                    sql = sql.replace("?", "%s")
+                    if not isinstance(params, tuple):
+                        params = tuple(params)
                     cursor.execute(sql, params)
                 else:
                     cursor.execute(sql)
