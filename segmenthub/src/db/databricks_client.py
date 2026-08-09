@@ -1,16 +1,17 @@
 import os
 import time
 import logging
-from typing import Dict, Any, List, Optional
-from databricks.sdk import WorkspaceClient
+from typing import Dict, Any, List, Optional, Tuple
+from databricks import sql
+from databricks.sql.client import Connection
 
 logger = logging.getLogger(__name__)
 
 
 class DatabricksSQLClient:
     def __init__(self):
-        # Cria WorkspaceClient sem parâmetros – o Databricks Apps cuida da autenticação
-        self.client = WorkspaceClient()
+        self.host = os.getenv("DATABRICKS_HOST", "").replace("https://", "")
+        self.token = os.getenv("DATABRICKS_TOKEN")
         self.warehouse_id = os.getenv("DATABRICKS_WAREHOUSE_ID")
         self.catalog = os.getenv("UC_CATALOG", "plataforma")
         self.schema = os.getenv("UC_SCHEMA", "default")
@@ -19,93 +20,60 @@ class DatabricksSQLClient:
         self.backoff = int(os.getenv("RETRY_BACKOFF_SECONDS", "1"))
         self.backoff_factor = float(os.getenv("RETRY_BACKOFF_FACTOR", "2"))
 
+        if not self.host:
+            raise ValueError("DATABRICKS_HOST não definido")
+        if not self.token:
+            raise ValueError("DATABRICKS_TOKEN não definido")
         if not self.warehouse_id:
             raise ValueError("DATABRICKS_WAREHOUSE_ID não definido")
 
-        logger.info(f"✅ DatabricksSQLClient inicializado com WorkspaceClient padrão")
+        logger.info("✅ DatabricksSQLClient inicializado com sql.connect (PAT)")
 
-    def execute_query(
-        self,
-        sql: str,
-        params: Optional[Dict[str, Any]] = None,
-        timeout: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
-        timeout = timeout or self.timeout
-        param_list = [{"name": k, "value": v} for k, v in (params or {}).items()]
+    def _get_connection(self) -> Connection:
+        return sql.connect(
+            server_hostname=self.host,
+            http_path=f"/sql/1.0/warehouses/{self.warehouse_id}",
+            access_token=self.token,
+            catalog=self.catalog,
+            schema=self.schema,
+        )
 
+    def execute_query(self, sql_query: str, params: Optional[tuple] = None, fetch: bool = True) -> List[Dict]:
         for attempt in range(self.max_retries):
             try:
-                response = self.client.statement_execution.execute_statement(
-                    warehouse_id=self.warehouse_id,
-                    statement=sql,
-                    parameters=param_list if param_list else None,
-                    catalog=self.catalog,
-                    schema=self.schema,
-                    wait_timeout=timeout,
-                )
-                result = self.client.statement_execution.get_statement(response.statement_id)
-                state = str(result.status.state)
+                with self._get_connection() as conn:
+                    with conn.cursor() as cursor:
+                        if params:
+                            cursor.execute(sql_query, params)
+                        else:
+                            cursor.execute(sql_query)
 
-                if state == "SUCCEEDED":
-                    rows = result.result.data_array if result.result else []
-                    if rows and result.result.column_names:
-                        columns = result.result.column_names
-                        return [dict(zip(columns, row)) for row in rows]
-                    return []
-                elif state in ["FAILED", "CANCELED", "CLOSED"]:
-                    error_msg = getattr(result.status, "error", "Erro desconhecido")
-                    raise RuntimeError(f"Query falhou: {error_msg}")
-                else:
-                    # Polling manual (fallback)
-                    return self._poll_query(response.statement_id, timeout)
-
+                        if fetch:
+                            columns = [desc[0] for desc in cursor.description] if cursor.description else []
+                            rows = cursor.fetchall()
+                            return [dict(zip(columns, row)) for row in rows]
+                        else:
+                            return cursor.rowcount or 0
             except Exception as e:
+                logger.warning(f"Tentativa {attempt+1} falhou: {e}")
                 if attempt < self.max_retries - 1:
                     wait = self.backoff * (self.backoff_factor ** attempt)
-                    logger.warning(f"Tentativa {attempt+1} falhou: {e}. Re-tentando em {wait}s...")
+                    logger.info(f"Re-tentando em {wait}s...")
                     time.sleep(wait)
                 else:
                     raise RuntimeError(f"Falha após {self.max_retries} tentativas: {e}")
+        return []
 
-        raise RuntimeError("Falha inesperada")
-
-    def _poll_query(self, statement_id: str, timeout: int) -> List[Dict]:
-        start = time.time()
-        while time.time() - start < timeout:
-            result = self.client.statement_execution.get_statement(statement_id)
-            state = str(result.status.state)
-            if state == "SUCCEEDED":
-                rows = result.result.data_array if result.result else []
-                if rows and result.result.column_names:
-                    columns = result.result.column_names
-                    return [dict(zip(columns, row)) for row in rows]
-                return []
-            if state in ["FAILED", "CANCELED", "CLOSED"]:
-                error_msg = getattr(result.status, "error", "Erro desconhecido")
-                raise RuntimeError(f"Query falhou: {error_msg}")
-            time.sleep(2)
-        raise TimeoutError(f"Timeout após {timeout}s")
-
-    def fetch_one(self, sql: str, params: Optional[Dict] = None) -> Optional[Dict]:
+    def fetch_one(self, sql: str, params: Optional[tuple] = None) -> Optional[Dict]:
         results = self.execute_query(sql, params)
         return results[0] if results else None
 
-    def fetch_value(self, sql: str, params: Optional[Dict] = None):
+    def fetch_value(self, sql: str, params: Optional[tuple] = None):
         row = self.fetch_one(sql, params)
         return list(row.values())[0] if row else None
 
-    def execute_insert(self, sql: str, params: Optional[Dict] = None) -> int:
-        param_list = [{"name": k, "value": v} for k, v in (params or {}).items()]
-        response = self.client.statement_execution.execute_statement(
-            warehouse_id=self.warehouse_id,
-            statement=sql,
-            parameters=param_list if param_list else None,
-            catalog=self.catalog,
-            schema=self.schema,
-            wait_timeout=self.timeout,
-        )
-        result = self.client.statement_execution.get_statement(response.statement_id)
-        return result.status.row_count or 0
+    def execute_insert(self, sql: str, params: Optional[tuple] = None) -> int:
+        return self.execute_query(sql, params, fetch=False)
 
 
 _default_client = None
