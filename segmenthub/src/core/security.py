@@ -9,6 +9,11 @@ logger = logging.getLogger(__name__)
 
 
 async def get_current_user(request: Request) -> Optional[dict]:
+    """
+    Obtém o usuário atual a partir do cabeçalho OBO (Databricks Apps) e valida o perfil no banco.
+    Em desenvolvimento, usa a variável DEV_USER.
+    """
+    # 1. Identifica o usuário
     user_email = request.headers.get("X-Forwarded-Email")
     if not user_email:
         user_email = os.getenv("DEV_USER")
@@ -16,23 +21,27 @@ async def get_current_user(request: Request) -> Optional[dict]:
         logger.warning("Nenhum usuário identificado")
         return None
 
+    # 2. Valida o perfil no banco
     try:
         client = get_client()
         row = client.fetch_one(
             "SELECT perfil FROM plataforma.governanca.usuarios_perfil "
             "WHERE usuario_id = :user_id AND sistema = 'segmenthub' AND ativo = true",
-            (user_email,)  # placeholders posicionais
+            {"user_id": user_email}
         )
         if row:
+            logger.info(f"Usuário {user_email} autenticado com perfil {row['perfil']}")
             return {"usuario_id": user_email, "perfil": row["perfil"]}
         else:
-            logger.warning(f"Usuário {user_email} não encontrado")
+            logger.warning(f"Usuário {user_email} não encontrado ou inativo")
             return None
     except Exception as e:
         logger.error(f"Erro ao buscar perfil: {e}")
-        # Fallback apenas para desenvolvimento
+        # Fallback apenas para desenvolvimento (não em produção)
         if os.getenv("ENV") == "production":
             return None
+        # Em desenvolvimento, assume admin para facilitar testes
+        logger.warning(f"Fallback: assumindo perfil 'admin' para {user_email} (modo desenvolvimento)")
         return {"usuario_id": user_email, "perfil": "admin"}
 
 
