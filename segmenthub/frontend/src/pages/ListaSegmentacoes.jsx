@@ -127,7 +127,6 @@ export default function ListaSegmentacoes() {
       <PageHeader
         title="Segmentações"
         subtitle="Gerencie suas segmentações de clientes"
-        breadcrumbs={[{ label: 'Segmentações', href: '/segmentacoes' }]}
       >
         <Button
           variant="contained"
