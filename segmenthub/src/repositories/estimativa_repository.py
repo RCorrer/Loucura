@@ -18,8 +18,9 @@ class EstimativaRepository:
         """
         result = self.client.execute_query(sql, params)
         if result and len(result) > 0:
-            # Pega o valor da primeira coluna (estimativa)
-            return list(result[0].values())[0] or 0
+            # result[0] é uma lista com os valores da primeira linha
+            # o primeiro valor é a estimativa
+            return result[0][0] or 0
         return 0
 
     def executar_contagem(self, sql: str, params: tuple) -> int:
@@ -28,5 +29,5 @@ class EstimativaRepository:
         """
         result = self.client.execute_query(sql, params)
         if result and len(result) > 0:
-            return list(result[0].values())[0] or 0
+            return result[0][0] or 0
         return 0

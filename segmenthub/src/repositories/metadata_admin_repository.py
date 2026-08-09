@@ -28,45 +28,52 @@ class MetadataAdminRepository:
         offset: int = 0,
     ) -> List[Dict]:
         """Lista características com filtros (inclui inativas)."""
-        conditions = ["1=1"]
-        params = {}
-
-        if tema:
-            conditions.append("tema = :tema")
-            params["tema"] = tema
-        if sistema == "s2":
-            conditions.append("usavel_em_visao360 = true")
-        elif sistema == "s3":
-            conditions.append("usavel_em_peca = true")
-        if status == "ativo":
-            conditions.append("ativo = true")
-        elif status == "inativo":
-            conditions.append("ativo = false")
-        if busca:
-            conditions.append("(campo_label LIKE :busca OR caracteristica_id LIKE :busca OR descricao LIKE :busca)")
-            params["busca"] = f"%{busca}%"
-
-        where_clause = " AND ".join(conditions)
-        sql = f"""
+        sql = """
             SELECT 
                 caracteristica_id, campo_label, tema, tipo_dado, sensibilidade,
                 ativo, usavel_em_visao360, usavel_em_peca, bloco_visao360,
                 tabela_fisica, campo_fisico, operadores, valores_dominio, descricao
             FROM plataforma.metadata.catalogo_caracteristicas
-            WHERE {where_clause}
-            ORDER BY tema, campo_label
-            LIMIT :limit OFFSET :offset
+            WHERE 1=1
         """
-        params["limit"] = limit
-        params["offset"] = offset
-        results = self.client.execute_query(sql, params)
+        params = []
 
-        # Converte arrays para listas Python
-        for row in results:
-            if "operadores" in row and hasattr(row["operadores"], "tolist"):
-                row["operadores"] = row["operadores"].tolist()
-            if "valores_dominio" in row and hasattr(row["valores_dominio"], "tolist"):
-                row["valores_dominio"] = row["valores_dominio"].tolist()
+        if tema:
+            sql += " AND tema = ?"
+            params.append(tema)
+        if sistema == "s2":
+            sql += " AND usavel_em_visao360 = true"
+        elif sistema == "s3":
+            sql += " AND usavel_em_peca = true"
+        if status == "ativo":
+            sql += " AND ativo = true"
+        elif status == "inativo":
+            sql += " AND ativo = false"
+        if busca:
+            sql += " AND (campo_label LIKE ? OR caracteristica_id LIKE ? OR descricao LIKE ?)"
+            busca_param = f"%{busca}%"
+            params.extend([busca_param, busca_param, busca_param])
+
+        sql += " ORDER BY tema, campo_label LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+
+        rows = self.client.execute_query(sql, tuple(params))
+        columns = [
+            "caracteristica_id", "campo_label", "tema", "tipo_dado", "sensibilidade",
+            "ativo", "usavel_em_visao360", "usavel_em_peca", "bloco_visao360",
+            "tabela_fisica", "campo_fisico", "operadores", "valores_dominio", "descricao"
+        ]
+        results = []
+        for row in rows:
+            # Converte arrays para listas Python se necessário
+            row_list = list(row)
+            # operadores está na posição 11 (índice 11)
+            if len(row_list) > 11 and hasattr(row_list[11], "tolist"):
+                row_list[11] = row_list[11].tolist()
+            # valores_dominio está na posição 12 (índice 12)
+            if len(row_list) > 12 and hasattr(row_list[12], "tolist"):
+                row_list[12] = row_list[12].tolist()
+            results.append(dict(zip(columns, row_list)))
         return results
 
     def contar_campos(
@@ -77,32 +84,27 @@ class MetadataAdminRepository:
         busca: Optional[str] = None,
     ) -> int:
         """Conta características com filtros."""
-        conditions = ["1=1"]
-        params = {}
+        sql = "SELECT COUNT(*) FROM plataforma.metadata.catalogo_caracteristicas WHERE 1=1"
+        params = []
 
         if tema:
-            conditions.append("tema = :tema")
-            params["tema"] = tema
+            sql += " AND tema = ?"
+            params.append(tema)
         if sistema == "s2":
-            conditions.append("usavel_em_visao360 = true")
+            sql += " AND usavel_em_visao360 = true"
         elif sistema == "s3":
-            conditions.append("usavel_em_peca = true")
+            sql += " AND usavel_em_peca = true"
         if status == "ativo":
-            conditions.append("ativo = true")
+            sql += " AND ativo = true"
         elif status == "inativo":
-            conditions.append("ativo = false")
+            sql += " AND ativo = false"
         if busca:
-            conditions.append("(campo_label LIKE :busca OR caracteristica_id LIKE :busca OR descricao LIKE :busca)")
-            params["busca"] = f"%{busca}%"
+            sql += " AND (campo_label LIKE ? OR caracteristica_id LIKE ? OR descricao LIKE ?)"
+            busca_param = f"%{busca}%"
+            params.extend([busca_param, busca_param, busca_param])
 
-        where_clause = " AND ".join(conditions)
-        sql = f"""
-            SELECT COUNT(*) as total
-            FROM plataforma.metadata.catalogo_caracteristicas
-            WHERE {where_clause}
-        """
-        result = self.client.execute_query(sql, params)
-        return result[0]["total"] if result else 0
+        result = self.client.execute_query(sql, tuple(params))
+        return result[0][0] if result else 0
 
     def buscar_campo_por_id(self, caracteristica_id: str) -> Optional[Dict]:
         """Busca uma característica por ID (inclui inativas)."""
@@ -114,14 +116,19 @@ class MetadataAdminRepository:
             FROM plataforma.metadata.catalogo_caracteristicas
             WHERE caracteristica_id = ?
         """
-        results = self.client.execute_query(sql, (caracteristica_id,))
-        if results:
-            row = results[0]
-            if "operadores" in row and hasattr(row["operadores"], "tolist"):
-                row["operadores"] = row["operadores"].tolist()
-            if "valores_dominio" in row and hasattr(row["valores_dominio"], "tolist"):
-                row["valores_dominio"] = row["valores_dominio"].tolist()
-            return row
+        rows = self.client.execute_query(sql, (caracteristica_id,))
+        if rows:
+            columns = [
+                "caracteristica_id", "campo_label", "tema", "tipo_dado", "sensibilidade",
+                "ativo", "usavel_em_visao360", "usavel_em_peca", "bloco_visao360",
+                "tabela_fisica", "campo_fisico", "operadores", "valores_dominio", "descricao"
+            ]
+            row = list(rows[0])
+            if len(row) > 11 and hasattr(row[11], "tolist"):
+                row[11] = row[11].tolist()
+            if len(row) > 12 and hasattr(row[12], "tolist"):
+                row[12] = row[12].tolist()
+            return dict(zip(columns, row))
         return None
 
     def atualizar_flags(
@@ -142,22 +149,22 @@ class MetadataAdminRepository:
 
         alteracoes = {}
         updates = []
-        params = {"caracteristica_id": caracteristica_id}
+        params = [caracteristica_id]  # primeiro parâmetro: WHERE
 
         if usavel_em_visao360 is not None and atual["usavel_em_visao360"] != usavel_em_visao360:
             alteracoes["usavel_em_visao360"] = {"de": atual["usavel_em_visao360"], "para": usavel_em_visao360}
-            updates.append("usavel_em_visao360 = :usavel_em_visao360")
-            params["usavel_em_visao360"] = usavel_em_visao360
+            updates.append("usavel_em_visao360 = ?")
+            params.append(usavel_em_visao360)
 
         if usavel_em_peca is not None and atual["usavel_em_peca"] != usavel_em_peca:
             alteracoes["usavel_em_peca"] = {"de": atual["usavel_em_peca"], "para": usavel_em_peca}
-            updates.append("usavel_em_peca = :usavel_em_peca")
-            params["usavel_em_peca"] = usavel_em_peca
+            updates.append("usavel_em_peca = ?")
+            params.append(usavel_em_peca)
 
         if bloco_visao360 is not None and atual["bloco_visao360"] != bloco_visao360:
             alteracoes["bloco_visao360"] = {"de": atual["bloco_visao360"], "para": bloco_visao360}
-            updates.append("bloco_visao360 = :bloco_visao360")
-            params["bloco_visao360"] = bloco_visao360
+            updates.append("bloco_visao360 = ?")
+            params.append(bloco_visao360)
 
         if not alteracoes:
             return {"alteracoes": {}}
@@ -172,9 +179,9 @@ class MetadataAdminRepository:
         sql = f"""
             UPDATE plataforma.metadata.catalogo_caracteristicas
             SET {set_clause}
-            WHERE caracteristica_id = :caracteristica_id
+            WHERE caracteristica_id = ?
         """
-        self.client.execute_insert(sql, params)
+        self.client.execute_insert(sql, tuple(params))
 
         return {
             "alteracoes": alteracoes,
@@ -192,14 +199,14 @@ class MetadataAdminRepository:
             raise ValueError(f"Característica '{caracteristica_id}' não encontrada")
 
         if atual["ativo"] == ativo:
-            return {"alteracao": None}  # sem mudança
+            return {"alteracao": None}
 
         sql = """
             UPDATE plataforma.metadata.catalogo_caracteristicas
-            SET ativo = :ativo
-            WHERE caracteristica_id = :caracteristica_id
+            SET ativo = ?
+            WHERE caracteristica_id = ?
         """
-        self.client.execute_insert(sql, {"caracteristica_id": caracteristica_id, "ativo": ativo})
+        self.client.execute_insert(sql, (ativo, caracteristica_id))
 
         return {
             "alteracao": {"de": atual["ativo"], "para": ativo}
@@ -216,13 +223,20 @@ class MetadataAdminRepository:
                 hist_id, caracteristica_id, campo_label,
                 flag_alterada, sistema_alvo, valor_anterior, valor_novo,
                 acao, alterado_por, alterado_em
-            ) VALUES (
-                :hist_id, :caracteristica_id, :campo_label,
-                :flag_alterada, :sistema_alvo, :valor_anterior, :valor_novo,
-                :acao, :alterado_por, current_timestamp()
-            )
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, current_timestamp())
         """
-        self.client.execute_insert(sql, dados)
+        params = (
+            dados["hist_id"],
+            dados["caracteristica_id"],
+            dados.get("campo_label"),
+            dados["flag_alterada"],
+            dados.get("sistema_alvo"),
+            dados.get("valor_anterior"),
+            dados["valor_novo"],
+            dados["acao"],
+            dados["alterado_por"],
+        )
+        self.client.execute_insert(sql, params)
         return dados["hist_id"]
 
     def listar_historico(
@@ -237,42 +251,45 @@ class MetadataAdminRepository:
         offset: int = 0,
     ) -> List[Dict]:
         """Lista histórico de governança com filtros."""
-        conditions = ["1=1"]
-        params = {}
-
-        if caracteristica_id:
-            conditions.append("caracteristica_id = :caracteristica_id")
-            params["caracteristica_id"] = caracteristica_id
-        if sistema_alvo:
-            conditions.append("sistema_alvo = :sistema_alvo")
-            params["sistema_alvo"] = sistema_alvo
-        if acao:
-            conditions.append("acao = :acao")
-            params["acao"] = acao
-        if alterado_por:
-            conditions.append("alterado_por = :alterado_por")
-            params["alterado_por"] = alterado_por
-        if de:
-            conditions.append("alterado_em >= :de")
-            params["de"] = de
-        if ate:
-            conditions.append("alterado_em <= :ate")
-            params["ate"] = ate
-
-        where_clause = " AND ".join(conditions)
-        sql = f"""
+        sql = """
             SELECT 
                 hist_id, caracteristica_id, campo_label,
                 flag_alterada, sistema_alvo, valor_anterior, valor_novo,
                 acao, alterado_por, alterado_em
             FROM plataforma.metadata.catalogo_governanca_hist
-            WHERE {where_clause}
-            ORDER BY alterado_em DESC
-            LIMIT :limit OFFSET :offset
+            WHERE 1=1
         """
-        params["limit"] = limit
-        params["offset"] = offset
-        return self.client.execute_query(sql, params)
+        params = []
+
+        if caracteristica_id:
+            sql += " AND caracteristica_id = ?"
+            params.append(caracteristica_id)
+        if sistema_alvo:
+            sql += " AND sistema_alvo = ?"
+            params.append(sistema_alvo)
+        if acao:
+            sql += " AND acao = ?"
+            params.append(acao)
+        if alterado_por:
+            sql += " AND alterado_por = ?"
+            params.append(alterado_por)
+        if de:
+            sql += " AND alterado_em >= ?"
+            params.append(de)
+        if ate:
+            sql += " AND alterado_em <= ?"
+            params.append(ate)
+
+        sql += " ORDER BY alterado_em DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+
+        rows = self.client.execute_query(sql, tuple(params))
+        columns = [
+            "hist_id", "caracteristica_id", "campo_label",
+            "flag_alterada", "sistema_alvo", "valor_anterior", "valor_novo",
+            "acao", "alterado_por", "alterado_em"
+        ]
+        return [dict(zip(columns, row)) for row in rows]
 
     def contar_historico(
         self,
@@ -284,33 +301,27 @@ class MetadataAdminRepository:
         ate: Optional[str] = None,
     ) -> int:
         """Conta registros de histórico com filtros."""
-        conditions = ["1=1"]
-        params = {}
+        sql = "SELECT COUNT(*) FROM plataforma.metadata.catalogo_governanca_hist WHERE 1=1"
+        params = []
 
         if caracteristica_id:
-            conditions.append("caracteristica_id = :caracteristica_id")
-            params["caracteristica_id"] = caracteristica_id
+            sql += " AND caracteristica_id = ?"
+            params.append(caracteristica_id)
         if sistema_alvo:
-            conditions.append("sistema_alvo = :sistema_alvo")
-            params["sistema_alvo"] = sistema_alvo
+            sql += " AND sistema_alvo = ?"
+            params.append(sistema_alvo)
         if acao:
-            conditions.append("acao = :acao")
-            params["acao"] = acao
+            sql += " AND acao = ?"
+            params.append(acao)
         if alterado_por:
-            conditions.append("alterado_por = :alterado_por")
-            params["alterado_por"] = alterado_por
+            sql += " AND alterado_por = ?"
+            params.append(alterado_por)
         if de:
-            conditions.append("alterado_em >= :de")
-            params["de"] = de
+            sql += " AND alterado_em >= ?"
+            params.append(de)
         if ate:
-            conditions.append("alterado_em <= :ate")
-            params["ate"] = ate
+            sql += " AND alterado_em <= ?"
+            params.append(ate)
 
-        where_clause = " AND ".join(conditions)
-        sql = f"""
-            SELECT COUNT(*) as total
-            FROM plataforma.metadata.catalogo_governanca_hist
-            WHERE {where_clause}
-        """
-        result = self.client.execute_query(sql, params)
-        return result[0]["total"] if result else 0
+        result = self.client.execute_query(sql, tuple(params))
+        return result[0][0] if result else 0

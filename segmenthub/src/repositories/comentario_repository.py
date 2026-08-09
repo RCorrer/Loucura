@@ -14,66 +14,85 @@ class ComentarioRepository:
     def listar_comentarios(self, seg_id: str) -> List[Dict]:
         """Lista todos os comentários de uma segmentação (sem thread aninhada)."""
         sql = """
-            SELECT *
+            SELECT 
+                comentario_id, seg_id, versao_referencia, tipo, autor, texto,
+                respondendo_a, mencoes, resolvido, criado_em, editado_em
             FROM plataforma.segmentacao.seg_comentario
             WHERE seg_id = ?
             ORDER BY criado_em ASC
         """
-        return self.client.execute_query(sql, (seg_id,))
+        rows = self.client.execute_query(sql, (seg_id,))
+        columns = ["comentario_id", "seg_id", "versao_referencia", "tipo", "autor", "texto",
+                   "respondendo_a", "mencoes", "resolvido", "criado_em", "editado_em"]
+        return [dict(zip(columns, row)) for row in rows]
 
     def criar_comentario(self, dados: Dict) -> str:
         """Insere um novo comentário e retorna o ID."""
         comentario_id = f"com_{uuid.uuid4().hex[:12]}"
-        dados["comentario_id"] = comentario_id
         sql = """
             INSERT INTO plataforma.segmentacao.seg_comentario
             (comentario_id, seg_id, versao_referencia, tipo, autor, texto, respondendo_a, mencoes, resolvido, criado_em, editado_em)
-            VALUES (
-                :comentario_id, :seg_id, :versao_referencia, :tipo, :autor, :texto, :respondendo_a, :mencoes, :resolvido, current_timestamp(), NULL
-            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, current_timestamp(), NULL)
         """
-        self.client.execute_insert(sql, dados)
+        params = (
+            comentario_id,
+            dados["seg_id"],
+            dados.get("versao_referencia"),
+            dados.get("tipo", "geral"),
+            dados["autor"],
+            dados["texto"],
+            dados.get("respondendo_a"),
+            dados.get("mencoes", []),
+            dados.get("resolvido", False),
+        )
+        self.client.execute_insert(sql, params)
         return comentario_id
 
     def atualizar_comentario(self, comentario_id: str, texto: Optional[str] = None, resolvido: Optional[bool] = None) -> bool:
         """Atualiza texto e/ou resolvido de um comentário."""
         set_parts = []
-        params = {"comentario_id": comentario_id}
+        params = [comentario_id]
         if texto is not None:
-            set_parts.append("texto = :texto")
-            params["texto"] = texto
+            set_parts.append("texto = ?")
+            params.append(texto)
         if resolvido is not None:
-            set_parts.append("resolvido = :resolvido")
-            params["resolvido"] = resolvido
+            set_parts.append("resolvido = ?")
+            params.append(resolvido)
         if not set_parts:
-            return True  # nada a atualizar
+            return True
         set_parts.append("editado_em = current_timestamp()")
         sql = f"""
             UPDATE plataforma.segmentacao.seg_comentario
             SET {", ".join(set_parts)}
-            WHERE comentario_id = :comentario_id
+            WHERE comentario_id = ?
         """
-        rows = self.client.execute_insert(sql, params)
+        rows = self.client.execute_insert(sql, tuple(params))
         return rows > 0
 
     def criar_notificacao(self, dados: Dict) -> str:
         """Insere uma notificação e retorna o ID."""
         notif_id = f"notif_{uuid.uuid4().hex[:12]}"
-        dados["notif_id"] = notif_id
         sql = """
             INSERT INTO plataforma.segmentacao.seg_notificacao
             (notif_id, destinatario, tipo, seg_id, titulo, mensagem, lida, criado_em)
-            VALUES (
-                :notif_id, :destinatario, :tipo, :seg_id, :titulo, :mensagem, false, current_timestamp()
-            )
+            VALUES (?, ?, ?, ?, ?, ?, false, current_timestamp())
         """
-        self.client.execute_insert(sql, dados)
+        params = (
+            notif_id,
+            dados["destinatario"],
+            dados["tipo"],
+            dados.get("seg_id"),
+            dados["titulo"],
+            dados["mensagem"],
+        )
+        self.client.execute_insert(sql, params)
         return notif_id
 
     def listar_notificacoes(self, destinatario: str, lida: Optional[bool] = None) -> List[Dict]:
         """Lista notificações de um usuário."""
         sql = """
-            SELECT * FROM plataforma.segmentacao.seg_notificacao
+            SELECT notif_id, destinatario, tipo, seg_id, titulo, mensagem, lida, criado_em
+            FROM plataforma.segmentacao.seg_notificacao
             WHERE destinatario = ?
         """
         params = [destinatario]
@@ -81,7 +100,9 @@ class ComentarioRepository:
             sql += " AND lida = ?"
             params.append(lida)
         sql += " ORDER BY criado_em DESC"
-        return self.client.execute_query(sql, tuple(params))
+        rows = self.client.execute_query(sql, tuple(params))
+        columns = ["notif_id", "destinatario", "tipo", "seg_id", "titulo", "mensagem", "lida", "criado_em"]
+        return [dict(zip(columns, row)) for row in rows]
 
     def marcar_lida(self, notif_id: str) -> bool:
         """Marca uma notificação como lida."""
@@ -94,6 +115,13 @@ class ComentarioRepository:
         return rows > 0
 
     def buscar_notificacao(self, notif_id: str) -> Optional[Dict]:
-        sql = "SELECT * FROM plataforma.segmentacao.seg_notificacao WHERE notif_id = ?"
-        result = self.client.execute_query(sql, (notif_id,))
-        return result[0] if result else None
+        sql = """
+            SELECT notif_id, destinatario, tipo, seg_id, titulo, mensagem, lida, criado_em
+            FROM plataforma.segmentacao.seg_notificacao
+            WHERE notif_id = ?
+        """
+        rows = self.client.execute_query(sql, (notif_id,))
+        if rows:
+            columns = ["notif_id", "destinatario", "tipo", "seg_id", "titulo", "mensagem", "lida", "criado_em"]
+            return dict(zip(columns, rows[0]))
+        return None
