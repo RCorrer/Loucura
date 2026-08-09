@@ -1,113 +1,115 @@
-"""
-Databricks SQL Warehouse client for SegmentHub (S1).
-Stateless client using databricks-sql-connector.
-Each call opens and closes a connection – no shared state.
-"""
-
+import os
 import logging
 import time
-from typing import Any, Dict, List, Optional, Tuple
-from databricks import sql
-from databricks.sql.client import Connection
-from src.core.config import AppConfig
+from typing import Dict, Any, List, Optional
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound, PermissionDenied
 
 logger = logging.getLogger(__name__)
 
 
 class DatabricksSQLClient:
-    """Cliente stateless para executar queries no SQL Warehouse."""
-
     def __init__(self, user_token: Optional[str] = None):
-        """
-        Inicializa o cliente.
-        Se `user_token` for fornecido, ele será usado como access_token (OBO).
-        Caso contrário, usa o token do Service Principal (AppConfig.DATABRICKS_TOKEN).
-        """
-        self.host = AppConfig.DATABRICKS_HOST.replace("https://", "")
-        # Se user_token for fornecido, usa ele; senão, usa o token do Service Principal
-        self.token = user_token if user_token else AppConfig.DATABRICKS_TOKEN
-        self.warehouse_id = AppConfig.DATABRICKS_WAREHOUSE_ID
-        self.catalog = AppConfig.UC_CATALOG
-        self.schema = AppConfig.UC_SCHEMA
-        self.timeout = AppConfig.QUERY_TIMEOUT_SECONDS
-        self.max_retries = AppConfig.MAX_RETRIES
-        self.backoff = AppConfig.RETRY_BACKOFF_SECONDS
-        self.backoff_factor = AppConfig.RETRY_BACKOFF_FACTOR
+        # Se user_token for fornecido, cria WorkspaceClient com ele
+        if user_token:
+            self.client = WorkspaceClient(token=user_token)
+        else:
+            # Caso contrário, usa as credenciais do ambiente (Service Principal)
+            self.client = WorkspaceClient()
+        self.warehouse_id = os.getenv("DATABRICKS_WAREHOUSE_ID")
+        self.catalog = os.getenv("UC_CATALOG", "plataforma")
+        self.schema = os.getenv("UC_SCHEMA", "default")
+        self.timeout = int(os.getenv("QUERY_TIMEOUT_SECONDS", "120"))
+        self.max_retries = int(os.getenv("MAX_RETRIES", "3"))
+        self.backoff = int(os.getenv("RETRY_BACKOFF_SECONDS", "1"))
+        self.backoff_factor = float(os.getenv("RETRY_BACKOFF_FACTOR", "2"))
+        self.poll_interval = int(os.getenv("POLL_INTERVAL_SECONDS", "2"))
+        if not self.warehouse_id:
+            raise ValueError("DATABRICKS_WAREHOUSE_ID não definido")
 
-        if not all([self.host, self.token, self.warehouse_id]):
-            raise ValueError(
-                "DATABRICKS_HOST, DATABRICKS_TOKEN e DATABRICKS_WAREHOUSE_ID são obrigatórios."
-            )
+    def execute_query(self, sql: str, params: Optional[Dict[str, Any]] = None,
+                      timeout: Optional[int] = None) -> List[Dict[str, Any]]:
+        timeout = timeout or self.timeout
+        param_list = [{"name": k, "value": v} for k, v in (params or {}).items()]
 
-    def _get_connection(self) -> Connection:
-        """Cria uma nova conexão com o SQL Warehouse (stateless)."""
-        return sql.connect(
-            server_hostname=self.host,
-            http_path=f"/sql/1.0/warehouses/{self.warehouse_id}",
-            access_token=self.token,
-            catalog=self.catalog,
-            schema=self.schema,
-        )
-
-    def execute_query(
-        self,
-        sql_query: str,
-        params: Optional[Tuple[Any, ...]] = None,
-        fetch: bool = True,
-        timeout: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
-        """
-        Executa uma query SQL parametrizada.
-        Usa placeholders '?' para parâmetros.
-        """
         for attempt in range(self.max_retries):
             try:
-                with self._get_connection() as conn:
-                    with conn.cursor() as cursor:
-                        if params:
-                            cursor.execute(sql_query, params)
-                        else:
-                            cursor.execute(sql_query)
+                response = self.client.statement_execution.execute_statement(
+                    warehouse_id=self.warehouse_id,
+                    statement=sql,
+                    parameters=param_list if param_list else None,
+                    catalog=self.catalog,
+                    schema=self.schema,
+                    wait_timeout=timeout,
+                )
+                result = self.client.statement_execution.get_statement(response.statement_id)
+                state = str(result.status.state)
 
-                        if fetch:
-                            columns = [desc[0] for desc in cursor.description] if cursor.description else []
-                            rows = cursor.fetchall()
-                            return [dict(zip(columns, row)) for row in rows]
-                        else:
-                            return cursor.rowcount or 0
+                if state == "SUCCEEDED":
+                    rows = result.result.data_array if result.result else []
+                    if rows and result.result.column_names:
+                        columns = result.result.column_names
+                        return [dict(zip(columns, row)) for row in rows]
+                    return []
+                elif state in ["FAILED", "CANCELED", "CLOSED"]:
+                    error_msg = getattr(result.status, "error", "Erro desconhecido")
+                    raise RuntimeError(f"Query falhou: {error_msg}")
+                else:
+                    return self._poll_query(response.statement_id, timeout)
 
-            except Exception as e:
-                logger.warning(f"Tentativa {attempt+1} falhou: {e}")
+            except (TimeoutError, PermissionDenied, NotFound) as e:
                 if attempt < self.max_retries - 1:
                     wait = self.backoff * (self.backoff_factor ** attempt)
-                    logger.info(f"Tentando novamente em {wait}s...")
+                    logger.warning(f"Tentativa {attempt+1} falhou: {e}. Re-tentando em {wait}s...")
                     time.sleep(wait)
                 else:
                     raise RuntimeError(f"Falha após {self.max_retries} tentativas: {e}") from e
 
-        return []
+        raise RuntimeError("Falha inesperada")
 
-    def fetch_one(self, sql: str, params: Optional[Tuple] = None) -> Optional[Dict]:
+    def _poll_query(self, statement_id: str, timeout: int) -> List[Dict]:
+        start = time.time()
+        while time.time() - start < timeout:
+            result = self.client.statement_execution.get_statement(statement_id)
+            state = str(result.status.state)
+            if state == "SUCCEEDED":
+                rows = result.result.data_array if result.result else []
+                if rows and result.result.column_names:
+                    columns = result.result.column_names
+                    return [dict(zip(columns, row)) for row in rows]
+                return []
+            if state in ["FAILED", "CANCELED", "CLOSED"]:
+                error_msg = getattr(result.status, "error", "Erro desconhecido")
+                raise RuntimeError(f"Query falhou: {error_msg}")
+            time.sleep(self.poll_interval)
+        raise TimeoutError(f"Timeout após {timeout}s aguardando query")
+
+    def fetch_one(self, sql: str, params: Optional[Dict] = None) -> Optional[Dict]:
         results = self.execute_query(sql, params)
         return results[0] if results else None
 
-    def fetch_value(self, sql: str, params: Optional[Tuple] = None):
+    def fetch_value(self, sql: str, params: Optional[Dict] = None):
         row = self.fetch_one(sql, params)
         return list(row.values())[0] if row else None
 
-    def execute_insert(self, sql: str, params: Optional[Tuple] = None) -> int:
-        return self.execute_query(sql, params, fetch=False)
+    def execute_insert(self, sql: str, params: Optional[Dict] = None) -> int:
+        # Usa statement_execution, mas não retorna dados
+        param_list = [{"name": k, "value": v} for k, v in (params or {}).items()]
+        response = self.client.statement_execution.execute_statement(
+            warehouse_id=self.warehouse_id,
+            statement=sql,
+            parameters=param_list if param_list else None,
+            catalog=self.catalog,
+            schema=self.schema,
+            wait_timeout=self.timeout,
+        )
+        result = self.client.statement_execution.get_statement(response.statement_id)
+        return result.status.row_count or 0
 
 
-# Singleton para conexões com Service Principal (sem user_token)
 _default_client = None
 
 def get_client(user_token: Optional[str] = None) -> DatabricksSQLClient:
-    """
-    Retorna um cliente.
-    Se `user_token` for fornecido, cria uma nova instância com o token do usuário (OBO).
-    Caso contrário, retorna o singleton (Service Principal).
-    """
     if user_token:
         return DatabricksSQLClient(user_token=user_token)
     global _default_client
