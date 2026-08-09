@@ -24,10 +24,16 @@ export default function ListaSegmentacoes() {
         ...filtros,
         busca: buscaAtiva,
       });
+      console.log('📦 Resposta da API:', response); // <-- ADICIONE AQUI
+      console.log('📊 Data:', response.data);      // <-- ADICIONE AQUI
+      console.log('📄 Meta:', response.meta);      // <-- ADICIONE AQUI
+
       const rowsWithId = (response.data || []).map(row => ({
         ...row,
         id: row.seg_id,
       }));
+      console.log('✅ rowsWithId:', rowsWithId);    // <-- ADICIONE AQUI
+
       setSegmentacoes(rowsWithId);
       setMeta(response.meta || { page: 1, size: 10, total: 0, total_pages: 0 });
     } catch (err) {
