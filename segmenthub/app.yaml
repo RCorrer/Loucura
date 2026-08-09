@@ -13,6 +13,3 @@ env:
     value: "plataforma"
   - name: UC_SCHEMA
     value: "default"
-  # (Opcional) Se precisar de token explícito para autenticação externa:
-  # - name: DATABRICKS_TOKEN
-  #   valueFrom: secret-scope/databricks-token

@@ -14,22 +14,16 @@ logger = logging.getLogger(__name__)
 
 
 async def get_current_user(request: Request) -> Optional[dict]:
-    # Obtém o email e o token do usuário dos cabeçalhos OBO
     user_email = request.headers.get("X-Forwarded-Email")
-    user_token = request.headers.get("X-Forwarded-Access-Token")
-    
-    # Fallback para desenvolvimento local (variável de ambiente)
     if not user_email:
         user_email = os.getenv("DEV_USER")
-        user_token = os.getenv("DEV_TOKEN")  # opcional, para testes locais
-    
     if not user_email:
-        logger.warning("Nenhum usuário identificado na requisição")
+        logger.warning("Nenhum usuário identificado")
         return None
-    
-    # Cria cliente com o token do usuário (OBO) ou sem token (Service Principal)
+
     try:
-        client = get_client(user_token=user_token)
+        client = get_client()  # Service Principal (OAuth)
+        # A consulta usa o Service Principal, não o token do usuário
         row = client.fetch_one(
             "SELECT perfil FROM plataforma.governanca.usuarios_perfil WHERE usuario_id = :user_id AND sistema = 'segmenthub' AND ativo = true",
             {"user_id": user_email}
@@ -37,11 +31,10 @@ async def get_current_user(request: Request) -> Optional[dict]:
         if row:
             return {"usuario_id": user_email, "perfil": row["perfil"]}
         else:
-            logger.warning(f"Usuário {user_email} não encontrado ou inativo")
+            logger.warning(f"Usuário {user_email} não encontrado")
             return None
     except Exception as e:
-        logger.error(f"Erro ao buscar perfil do usuário {user_email}: {e}")
-        # Em caso de erro, retorna None (401) ou um perfil padrão (para desenvolvimento)
+        logger.error(f"Erro ao buscar perfil: {e}")
         return None
 
 

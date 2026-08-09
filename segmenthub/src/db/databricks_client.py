@@ -10,28 +10,21 @@ from typing import Any, Dict, List, Optional, Tuple
 from databricks import sql
 from databricks.sql.client import Connection
 from src.core.config import AppConfig
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.errors import NotFound, PermissionDenied
 
 logger = logging.getLogger(__name__)
 
 
 class DatabricksSQLClient:
-    """Cliente stateless para executar queries no SQL Warehouse."""
-
     def __init__(self):
-        self.host = AppConfig.DATABRICKS_HOST.replace("https://", "")
-        self.token = AppConfig.DATABRICKS_TOKEN
-        self.warehouse_id = AppConfig.DATABRICKS_WAREHOUSE_ID
-        self.catalog = AppConfig.UC_CATALOG
-        self.schema = AppConfig.UC_SCHEMA
-        self.timeout = AppConfig.QUERY_TIMEOUT_SECONDS
-        self.max_retries = AppConfig.MAX_RETRIES
-        self.backoff = AppConfig.RETRY_BACKOFF_SECONDS
-        self.backoff_factor = AppConfig.RETRY_BACKOFF_FACTOR
-
-        if not all([self.host, self.token, self.warehouse_id]):
-            raise ValueError(
-                "DATABRICKS_HOST, DATABRICKS_TOKEN e DATABRICKS_WAREHOUSE_ID são obrigatórios."
-            )
+        # WorkspaceClient usa automaticamente as credenciais do ambiente (OAuth)
+        self.client = WorkspaceClient()
+        self.warehouse_id = os.getenv("DATABRICKS_WAREHOUSE_ID")
+        self.catalog = os.getenv("UC_CATALOG", "plataforma")
+        self.schema = os.getenv("UC_SCHEMA", "default")
+        if not self.warehouse_id:
+            raise ValueError("DATABRICKS_WAREHOUSE_ID não definido")
 
     def _get_connection(self) -> Connection:
         """Cria uma nova conexão com o SQL Warehouse (stateless)."""
