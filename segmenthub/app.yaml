@@ -1,18 +1,18 @@
-build: false
 command:
-  - sh
-  - -c
-  - |
-    echo "=== Iniciando build manual ==="
-    cd frontend
-    echo "📁 Diretório atual: $(pwd)"
-    echo "📄 Conteúdo da pasta frontend:"
-    ls -la
-    echo "🧹 Instalando dependências..."
-    npm install
-    echo "🔨 Buildando o frontend..."
-    npm run build
-    echo "✅ Build concluído!"
-    cd ..
-    echo "🚀 Iniciando o servidor..."
-    uvicorn src.main:app --host 0.0.0.0 --port 8000
+  - uvicorn
+  - src.main:app
+  - --host
+  - 0.0.0.0
+  - --port
+  - "8000"
+
+env:
+  - name: DATABRICKS_WAREHOUSE_ID
+    valueFrom: sql-warehouse
+  - name: UC_CATALOG
+    value: "plataforma"
+  - name: UC_SCHEMA
+    value: "default"
+  # (Opcional) Se precisar de token explícito para autenticação externa:
+  # - name: DATABRICKS_TOKEN
+  #   valueFrom: secret-scope/databricks-token
