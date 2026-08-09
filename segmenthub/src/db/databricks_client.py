@@ -18,7 +18,6 @@ class DatabricksSQLClient:
             raise ValueError("DATABRICKS_WAREHOUSE_ID não definido")
 
         self.host = self.cfg.host.replace("https://", "").replace("http://", "")
-
         logger.info("✅ DatabricksSQLClient inicializado com Config() + credentials_provider")
 
     def _get_connection(self) -> Connection:
@@ -34,7 +33,12 @@ class DatabricksSQLClient:
         try:
             with self._get_connection() as conn:
                 with conn.cursor() as cursor:
+                    # Converte placeholders ? para %s (compatível com databricks-sql-connector)
                     if params:
+                        # Substitui ? por %s (mantém a ordem)
+                        sql = sql.replace("?", "%s")
+                        logger.debug(f"SQL ajustada: {sql}")
+                        logger.debug(f"Params: {params}")
                         cursor.execute(sql, params)
                     else:
                         cursor.execute(sql)
@@ -69,6 +73,7 @@ class DatabricksSQLClient:
         with self._get_connection() as conn:
             with conn.cursor() as cursor:
                 if params:
+                    sql = sql.replace("?", "%s")
                     cursor.execute(sql, params)
                 else:
                     cursor.execute(sql)
