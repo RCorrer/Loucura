@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import EditIcon from '@mui/icons-material/Edit';
 import SearchIcon from '@mui/icons-material/Search';
 
 export default function ListaSegmentacoes() {
@@ -109,12 +110,17 @@ export default function ListaSegmentacoes() {
     {
       field: 'actions',
       headerName: 'Ações',
-      width: 150,
+      width: 200,
       renderCell: (params) => (
-        <Box>
+        <Box sx={{ display: 'flex', gap: 0.5 }}>
           <Tooltip title="Visualizar">
             <IconButton size="small" onClick={() => handleVisualizar(params.row.seg_id)}>
               <VisibilityIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Editar">
+            <IconButton size="small" onClick={() => navigate(`/segmentacoes/${params.row.seg_id}/editar`)}>
+              <EditIcon fontSize="small" />
             </IconButton>
           </Tooltip>
           <Tooltip title="Clonar">
