@@ -155,6 +155,7 @@ export default function BuilderSegmentacao() {
     navigate('/segmentacoes');
   };
 
+  // ✅ Loading apenas na edição
   if (carregandoDados && isEdit) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>

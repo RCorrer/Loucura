@@ -36,7 +36,7 @@ export default function ExclusaoBuilder({ value, onChange, operadores = DEFAULT_
           index={index}
           onUpdate={handleUpdateGroup}
           onRemove={handleRemoveGroup}
-          operadores={operadores}  // ← passando para o grupo
+          operadores={operadores}
         />
       ))}
       <Button variant="outlined" color="error" onClick={handleAddGroup} size="small">

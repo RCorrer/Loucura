@@ -9,8 +9,7 @@ export default function RuleRow({ rule, index, onUpdate, onRemove, operadores = 
     onUpdate(index, { ...rule, [field]: value });
   };
 
-  // Garantir que operadores seja um array
-  const ops = Array.isArray(operadores) && operadores.length > 0 ? operadores : DEFAULT_OPERADORES;
+  const ops = (operadores && operadores.length > 0) ? operadores : DEFAULT_OPERADORES;
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>

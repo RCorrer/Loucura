@@ -8,16 +8,17 @@ export default function TemaMenu({ onSelectCampo }) {
   const [temas, setTemas] = useState([]);
   const [camposPorTema, setCamposPorTema] = useState({});
   const [expanded, setExpanded] = useState({});
-  const [carregandoCampos, setCarregandoCampos] = useState(false);
+  const [loaded, setLoaded] = useState(false); // flag para evitar recarga
 
   useEffect(() => {
+    if (loaded) return; // já carregou, não recarrega
+
     const carregarTudo = async () => {
       try {
         const temasResponse = await listarTemas();
         const temasData = temasResponse.data || [];
         setTemas(temasData);
 
-        setCarregandoCampos(true);
         const promises = temasData.map((tema) =>
           listarCampos(tema.tema).then((response) => ({
             tema: tema.tema,
@@ -30,14 +31,13 @@ export default function TemaMenu({ onSelectCampo }) {
           map[tema] = campos;
         });
         setCamposPorTema(map);
+        setLoaded(true);
       } catch (err) {
         console.error('Erro ao carregar temas/campos:', err);
-      } finally {
-        setCarregandoCampos(false);
       }
     };
     carregarTudo();
-  }, [listarTemas, listarCampos]);
+  }, [listarTemas, listarCampos, loaded]);
 
   const handleToggle = (tema) => {
     setExpanded((prev) => ({ ...prev, [tema]: !prev[tema] }));
@@ -56,11 +56,6 @@ export default function TemaMenu({ onSelectCampo }) {
       <Typography variant="subtitle2" sx={{ px: 2, py: 1, color: 'text.secondary' }}>
         Temas e Campos
       </Typography>
-      {carregandoCampos && temas.length > 0 && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', p: 1 }}>
-          <CircularProgress size={24} />
-        </Box>
-      )}
       {temas.map((tema) => {
         const campos = camposPorTema[tema.tema] || [];
         const isExpanded = expanded[tema.tema];
@@ -81,7 +76,7 @@ export default function TemaMenu({ onSelectCampo }) {
                     >
                       <ListItemText
                         primary={campo.campo_label}
-                        secondary={`${campo.tipo_dado}`}
+                        secondary={campo.tipo_dado}
                       />
                     </ListItemButton>
                   ))
