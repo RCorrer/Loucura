@@ -10,25 +10,28 @@ export default function TemaMenu({ onSelectCampo }) {
   const [expanded, setExpanded] = useState({});
   const [carregandoCampos, setCarregandoCampos] = useState(false);
 
-  // Carrega temas e, em paralelo, os campos de cada tema
   useEffect(() => {
     const carregarTudo = async () => {
       try {
-        const responseTemas = await listarTemas();
-        const temasData = responseTemas.data || [];
+        const temasResponse = await listarTemas();
+        const temasData = temasResponse.data || [];
         setTemas(temasData);
 
-        // Pré-carregar campos de todos os temas em paralelo
         setCarregandoCampos(true);
-        const promises = temasData.map(tema => listarCampos(tema.tema));
+        const promises = temasData.map((tema) =>
+          listarCampos(tema.tema).then((response) => ({
+            tema: tema.tema,
+            campos: response.data || [],
+          }))
+        );
         const resultados = await Promise.all(promises);
-        const camposMap = {};
-        temasData.forEach((tema, index) => {
-          camposMap[tema.tema] = resultados[index].data || [];
+        const map = {};
+        resultados.forEach(({ tema, campos }) => {
+          map[tema] = campos;
         });
-        setCamposPorTema(camposMap);
+        setCamposPorTema(map);
       } catch (err) {
-        console.error('Erro ao carregar temas ou campos:', err);
+        console.error('Erro ao carregar temas/campos:', err);
       } finally {
         setCarregandoCampos(false);
       }
@@ -52,38 +55,46 @@ export default function TemaMenu({ onSelectCampo }) {
     <List component="nav" sx={{ width: '100%', bgcolor: 'background.paper' }}>
       <Typography variant="subtitle2" sx={{ px: 2, py: 1, color: 'text.secondary' }}>
         Temas e Campos
-        {carregandoCampos && <CircularProgress size={16} sx={{ ml: 1 }} />}
       </Typography>
-      {temas.map((tema) => (
-        <div key={tema.tema}>
-          <ListItemButton onClick={() => handleToggle(tema.tema)}>
-            <ListItemText primary={tema.tema} secondary={`Ordem: ${tema.tema_ordem}`} />
-            {expanded[tema.tema] ? <ExpandLess /> : <ExpandMore />}
-          </ListItemButton>
-          <Collapse in={expanded[tema.tema]} timeout="auto" unmountOnExit>
-            <List component="div" disablePadding>
-              {camposPorTema[tema.tema]?.length > 0 ? (
-                camposPorTema[tema.tema].map((campo) => (
-                  <ListItemButton
-                    key={campo.caracteristica_id}
-                    sx={{ pl: 4 }}
-                    onClick={() => onSelectCampo(campo)}
-                  >
-                    <ListItemText
-                      primary={campo.campo_label}
-                      secondary={campo.tipo_dado} // sem cadeado
-                    />
-                  </ListItemButton>
-                ))
-              ) : (
-                <Typography variant="body2" sx={{ pl: 4, py: 1, color: 'text.secondary' }}>
-                  Nenhum campo disponível
-                </Typography>
-              )}
-            </List>
-          </Collapse>
-        </div>
-      ))}
+      {carregandoCampos && temas.length > 0 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 1 }}>
+          <CircularProgress size={24} />
+        </Box>
+      )}
+      {temas.map((tema) => {
+        const campos = camposPorTema[tema.tema] || [];
+        const isExpanded = expanded[tema.tema];
+        return (
+          <div key={tema.tema}>
+            <ListItemButton onClick={() => handleToggle(tema.tema)}>
+              <ListItemText primary={tema.tema} secondary={`Ordem: ${tema.tema_ordem}`} />
+              {isExpanded ? <ExpandLess /> : <ExpandMore />}
+            </ListItemButton>
+            <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+              <List component="div" disablePadding>
+                {campos.length > 0 ? (
+                  campos.map((campo) => (
+                    <ListItemButton
+                      key={campo.caracteristica_id}
+                      sx={{ pl: 4 }}
+                      onClick={() => onSelectCampo(campo)}
+                    >
+                      <ListItemText
+                        primary={campo.campo_label}
+                        secondary={`${campo.tipo_dado}`}
+                      />
+                    </ListItemButton>
+                  ))
+                ) : (
+                  <Typography variant="body2" sx={{ pl: 4, py: 1, color: 'text.secondary' }}>
+                    Nenhum campo disponível
+                  </Typography>
+                )}
+              </List>
+            </Collapse>
+          </div>
+        );
+      })}
     </List>
   );
 }

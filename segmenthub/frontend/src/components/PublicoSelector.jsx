@@ -5,6 +5,7 @@ import { useMetadataApi } from '../api/metadata';
 export default function PublicoSelector({ value, onChange, error, helperText }) {
   const { listarPublicos, loading } = useMetadataApi();
   const [publicos, setPublicos] = useState([]);
+  const [carregado, setCarregado] = useState(false);
 
   useEffect(() => {
     const carregar = async () => {
@@ -13,10 +14,12 @@ export default function PublicoSelector({ value, onChange, error, helperText }) 
         setPublicos(response.data || []);
       } catch (err) {
         console.error('Erro ao carregar públicos:', err);
+      } finally {
+        setCarregado(true);
       }
     };
     carregar();
-  }, []);
+  }, [listarPublicos]);
 
   return (
     <FormControl fullWidth error={!!error}>
@@ -26,7 +29,7 @@ export default function PublicoSelector({ value, onChange, error, helperText }) 
         value={value || ''}
         onChange={(e) => onChange(e.target.value)}
         label="Público Base"
-        disabled={loading}
+        disabled={loading || !carregado}
       >
         <MenuItem value="">
           <em>Selecione um público</em>
@@ -37,7 +40,7 @@ export default function PublicoSelector({ value, onChange, error, helperText }) 
           </MenuItem>
         ))}
       </Select>
-      {loading && <CircularProgress size={20} sx={{ ml: 2 }} />}
+      {(loading || !carregado) && <CircularProgress size={20} sx={{ ml: 2, position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)' }} />}
       {helperText && <FormHelperText>{helperText}</FormHelperText>}
     </FormControl>
   );

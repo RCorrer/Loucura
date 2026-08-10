@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Button, Typography, Paper } from '@mui/material';
 import RuleGroup from './RuleGroup';
 
-export default function ExclusaoBuilder({ value, onChange }) {
+export default function ExclusaoBuilder({ value, onChange, operadores = [] }) {
   const handleAddGroup = () => {
     const newGroups = [...value, { operator: 'OR', rules: [{ campo_id: '', op: '', value: '' }] }];
     onChange(newGroups);
@@ -34,6 +34,7 @@ export default function ExclusaoBuilder({ value, onChange }) {
           index={index}
           onUpdate={handleUpdateGroup}
           onRemove={handleRemoveGroup}
+          operadores={operadores}
         />
       ))}
       <Button variant="outlined" color="error" onClick={handleAddGroup} size="small">

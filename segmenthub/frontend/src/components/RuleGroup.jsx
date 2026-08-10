@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Button, Select, MenuItem, FormControl, InputLabel, Paper } from '@mui/material';
 import RuleRow from './RuleRow';
 
-export default function RuleGroup({ group, index, onUpdate, onRemove, operadores }) {
+export default function RuleGroup({ group, index, onUpdate, onRemove, operadores = [] }) {
   const handleAddRule = () => {
     const newRules = [...group.rules, { campo_id: '', op: '', value: '' }];
     onUpdate(index, { ...group, rules: newRules });

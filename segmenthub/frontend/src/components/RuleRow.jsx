@@ -2,7 +2,9 @@ import React from 'react';
 import { Box, TextField, Select, MenuItem, IconButton, FormControl, InputLabel } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 
-export default function RuleRow({ rule, index, onUpdate, onRemove, operadores }) {
+const DEFAULT_OPERADORES = ['=', '!=', '>', '<', '>=', '<=', 'between', 'in', 'not_in', 'is_null', 'is_not_null'];
+
+export default function RuleRow({ rule, index, onUpdate, onRemove, operadores = DEFAULT_OPERADORES }) {
   const handleChange = (field, value) => {
     onUpdate(index, { ...rule, [field]: value });
   };
@@ -23,7 +25,7 @@ export default function RuleRow({ rule, index, onUpdate, onRemove, operadores })
           onChange={(e) => handleChange('op', e.target.value)}
           label="Operador"
         >
-          {operadores?.map((op) => (
+          {operadores.map((op) => (
             <MenuItem key={op} value={op}>
               {op}
             </MenuItem>

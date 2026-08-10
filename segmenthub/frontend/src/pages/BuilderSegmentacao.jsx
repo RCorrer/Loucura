@@ -49,10 +49,9 @@ export default function BuilderSegmentacao() {
   const [error, setError] = useState(null);
   const [activeStep, setActiveStep] = useState(0);
 
-  // Carregar dados se for edição
   useEffect(() => {
     if (isEdit) {
-      const carregar = async () => {
+      const carregarSegmentacao = async () => {
         setCarregandoDados(true);
         setError(null);
         try {
@@ -83,11 +82,10 @@ export default function BuilderSegmentacao() {
           setCarregandoDados(false);
         }
       };
-      carregar();
+      carregarSegmentacao();
     }
   }, [isEdit, id, buscar]);
 
-  // Função para adicionar regra de inclusão a partir do campo selecionado
   const handleSelectCampoInclusao = (campo) => {
     const lastIndex = regrasInclusao.length - 1;
     const novasRegras = [...regrasInclusao];
@@ -100,7 +98,6 @@ export default function BuilderSegmentacao() {
     if (activeStep < 1) setActiveStep(1);
   };
 
-  // Função para adicionar regra de exclusão a partir do campo selecionado
   const handleSelectCampoExclusao = (campo) => {
     const lastIndex = regrasExclusao.length - 1;
     const novasRegras = [...regrasExclusao];
@@ -154,9 +151,10 @@ export default function BuilderSegmentacao() {
     }
   };
 
-  const handleVoltar = () => navigate('/segmentacoes');
+  const handleVoltar = () => {
+    navigate('/segmentacoes');
+  };
 
-  // Item 1: Loading apenas para edição
   if (carregandoDados && isEdit) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
@@ -194,7 +192,6 @@ export default function BuilderSegmentacao() {
       </Stepper>
 
       <Box sx={{ flex: 1, overflow: 'auto' }}>
-        {/* Passo 0: Público */}
         {activeStep === 0 && (
           <Paper sx={{ p: 3 }}>
             <PublicoSelector
@@ -240,7 +237,6 @@ export default function BuilderSegmentacao() {
           </Paper>
         )}
 
-        {/* Passo 1: Inclusão */}
         {activeStep === 1 && (
           <Paper sx={{ p: 3 }}>
             <Box sx={{ display: 'flex', gap: 3 }}>
@@ -257,7 +253,6 @@ export default function BuilderSegmentacao() {
           </Paper>
         )}
 
-        {/* Passo 2: Exclusão - com TemaMenu também */}
         {activeStep === 2 && (
           <Paper sx={{ p: 3 }}>
             <Box sx={{ display: 'flex', gap: 3 }}>
