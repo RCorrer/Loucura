@@ -9,6 +9,9 @@ export default function RuleRow({ rule, index, onUpdate, onRemove, operadores = 
     onUpdate(index, { ...rule, [field]: value });
   };
 
+  // Garantir que operadores seja um array
+  const ops = Array.isArray(operadores) && operadores.length > 0 ? operadores : DEFAULT_OPERADORES;
+
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
       <TextField
@@ -25,7 +28,7 @@ export default function RuleRow({ rule, index, onUpdate, onRemove, operadores = 
           onChange={(e) => handleChange('op', e.target.value)}
           label="Operador"
         >
-          {operadores.map((op) => (
+          {ops.map((op) => (
             <MenuItem key={op} value={op}>
               {op}
             </MenuItem>

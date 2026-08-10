@@ -3,6 +3,9 @@ import { Box, Button, Select, MenuItem, FormControl, InputLabel, Paper } from '@
 import RuleRow from './RuleRow';
 
 export default function RuleGroup({ group, index, onUpdate, onRemove, operadores = [] }) {
+  // Se operadores estiver vazio, use uma lista padrão
+  const ops = operadores.length > 0 ? operadores : ['=', '!=', '>', '<', '>=', '<=', 'between', 'in', 'not_in', 'is_null', 'is_not_null'];
+
   const handleAddRule = () => {
     const newRules = [...group.rules, { campo_id: '', op: '', value: '' }];
     onUpdate(index, { ...group, rules: newRules });
@@ -50,7 +53,7 @@ export default function RuleGroup({ group, index, onUpdate, onRemove, operadores
           index={ruleIndex}
           onUpdate={handleUpdateRule}
           onRemove={handleRemoveRule}
-          operadores={operadores}
+          operadores={ops}  // ← passando a lista com fallback
         />
       ))}
     </Paper>

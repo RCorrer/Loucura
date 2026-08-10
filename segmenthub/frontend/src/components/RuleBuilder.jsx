@@ -2,7 +2,10 @@ import React from 'react';
 import { Box, Button, Typography, Paper } from '@mui/material';
 import RuleGroup from './RuleGroup';
 
-export default function RuleBuilder({ value, onChange, operadores = [], label = 'Inclusão' }) {
+// Lista padrão de operadores
+const DEFAULT_OPERADORES = ['=', '!=', '>', '<', '>=', '<=', 'between', 'in', 'not_in', 'is_null', 'is_not_null'];
+
+export default function RuleBuilder({ value, onChange, operadores = DEFAULT_OPERADORES, label = 'Inclusão' }) {
   const handleAddGroup = () => {
     const newGroups = [...value, { operator: 'AND', rules: [{ campo_id: '', op: '', value: '' }] }];
     onChange(newGroups);
@@ -36,7 +39,7 @@ export default function RuleBuilder({ value, onChange, operadores = [], label = 
             index={index}
             onUpdate={handleUpdateGroup}
             onRemove={handleRemoveGroup}
-            operadores={operadores}
+            operadores={operadores}  // ← passando para o grupo
           />
         ))
       )}
