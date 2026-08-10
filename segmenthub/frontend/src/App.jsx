@@ -1,13 +1,14 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AppShell } from '@shared';
-import ListaSegmentacoes from './pages/ListaSegmentacoes';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import HealthAndSafetyIcon from '@mui/icons-material/HealthAndSafety';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import ChatIcon from '@mui/icons-material/Chat';
 import { Divider } from '@mui/material';
+import BuilderSegmentacao from './pages/BuilderSegmentacao';
+import ListaSegmentacoes from './pages/ListaSegmentacoes';
 
 function App() {
   const location = useLocation();
@@ -60,6 +61,8 @@ function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/segmentacoes" replace />} />
         <Route path="/segmentacoes" element={<ListaSegmentacoes />} />
+        <Route path="/segmentacoes/nova" element={<BuilderSegmentacao />} />
+        <Route path="/segmentacoes/:id/editar" element={<BuilderSegmentacao />} />
         {/* Futuras rotas */}
         <Route path="/saude" element={<div>Dashboard de Saúde</div>} />
         <Route path="/admin/catalogo" element={<div>Admin Catálogo</div>} />
