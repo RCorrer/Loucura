@@ -11,29 +11,30 @@ import {
   Step,
   StepLabel,
   Paper,
+  MenuItem, // ✅ ADICIONADO
 } from '@mui/material';
 import { useSegmentacoesApi } from '../api/segmentacoes';
 import { useMetadataApi } from '../api/metadata';
 
-// Componentes que vamos construir em seguida
+// Componentes auxiliares
 import PublicoSelector from '../components/PublicoSelector';
 import TemaMenu from '../components/TemaMenu';
 import RuleBuilder from '../components/RuleBuilder';
 import ExclusaoBuilder from '../components/ExclusaoBuilder';
 
-// Estados do builder
+// Passos do builder
 const STEPS = ['Público', 'Regras de Inclusão', 'Regras de Exclusão'];
 
 export default function BuilderSegmentacao() {
   const navigate = useNavigate();
-  const { id } = useParams(); // se for edição, tem o ID
+  const { id } = useParams(); // ID da segmentação (se for edição)
   const isEdit = !!id;
 
-  // API hooks
+  // Hooks de API
   const { buscar, criar, atualizar, loading: apiLoading } = useSegmentacoesApi();
-  const { listarPublicos, loading: metaLoading } = useMetadataApi();
+  const { loading: metaLoading } = useMetadataApi();
 
-  // Estados da segmentação
+  // Dados básicos da segmentação
   const [dadosBasicos, setDadosBasicos] = useState({
     nome: '',
     descricao: '',
@@ -43,18 +44,16 @@ export default function BuilderSegmentacao() {
     email_contato: '',
   });
 
-  // Estados do builder
+  // Estados do builder (ajustados para arrays de grupos)
   const [publicoSelecionado, setPublicoSelecionado] = useState(null);
-  const [regrasInclusao, setRegrasInclusao] = useState({
-    operator: 'AND',
-    rules: [],
-  });
-  const [regrasExclusao, setRegrasExclusao] = useState({
-    operator: 'OR',
-    rules: [],
-  });
+  const [regrasInclusao, setRegrasInclusao] = useState([
+    { operator: 'AND', rules: [{ campo_id: '', op: '', value: '' }] }
+  ]);
+  const [regrasExclusao, setRegrasExclusao] = useState([
+    { operator: 'OR', rules: [{ campo_id: '', op: '', value: '' }] }
+  ]);
 
-  // Estado de carregamento da segmentação (se for edição)
+  // Estado de carregamento da edição
   const [carregandoDados, setCarregandoDados] = useState(false);
   const [error, setError] = useState(null);
 
@@ -78,8 +77,17 @@ export default function BuilderSegmentacao() {
           });
           setPublicoSelecionado(data.publico_base_id || null);
           if (data.regras_json) {
-            setRegrasInclusao(data.regras_json.inclusao || { operator: 'AND', rules: [] });
-            setRegrasExclusao(data.regras_json.exclusao || { operator: 'OR', rules: [] });
+            // Garantir que sejam arrays, mesmo se vierem como objeto único
+            const inclusao = Array.isArray(data.regras_json.inclusao) 
+              ? data.regras_json.inclusao 
+              : [data.regras_json.inclusao || { operator: 'AND', rules: [] }];
+            const exclusao = data.regras_json.exclusao 
+              ? (Array.isArray(data.regras_json.exclusao) 
+                  ? data.regras_json.exclusao 
+                  : [data.regras_json.exclusao])
+              : [{ operator: 'OR', rules: [] }];
+            setRegrasInclusao(inclusao);
+            setRegrasExclusao(exclusao);
           }
         } catch (err) {
           setError('Erro ao carregar segmentação');
@@ -103,8 +111,12 @@ export default function BuilderSegmentacao() {
       setError('Selecione um público-base');
       return;
     }
-    if (!regrasInclusao.rules || regrasInclusao.rules.length === 0) {
-      setError('Adicione pelo menos uma regra de inclusão');
+    // Verifica se há pelo menos uma regra com campo preenchido
+    const temRegraValida = regrasInclusao.some(group => 
+      group.rules.some(rule => rule.campo_id && rule.op && rule.value !== '')
+    );
+    if (!temRegraValida) {
+      setError('Adicione pelo menos uma regra de inclusão válida');
       return;
     }
 
@@ -114,7 +126,7 @@ export default function BuilderSegmentacao() {
       regras_json: {
         publico_base: publicoSelecionado,
         inclusao: regrasInclusao,
-        exclusao: regrasExclusao.rules.length > 0 ? regrasExclusao : null,
+        exclusao: regrasExclusao.some(group => group.rules.some(r => r.campo_id)) ? regrasExclusao : null,
       },
     };
 
@@ -165,7 +177,7 @@ export default function BuilderSegmentacao() {
         </Alert>
       )}
 
-      {/* Stepper para navegar entre os passos */}
+      {/* Stepper */}
       <Stepper activeStep={activeStep} sx={{ mb: 3 }}>
         {STEPS.map((label, index) => (
           <Step key={label} completed={activeStep > index}>
@@ -183,7 +195,6 @@ export default function BuilderSegmentacao() {
               onChange={setPublicoSelecionado}
               disabled={metaLoading}
             />
-            {/* Campos básicos podem ficar aqui ou em uma aba separada */}
             <Box sx={{ mt: 3, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
               <TextField
                 label="Nome da Segmentação"
@@ -226,7 +237,7 @@ export default function BuilderSegmentacao() {
         {activeStep === 1 && (
           <Paper sx={{ p: 3 }}>
             <RuleBuilder
-              rules={regrasInclusao}
+              value={regrasInclusao}
               onChange={setRegrasInclusao}
             />
           </Paper>
@@ -235,7 +246,7 @@ export default function BuilderSegmentacao() {
         {activeStep === 2 && (
           <Paper sx={{ p: 3 }}>
             <ExclusaoBuilder
-              rules={regrasExclusao}
+              value={regrasExclusao}
               onChange={setRegrasExclusao}
             />
           </Paper>
