@@ -37,7 +37,6 @@ export default function BuilderSegmentacao() {
     email_contato: '',
   });
 
-  // Estados das regras (arrays de grupos)
   const [publicoSelecionado, setPublicoSelecionado] = useState('');
   const [regrasInclusao, setRegrasInclusao] = useState([
     { operator: 'AND', rules: [{ campo_id: '', op: '', value: '' }] }
@@ -53,12 +52,11 @@ export default function BuilderSegmentacao() {
   // Carregar dados se for edição
   useEffect(() => {
     if (isEdit) {
-      const carregarSegmentacao = async () => {
+      const carregar = async () => {
         setCarregandoDados(true);
         setError(null);
         try {
           const data = await buscar(id);
-
           setDadosBasicos({
             nome: data.nome || '',
             descricao: data.descricao || '',
@@ -67,13 +65,10 @@ export default function BuilderSegmentacao() {
             area_responsavel: data.area_responsavel || '',
             email_contato: data.email_contato || '',
           });
-
           setPublicoSelecionado(data.publico_base_id || '');
-
           if (data.regras_json) {
             const inclusao = data.regras_json.inclusao;
             const exclusao = data.regras_json.exclusao;
-
             setRegrasInclusao(
               Array.isArray(inclusao) ? inclusao : [inclusao || { operator: 'AND', rules: [] }]
             );
@@ -88,13 +83,12 @@ export default function BuilderSegmentacao() {
           setCarregandoDados(false);
         }
       };
-      carregarSegmentacao();
+      carregar();
     }
   }, [isEdit, id, buscar]);
 
-  // ✅ Função para adicionar regra a partir do campo selecionado no TemaMenu
-  const handleSelectCampo = (campo) => {
-    // Adiciona uma nova regra ao último grupo de inclusão
+  // Função para adicionar regra de inclusão a partir do campo selecionado
+  const handleSelectCampoInclusao = (campo) => {
     const lastIndex = regrasInclusao.length - 1;
     const novasRegras = [...regrasInclusao];
     novasRegras[lastIndex].rules.push({
@@ -103,12 +97,22 @@ export default function BuilderSegmentacao() {
       value: '',
     });
     setRegrasInclusao(novasRegras);
-
-    // Opcional: avança para o passo 2 se não estiver lá
     if (activeStep < 1) setActiveStep(1);
   };
 
-  // Salvar segmentação
+  // Função para adicionar regra de exclusão a partir do campo selecionado
+  const handleSelectCampoExclusao = (campo) => {
+    const lastIndex = regrasExclusao.length - 1;
+    const novasRegras = [...regrasExclusao];
+    novasRegras[lastIndex].rules.push({
+      campo_id: campo.caracteristica_id,
+      op: campo.operadores?.[0] || '=',
+      value: '',
+    });
+    setRegrasExclusao(novasRegras);
+    if (activeStep < 2) setActiveStep(2);
+  };
+
   const handleSalvar = async () => {
     if (!dadosBasicos.nome) {
       setError('O nome é obrigatório');
@@ -150,11 +154,10 @@ export default function BuilderSegmentacao() {
     }
   };
 
-  const handleVoltar = () => {
-    navigate('/segmentacoes');
-  };
+  const handleVoltar = () => navigate('/segmentacoes');
 
-  if (carregandoDados) {
+  // Item 1: Loading apenas para edição
+  if (carregandoDados && isEdit) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
         <CircularProgress />
@@ -191,6 +194,7 @@ export default function BuilderSegmentacao() {
       </Stepper>
 
       <Box sx={{ flex: 1, overflow: 'auto' }}>
+        {/* Passo 0: Público */}
         {activeStep === 0 && (
           <Paper sx={{ p: 3 }}>
             <PublicoSelector
@@ -236,14 +240,13 @@ export default function BuilderSegmentacao() {
           </Paper>
         )}
 
+        {/* Passo 1: Inclusão */}
         {activeStep === 1 && (
           <Paper sx={{ p: 3 }}>
             <Box sx={{ display: 'flex', gap: 3 }}>
-              {/* ✅ Menu de Temas e Campos */}
               <Box sx={{ flex: '1 1 40%', maxHeight: 400, overflow: 'auto' }}>
-                <TemaMenu onSelectCampo={handleSelectCampo} />
+                <TemaMenu onSelectCampo={handleSelectCampoInclusao} />
               </Box>
-              {/* ✅ Construtor de Regras de Inclusão */}
               <Box sx={{ flex: '1 1 60%' }}>
                 <RuleBuilder
                   value={regrasInclusao}
@@ -254,12 +257,20 @@ export default function BuilderSegmentacao() {
           </Paper>
         )}
 
+        {/* Passo 2: Exclusão - com TemaMenu também */}
         {activeStep === 2 && (
           <Paper sx={{ p: 3 }}>
-            <ExclusaoBuilder
-              value={regrasExclusao}
-              onChange={setRegrasExclusao}
-            />
+            <Box sx={{ display: 'flex', gap: 3 }}>
+              <Box sx={{ flex: '1 1 40%', maxHeight: 400, overflow: 'auto' }}>
+                <TemaMenu onSelectCampo={handleSelectCampoExclusao} />
+              </Box>
+              <Box sx={{ flex: '1 1 60%' }}>
+                <ExclusaoBuilder
+                  value={regrasExclusao}
+                  onChange={setRegrasExclusao}
+                />
+              </Box>
+            </Box>
           </Paper>
         )}
       </Box>

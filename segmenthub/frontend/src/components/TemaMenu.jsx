@@ -8,31 +8,36 @@ export default function TemaMenu({ onSelectCampo }) {
   const [temas, setTemas] = useState([]);
   const [camposPorTema, setCamposPorTema] = useState({});
   const [expanded, setExpanded] = useState({});
+  const [carregandoCampos, setCarregandoCampos] = useState(false);
 
+  // Carrega temas e, em paralelo, os campos de cada tema
   useEffect(() => {
-    const carregarTemas = async () => {
+    const carregarTudo = async () => {
       try {
-        const response = await listarTemas();
-        setTemas(response.data || []);
+        const responseTemas = await listarTemas();
+        const temasData = responseTemas.data || [];
+        setTemas(temasData);
+
+        // Pré-carregar campos de todos os temas em paralelo
+        setCarregandoCampos(true);
+        const promises = temasData.map(tema => listarCampos(tema.tema));
+        const resultados = await Promise.all(promises);
+        const camposMap = {};
+        temasData.forEach((tema, index) => {
+          camposMap[tema.tema] = resultados[index].data || [];
+        });
+        setCamposPorTema(camposMap);
       } catch (err) {
-        console.error('Erro ao carregar temas:', err);
+        console.error('Erro ao carregar temas ou campos:', err);
+      } finally {
+        setCarregandoCampos(false);
       }
     };
-    carregarTemas();
-  }, [listarTemas]);
+    carregarTudo();
+  }, [listarTemas, listarCampos]);
 
-  const handleToggle = async (tema) => {
-    const isExpanded = expanded[tema];
-    setExpanded((prev) => ({ ...prev, [tema]: !isExpanded }));
-
-    if (!isExpanded && !camposPorTema[tema]) {
-      try {
-        const response = await listarCampos(tema);
-        setCamposPorTema((prev) => ({ ...prev, [tema]: response.data || [] }));
-      } catch (err) {
-        console.error('Erro ao carregar campos:', err);
-      }
-    }
+  const handleToggle = (tema) => {
+    setExpanded((prev) => ({ ...prev, [tema]: !prev[tema] }));
   };
 
   if (loading && temas.length === 0) {
@@ -47,6 +52,7 @@ export default function TemaMenu({ onSelectCampo }) {
     <List component="nav" sx={{ width: '100%', bgcolor: 'background.paper' }}>
       <Typography variant="subtitle2" sx={{ px: 2, py: 1, color: 'text.secondary' }}>
         Temas e Campos
+        {carregandoCampos && <CircularProgress size={16} sx={{ ml: 1 }} />}
       </Typography>
       {temas.map((tema) => (
         <div key={tema.tema}>
@@ -65,7 +71,7 @@ export default function TemaMenu({ onSelectCampo }) {
                   >
                     <ListItemText
                       primary={campo.campo_label}
-                      secondary={`${campo.tipo_dado}${campo.sensibilidade === 'sensivel' ? ' 🔒' : ''}`}
+                      secondary={campo.tipo_dado} // sem cadeado
                     />
                   </ListItemButton>
                 ))
