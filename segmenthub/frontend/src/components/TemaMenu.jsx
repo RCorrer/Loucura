@@ -19,7 +19,7 @@ export default function TemaMenu({ onSelectCampo }) {
       }
     };
     carregarTemas();
-  }, []);
+  }, [listarTemas]);
 
   const handleToggle = async (tema) => {
     const isExpanded = expanded[tema];

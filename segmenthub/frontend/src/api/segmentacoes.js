@@ -1,27 +1,37 @@
 import { useApi } from '@shared/hooks/useApi';
+import { useCallback } from 'react';
 
 const BASE_URL = '/api/segmentacoes';
 
 export const useSegmentacoesApi = () => {
   const { request, loading, error } = useApi();
 
-  const listar = (filtros = {}) => {
+  const listar = useCallback((filtros = {}) => {
     const params = new URLSearchParams(filtros).toString();
     return request(`${BASE_URL}?${params}`);
-  };
+  }, [request]);
 
-  const buscar = (id) => request(`${BASE_URL}/${id}`);
-  const criar = (dados) => request(BASE_URL, { method: 'POST', body: JSON.stringify(dados) });
-  const atualizar = (id, dados) => request(`${BASE_URL}/${id}`, { method: 'PUT', body: JSON.stringify(dados) });
-  const arquivar = (id) => request(`${BASE_URL}/${id}`, { method: 'DELETE' });
-  const clonar = (id, dados) => request(`${BASE_URL}/${id}/clonar`, { method: 'POST', body: JSON.stringify(dados) });
+  const buscar = useCallback((id) => request(`${BASE_URL}/${id}`), [request]);
 
-  const aprovar = (id, checklist) => request(`${BASE_URL}/${id}/aprovar`, { method: 'POST', body: JSON.stringify(checklist) });
-  const ativar = (id) => request(`${BASE_URL}/${id}/ativar`, { method: 'POST' });
-  const pausar = (id) => request(`${BASE_URL}/${id}/pausar`, { method: 'POST' });
-  const reativar = (id) => request(`${BASE_URL}/${id}/reativar`, { method: 'POST' });
-  const encerrar = (id) => request(`${BASE_URL}/${id}/encerrar`, { method: 'POST' });
-  const executar = (id) => request(`${BASE_URL}/${id}/executar`, { method: 'POST' });
+  const criar = useCallback((dados) => request(BASE_URL, { method: 'POST', body: JSON.stringify(dados) }), [request]);
+
+  const atualizar = useCallback((id, dados) => request(`${BASE_URL}/${id}`, { method: 'PUT', body: JSON.stringify(dados) }), [request]);
+
+  const arquivar = useCallback((id) => request(`${BASE_URL}/${id}`, { method: 'DELETE' }), [request]);
+
+  const clonar = useCallback((id, dados) => request(`${BASE_URL}/${id}/clonar`, { method: 'POST', body: JSON.stringify(dados) }), [request]);
+
+  const aprovar = useCallback((id, checklist) => request(`${BASE_URL}/${id}/aprovar`, { method: 'POST', body: JSON.stringify(checklist) }), [request]);
+
+  const ativar = useCallback((id) => request(`${BASE_URL}/${id}/ativar`, { method: 'POST' }), [request]);
+
+  const pausar = useCallback((id) => request(`${BASE_URL}/${id}/pausar`, { method: 'POST' }), [request]);
+
+  const reativar = useCallback((id) => request(`${BASE_URL}/${id}/reativar`, { method: 'POST' }), [request]);
+
+  const encerrar = useCallback((id) => request(`${BASE_URL}/${id}/encerrar`, { method: 'POST' }), [request]);
+
+  const executar = useCallback((id) => request(`${BASE_URL}/${id}/executar`, { method: 'POST' }), [request]);
 
   return {
     listar,

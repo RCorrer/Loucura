@@ -11,30 +11,23 @@ import {
   Step,
   StepLabel,
   Paper,
-  MenuItem, // ✅ ADICIONADO
+  MenuItem,
 } from '@mui/material';
 import { useSegmentacoesApi } from '../api/segmentacoes';
-import { useMetadataApi } from '../api/metadata';
-
-// Componentes auxiliares
 import PublicoSelector from '../components/PublicoSelector';
 import TemaMenu from '../components/TemaMenu';
 import RuleBuilder from '../components/RuleBuilder';
 import ExclusaoBuilder from '../components/ExclusaoBuilder';
 
-// Passos do builder
 const STEPS = ['Público', 'Regras de Inclusão', 'Regras de Exclusão'];
 
 export default function BuilderSegmentacao() {
   const navigate = useNavigate();
-  const { id } = useParams(); // ID da segmentação (se for edição)
+  const { id } = useParams();
   const isEdit = !!id;
 
-  // Hooks de API
   const { buscar, criar, atualizar, loading: apiLoading } = useSegmentacoesApi();
-  const { loading: metaLoading } = useMetadataApi();
 
-  // Dados básicos da segmentação
   const [dadosBasicos, setDadosBasicos] = useState({
     nome: '',
     descricao: '',
@@ -44,8 +37,8 @@ export default function BuilderSegmentacao() {
     email_contato: '',
   });
 
-  // Estados do builder (ajustados para arrays de grupos)
-  const [publicoSelecionado, setPublicoSelecionado] = useState(null);
+  // Estados das regras (arrays de grupos)
+  const [publicoSelecionado, setPublicoSelecionado] = useState('');
   const [regrasInclusao, setRegrasInclusao] = useState([
     { operator: 'AND', rules: [{ campo_id: '', op: '', value: '' }] }
   ]);
@@ -53,11 +46,8 @@ export default function BuilderSegmentacao() {
     { operator: 'OR', rules: [{ campo_id: '', op: '', value: '' }] }
   ]);
 
-  // Estado de carregamento da edição
   const [carregandoDados, setCarregandoDados] = useState(false);
   const [error, setError] = useState(null);
-
-  // Passo atual do stepper
   const [activeStep, setActiveStep] = useState(0);
 
   // Carregar dados se for edição
@@ -65,8 +55,10 @@ export default function BuilderSegmentacao() {
     if (isEdit) {
       const carregarSegmentacao = async () => {
         setCarregandoDados(true);
+        setError(null);
         try {
           const data = await buscar(id);
+
           setDadosBasicos({
             nome: data.nome || '',
             descricao: data.descricao || '',
@@ -75,34 +67,49 @@ export default function BuilderSegmentacao() {
             area_responsavel: data.area_responsavel || '',
             email_contato: data.email_contato || '',
           });
-          setPublicoSelecionado(data.publico_base_id || null);
+
+          setPublicoSelecionado(data.publico_base_id || '');
+
           if (data.regras_json) {
-            // Garantir que sejam arrays, mesmo se vierem como objeto único
-            const inclusao = Array.isArray(data.regras_json.inclusao) 
-              ? data.regras_json.inclusao 
-              : [data.regras_json.inclusao || { operator: 'AND', rules: [] }];
-            const exclusao = data.regras_json.exclusao 
-              ? (Array.isArray(data.regras_json.exclusao) 
-                  ? data.regras_json.exclusao 
-                  : [data.regras_json.exclusao])
-              : [{ operator: 'OR', rules: [] }];
-            setRegrasInclusao(inclusao);
-            setRegrasExclusao(exclusao);
+            const inclusao = data.regras_json.inclusao;
+            const exclusao = data.regras_json.exclusao;
+
+            setRegrasInclusao(
+              Array.isArray(inclusao) ? inclusao : [inclusao || { operator: 'AND', rules: [] }]
+            );
+            setRegrasExclusao(
+              Array.isArray(exclusao) ? exclusao : [exclusao || { operator: 'OR', rules: [] }]
+            );
           }
         } catch (err) {
-          setError('Erro ao carregar segmentação');
           console.error(err);
+          setError('Erro ao carregar segmentação');
         } finally {
           setCarregandoDados(false);
         }
       };
       carregarSegmentacao();
     }
-  }, [id, buscar]);
+  }, [isEdit, id, buscar]);
 
-  // Função para salvar
+  // ✅ Função para adicionar regra a partir do campo selecionado no TemaMenu
+  const handleSelectCampo = (campo) => {
+    // Adiciona uma nova regra ao último grupo de inclusão
+    const lastIndex = regrasInclusao.length - 1;
+    const novasRegras = [...regrasInclusao];
+    novasRegras[lastIndex].rules.push({
+      campo_id: campo.caracteristica_id,
+      op: campo.operadores?.[0] || '=',
+      value: '',
+    });
+    setRegrasInclusao(novasRegras);
+
+    // Opcional: avança para o passo 2 se não estiver lá
+    if (activeStep < 1) setActiveStep(1);
+  };
+
+  // Salvar segmentação
   const handleSalvar = async () => {
-    // Validações básicas
     if (!dadosBasicos.nome) {
       setError('O nome é obrigatório');
       return;
@@ -111,9 +118,8 @@ export default function BuilderSegmentacao() {
       setError('Selecione um público-base');
       return;
     }
-    // Verifica se há pelo menos uma regra com campo preenchido
-    const temRegraValida = regrasInclusao.some(group => 
-      group.rules.some(rule => rule.campo_id && rule.op && rule.value !== '')
+    const temRegraValida = regrasInclusao.some(group =>
+      group.rules.some(rule => rule.campo_id && rule.op && rule.value)
     );
     if (!temRegraValida) {
       setError('Adicione pelo menos uma regra de inclusão válida');
@@ -126,7 +132,7 @@ export default function BuilderSegmentacao() {
       regras_json: {
         publico_base: publicoSelecionado,
         inclusao: regrasInclusao,
-        exclusao: regrasExclusao.some(group => group.rules.some(r => r.campo_id)) ? regrasExclusao : null,
+        exclusao: regrasExclusao.length > 0 ? regrasExclusao : null,
       },
     };
 
@@ -148,7 +154,6 @@ export default function BuilderSegmentacao() {
     navigate('/segmentacoes');
   };
 
-  // Loading states
   if (carregandoDados) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
@@ -177,7 +182,6 @@ export default function BuilderSegmentacao() {
         </Alert>
       )}
 
-      {/* Stepper */}
       <Stepper activeStep={activeStep} sx={{ mb: 3 }}>
         {STEPS.map((label, index) => (
           <Step key={label} completed={activeStep > index}>
@@ -186,14 +190,12 @@ export default function BuilderSegmentacao() {
         ))}
       </Stepper>
 
-      {/* Conteúdo do passo atual */}
       <Box sx={{ flex: 1, overflow: 'auto' }}>
         {activeStep === 0 && (
           <Paper sx={{ p: 3 }}>
             <PublicoSelector
               value={publicoSelecionado}
               onChange={setPublicoSelecionado}
-              disabled={metaLoading}
             />
             <Box sx={{ mt: 3, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
               <TextField
@@ -236,10 +238,19 @@ export default function BuilderSegmentacao() {
 
         {activeStep === 1 && (
           <Paper sx={{ p: 3 }}>
-            <RuleBuilder
-              value={regrasInclusao}
-              onChange={setRegrasInclusao}
-            />
+            <Box sx={{ display: 'flex', gap: 3 }}>
+              {/* ✅ Menu de Temas e Campos */}
+              <Box sx={{ flex: '1 1 40%', maxHeight: 400, overflow: 'auto' }}>
+                <TemaMenu onSelectCampo={handleSelectCampo} />
+              </Box>
+              {/* ✅ Construtor de Regras de Inclusão */}
+              <Box sx={{ flex: '1 1 60%' }}>
+                <RuleBuilder
+                  value={regrasInclusao}
+                  onChange={setRegrasInclusao}
+                />
+              </Box>
+            </Box>
           </Paper>
         )}
 
@@ -253,7 +264,6 @@ export default function BuilderSegmentacao() {
         )}
       </Box>
 
-      {/* Navegação entre passos */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2, pt: 2, borderTop: '1px solid #e0e0e0' }}>
         <Button
           variant="outlined"
