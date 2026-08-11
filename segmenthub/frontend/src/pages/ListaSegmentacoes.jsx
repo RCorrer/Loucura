@@ -35,7 +35,7 @@ export default function ListaSegmentacoes() {
     } catch (err) {
       console.error('Erro ao carregar segmentações:', err);
     }
-  };
+  }, [listar, filtros, buscaAtiva]);
 
   useEffect(() => {
     carregar();
