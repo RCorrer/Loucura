@@ -321,6 +321,11 @@ class SegmentacaoService:
         if not original:
             raise ValueError("Segmentação original não encontrada")
 
+        # Garante que regras_json seja um dict válido
+        regras_json = original.get("regras_json")
+        if not regras_json or not isinstance(regras_json, dict):
+            regras_json = {}
+
         # Prepara dados do clone
         nome_clone = dados.nome or f"{original['nome']} (Clone)"
         create_dto = SegmentacaoCreateDTO(
@@ -337,7 +342,7 @@ class SegmentacaoService:
             area_responsavel=dados.area_responsavel or original.get("area_responsavel"),
             email_contato=original.get("email_contato"),
             publico_base_id=original["publico_base_id"],
-            regras_json=original.get("regras_json", {}),
+            regras_json=regras_json,
             tipo="clone",
         )
         # Cria o clone

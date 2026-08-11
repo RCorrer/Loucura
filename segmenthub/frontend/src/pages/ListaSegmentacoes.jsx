@@ -78,15 +78,20 @@ export default function ListaSegmentacoes() {
     try {
       setErrorMessage(null);
       const response = await clonar(id, { owner: 'admin' });
-      await carregar();
+      
+      console.log('Clone response:', response);
+      
       if (response && response.seg_id) {
+        await carregar();
         navigate(`/segmentacoes/${response.seg_id}`);
       } else {
-        setErrorMessage('Erro ao clonar: resposta inválida da API');
+        console.error('Resposta inválida:', response);
+        setErrorMessage(`Erro ao clonar: resposta inválida da API. Resposta: ${JSON.stringify(response)}`);
       }
     } catch (err) {
       console.error('Erro ao clonar:', err);
-      setErrorMessage('Erro ao clonar segmentação: ' + (err.message || 'Erro desconhecido'));
+      const errorMsg = err.message || 'Erro desconhecido';
+      setErrorMessage(`Erro ao clonar segmentação: ${errorMsg}`);
     }
   };
 
@@ -193,6 +198,12 @@ export default function ListaSegmentacoes() {
           Limpar
         </Button>
       </Box>
+
+      {errorMessage && (
+        <Alert severity="error" onClose={() => setErrorMessage(null)} sx={{ mb: 2 }}>
+          {errorMessage}
+        </Alert>
+      )}
 
       {error ? (
         <Alert severity="error">Erro ao carregar: {error}</Alert>
