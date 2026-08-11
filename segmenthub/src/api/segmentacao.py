@@ -261,12 +261,20 @@ async def clonar_segmentacao(
     """
     Clona uma segmentação existente.
     """
+    print(f"🔍 ENDPOINT CLONE: seg_id={seg_id}, dados={dados.dict()}, usuario={user['usuario_id']}")
     service = SegmentacaoService()
     try:
         result = service.clonar(seg_id, dados, user["usuario_id"])
+        print(f"🔍 ENDPOINT CLONE: SUCESSO - {result}")
         return {**result, "mensagem": "Segmentação clonada com sucesso"}
     except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        erro = str(e)
+        print(f"🔍 ENDPOINT CLONE: ERRO 422 - {erro}")
+        raise HTTPException(status_code=422, detail=erro)
+    except Exception as e:
+        erro = str(e)
+        print(f"🔍 ENDPOINT CLONE: ERRO INESPERADO - {type(e).__name__}: {erro}")
+        raise
 
 
 # ==================== DESTINO E VIGÊNCIA ====================

@@ -56,31 +56,29 @@ class SegmentacaoService:
 
     def _validar_regras(self, regras_dict: Dict[str, Any]) -> List[str]:
         """Valida regras JSON usando o RegraValidator."""
-        print(f"🔍 VALIDAR_REGRAS: entrada = {regras_dict}, type = {type(regras_dict)}")
-        
         # Se regras_json estiver vazio, não valida (será preenchido depois)
         if not regras_dict or regras_dict == {}:
-            print("🔍 VALIDAR_REGRAS: SKIP - dict vazio ou None")
             return []
         
         try:
             regras = RegrasJson(**regras_dict)
-            resultado = self.validator.validar_regras(regras)
-            print(f"🔍 VALIDAR_REGRAS: sucesso, erros = {resultado}")
-            return resultado
+            return self.validator.validar_regras(regras)
         except Exception as e:
-            erro = f"Erro ao validar regras: {str(e)}"
-            print(f"🔍 VALIDAR_REGRAS: ERRO - {erro}")
-            return [erro]
+            return [f"Erro ao validar regras: {str(e)}"]
 
     # ==================== CRUD ====================
 
     def criar(self, dados: SegmentacaoCreateDTO, usuario: str) -> Dict[str, str]:
         """Cria uma nova segmentação."""
+        print(f"🔍 CRIAR: dados.regras_json = {dados.regras_json}, type = {type(dados.regras_json)}")
+        
         # 1. Valida regras
         erros = self._validar_regras(dados.regras_json)
+        print(f"🔍 CRIAR: erros da validação = {erros}")
         if erros:
-            raise ValueError(f"Regras inválidas: {erros}")
+            erro_msg = f"Regras inválidas: {erros}"
+            print(f"🔍 CRIAR: LANÇANDO ValueError - {erro_msg}")
+            raise ValueError(erro_msg)
 
         # 2. Gera IDs
         seg_id = self._gerar_seg_id()
