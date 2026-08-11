@@ -136,9 +136,15 @@ class SegmentacaoService:
         # Converte regras_json de string para dict
         if dados.get("regras_json"):
             try:
-                dados["regras_json"] = json.loads(dados["regras_json"])
+                parsed = json.loads(dados["regras_json"])
+                # Se for lista, converte para dict vazio
+                if isinstance(parsed, list):
+                    print(f"⚠️ regras_json é uma LISTA, convertendo para dict vazio")
+                    dados["regras_json"] = {}
+                else:
+                    dados["regras_json"] = parsed
             except:
-                pass
+                dados["regras_json"] = {}
         return dados
 
     def listar(
@@ -333,9 +339,14 @@ class SegmentacaoService:
         # Garante que regras_json seja um dict válido
         regras_json = original.get("regras_json")
         print(f"🔍 CLONE DEBUG: regras_json original = {regras_json}, type = {type(regras_json)}")
-        if not regras_json or not isinstance(regras_json, dict):
+        
+        # Se for lista ou None ou não for dict, usa dict vazio
+        if isinstance(regras_json, list):
+            print(f"⚠️ CLONE: regras_json é LISTA, convertendo para dict vazio")
             regras_json = {}
+        elif not regras_json or not isinstance(regras_json, dict):
             print(f"🔍 CLONE DEBUG: regras_json resetado para dict vazio")
+            regras_json = {}
 
         # Prepara dados do clone
         nome_clone = dados.nome or f"{original['nome']} (Clone)"
