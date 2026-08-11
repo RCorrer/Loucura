@@ -56,15 +56,22 @@ class SegmentacaoService:
 
     def _validar_regras(self, regras_dict: Dict[str, Any]) -> List[str]:
         """Valida regras JSON usando o RegraValidator."""
+        print(f"🔍 VALIDAR_REGRAS: entrada = {regras_dict}, type = {type(regras_dict)}")
+        
         # Se regras_json estiver vazio, não valida (será preenchido depois)
         if not regras_dict or regras_dict == {}:
+            print("🔍 VALIDAR_REGRAS: SKIP - dict vazio ou None")
             return []
         
         try:
             regras = RegrasJson(**regras_dict)
-            return self.validator.validar_regras(regras)
+            resultado = self.validator.validar_regras(regras)
+            print(f"🔍 VALIDAR_REGRAS: sucesso, erros = {resultado}")
+            return resultado
         except Exception as e:
-            return [f"Erro ao validar regras: {str(e)}"]
+            erro = f"Erro ao validar regras: {str(e)}"
+            print(f"🔍 VALIDAR_REGRAS: ERRO - {erro}")
+            return [erro]
 
     # ==================== CRUD ====================
 
@@ -327,8 +334,10 @@ class SegmentacaoService:
 
         # Garante que regras_json seja um dict válido
         regras_json = original.get("regras_json")
+        print(f"🔍 CLONE DEBUG: regras_json original = {regras_json}, type = {type(regras_json)}")
         if not regras_json or not isinstance(regras_json, dict):
             regras_json = {}
+            print(f"🔍 CLONE DEBUG: regras_json resetado para dict vazio")
 
         # Prepara dados do clone
         nome_clone = dados.nome or f"{original['nome']} (Clone)"
