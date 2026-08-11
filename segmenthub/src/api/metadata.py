@@ -43,6 +43,27 @@ async def listar_temas(
     }
 
 
+@router.get("/temas-completos", response_model=RespostaLista)
+async def listar_temas_completos(
+    user: dict = Depends(require_perfil(["admin", "analista"])),
+    service: MetadataService = Depends(),
+):
+    """
+    Retorna todos os temas com seus campos em uma única chamada.
+    Resolve o problema de N+1 queries no frontend.
+    """
+    data = service.listar_temas_com_campos()
+    return {
+        "data": data,
+        "meta": {
+            "page": 1,
+            "size": len(data),
+            "total": len(data),
+            "total_pages": 1,
+        },
+    }
+
+
 @router.get("/temas/{tema}/caracteristicas", response_model=RespostaLista[CaracteristicaDTO])
 async def listar_caracteristicas_por_tema(
     tema: str,
