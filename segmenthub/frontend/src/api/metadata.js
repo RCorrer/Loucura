@@ -7,10 +7,11 @@ export const useMetadataApi = () => {
   const { request, loading, error } = useApi();
 
   const listarTemas = useCallback(() => request(`${BASE_URL}/temas`), [request]);
-  const listarCampos = useCallback((tema) => request(`${BASE_URL}/temas/${tema}/campos`), [request]);
+  const listarTemasCompletos = useCallback(() => request(`${BASE_URL}/temas-completos`), [request]);
+  const listarCampos = useCallback((tema) => request(`${BASE_URL}/temas/${tema}/caracteristicas`), [request]);
   const listarPublicos = useCallback(() => request(`${BASE_URL}/publicos`), [request]);
-  const listarCamposEmUso = useCallback(() => request(`${BASE_URL}/campos-em-uso`), [request]);
-  const obterCampo = useCallback((id) => request(`${BASE_URL}/campos/${id}`), [request]);
+  const listarCamposEmUso = useCallback(() => request(`${BASE_URL}/caracteristicas-em-uso`), [request]);
+  const obterCampo = useCallback((id) => request(`${BASE_URL}/caracteristicas/${id}`), [request]);
 
   // Funções admin (se existirem)
   const listarCamposAdmin = useCallback((filtros) => request(`${BASE_URL}/admin/campos?${new URLSearchParams(filtros)}`), [request]);
@@ -20,6 +21,7 @@ export const useMetadataApi = () => {
 
   return useMemo(() => ({
     listarTemas,
+    listarTemasCompletos,
     listarCampos,
     listarPublicos,
     listarCamposEmUso,
@@ -30,5 +32,5 @@ export const useMetadataApi = () => {
     listarHistorico,
     loading,
     error,
-  }), [listarTemas, listarCampos, listarPublicos, listarCamposEmUso, obterCampo, listarCamposAdmin, atualizarFlags, atualizarStatus, listarHistorico, loading, error]);
+  }), [listarTemas, listarTemasCompletos, listarCampos, listarPublicos, listarCamposEmUso, obterCampo, listarCamposAdmin, atualizarFlags, atualizarStatus, listarHistorico, loading, error]);
 };

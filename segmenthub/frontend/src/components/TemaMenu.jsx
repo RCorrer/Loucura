@@ -4,46 +4,31 @@ import { ExpandLess, ExpandMore } from '@mui/icons-material';
 import { useMetadataApi } from '../api/metadata';
 
 export default function TemaMenu({ onSelectCampo }) {
-  const { listarTemas, listarCampos, loading } = useMetadataApi();
-  const [temas, setTemas] = useState([]);
-  const [camposPorTema, setCamposPorTema] = useState({});
+  const { listarTemasCompletos, loading } = useMetadataApi();
+  const [temasCompletos, setTemasCompletos] = useState([]);
   const [expanded, setExpanded] = useState({});
-  const [loaded, setLoaded] = useState(false); // flag para evitar recarga
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    if (loaded) return; // já carregou, não recarrega
+    if (loaded) return;
 
     const carregarTudo = async () => {
       try {
-        const temasResponse = await listarTemas();
-        const temasData = temasResponse.data || [];
-        setTemas(temasData);
-
-        const promises = temasData.map((tema) =>
-          listarCampos(tema.tema).then((response) => ({
-            tema: tema.tema,
-            campos: response.data || [],
-          }))
-        );
-        const resultados = await Promise.all(promises);
-        const map = {};
-        resultados.forEach(({ tema, campos }) => {
-          map[tema] = campos;
-        });
-        setCamposPorTema(map);
+        const response = await listarTemasCompletos();
+        setTemasCompletos(response.data || []);
         setLoaded(true);
       } catch (err) {
         console.error('Erro ao carregar temas/campos:', err);
       }
     };
     carregarTudo();
-  }, [listarTemas, listarCampos, loaded]);
+  }, [listarTemasCompletos, loaded]);
 
   const handleToggle = (tema) => {
     setExpanded((prev) => ({ ...prev, [tema]: !prev[tema] }));
   };
 
-  if (loading && temas.length === 0) {
+  if (loading && temasCompletos.length === 0) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
         <CircularProgress />
@@ -56,8 +41,8 @@ export default function TemaMenu({ onSelectCampo }) {
       <Typography variant="subtitle2" sx={{ px: 2, py: 1, color: 'text.secondary' }}>
         Temas e Campos
       </Typography>
-      {temas.map((tema) => {
-        const campos = camposPorTema[tema.tema] || [];
+      {temasCompletos.map((tema) => {
+        const campos = tema.campos || [];
         const isExpanded = expanded[tema.tema];
         return (
           <div key={tema.tema}>
