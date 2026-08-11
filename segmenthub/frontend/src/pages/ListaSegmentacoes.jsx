@@ -215,7 +215,11 @@ export default function ListaSegmentacoes() {
           onAction={() => navigate('/segmentacoes/nova')}
         />
       ) : (
-        <Box sx={{ flex: 1, minHeight: 0, height: '100%' }}>
+        <Box sx={{ 
+          flex: 1, 
+          minHeight: 400,  // Altura mínima para evitar colapso no loading
+          height: '100%' 
+        }}>
           <DataTable
             key={`page-${meta.page}-${meta.size}`}
             rows={segmentacoes}

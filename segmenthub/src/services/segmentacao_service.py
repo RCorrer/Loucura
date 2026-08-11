@@ -56,6 +56,10 @@ class SegmentacaoService:
 
     def _validar_regras(self, regras_dict: Dict[str, Any]) -> List[str]:
         """Valida regras JSON usando o RegraValidator."""
+        # Se regras_json estiver vazio, não valida (será preenchido depois)
+        if not regras_dict or regras_dict == {}:
+            return []
+        
         try:
             regras = RegrasJson(**regras_dict)
             return self.validator.validar_regras(regras)
