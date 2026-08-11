@@ -70,62 +70,82 @@ class SegmentacaoService:
 
     def criar(self, dados: SegmentacaoCreateDTO, usuario: str) -> Dict[str, str]:
         """Cria uma nova segmentação."""
-        print(f"🔍 CRIAR: dados.regras_json = {dados.regras_json}, type = {type(dados.regras_json)}")
-        
-        # 1. Valida regras
-        erros = self._validar_regras(dados.regras_json)
-        print(f"🔍 CRIAR: erros da validação = {erros}")
-        if erros:
-            erro_msg = f"Regras inválidas: {erros}"
-            print(f"🔍 CRIAR: LANÇANDO ValueError - {erro_msg}")
-            raise ValueError(erro_msg)
+        try:
+            print(f"🔍 CRIAR: Iniciando criação")
+            print(f"🔍 CRIAR: dados.regras_json = {dados.regras_json}, type = {type(dados.regras_json)}")
+            
+            # 1. Valida regras
+            print(f"🔍 CRIAR: Validando regras...")
+            erros = self._validar_regras(dados.regras_json)
+            print(f"🔍 CRIAR: erros = {erros}")
+            if erros:
+                erro_msg = f"Regras inválidas: {erros}"
+                print(f"❌ CRIAR: {erro_msg}")
+                raise ValueError(erro_msg)
 
-        # 2. Gera IDs
-        seg_id = self._gerar_seg_id()
-        seg_codigo = self._gerar_seg_codigo(dados.nome)
-        seg_slug = self._gerar_seg_slug(dados.nome)
+            # 2. Gera IDs
+            print(f"🔍 CRIAR: Gerando IDs...")
+            seg_id = self._gerar_seg_id()
+            seg_codigo = self._gerar_seg_codigo(dados.nome)
+            seg_slug = self._gerar_seg_slug(dados.nome)
+            print(f"🔍 CRIAR: seg_id={seg_id}, seg_codigo={seg_codigo}")
 
-        # 3. Prepara dados para inserção
-        now = datetime.now()
-        dados_insert = {
-            "seg_id": seg_id,
-            "seg_codigo": seg_codigo,
-            "seg_slug": seg_slug,
-            "nome": dados.nome,
-            "descricao": dados.descricao,
-            "objetivo": dados.objetivo,
-            "seg_tags": dados.seg_tags or [],
-            "resumo": dados.resumo,
-            "objetivo_negocio": dados.objetivo_negocio,
-            "publico_alvo_descricao": dados.publico_alvo_descricao,
-            "observacoes": dados.observacoes,
-            "documentacao_md": dados.documentacao_md,
-            "owner": dados.owner,
-            "area_responsavel": dados.area_responsavel,
-            "email_contato": dados.email_contato,
-            "criado_por": usuario,
-            "publico_base_id": dados.publico_base_id,
-            "regras_json": json.dumps(dados.regras_json),
-            "tipo": dados.tipo or "direta",
-            "status": "rascunho",
-            "versao_atual": 1,
-            "criado_em": now,
-            "atualizado_em": now,
-        }
+            # 3. Prepara dados para inserção
+            print(f"🔍 CRIAR: Preparando dados para inserção...")
+            now = datetime.now()
+            dados_insert = {
+                "seg_id": seg_id,
+                "seg_codigo": seg_codigo,
+                "seg_slug": seg_slug,
+                "nome": dados.nome,
+                "descricao": dados.descricao,
+                "objetivo": dados.objetivo,
+                "seg_tags": dados.seg_tags or [],
+                "resumo": dados.resumo,
+                "objetivo_negocio": dados.objetivo_negocio,
+                "publico_alvo_descricao": dados.publico_alvo_descricao,
+                "observacoes": dados.observacoes,
+                "documentacao_md": dados.documentacao_md,
+                "owner": dados.owner,
+                "area_responsavel": dados.area_responsavel,
+                "email_contato": dados.email_contato,
+                "criado_por": usuario,
+                "publico_base_id": dados.publico_base_id,
+                "regras_json": json.dumps(dados.regras_json),
+                "tipo": dados.tipo or "direta",
+                "status": "rascunho",
+                "versao_atual": 1,
+                "criado_em": now,
+                "atualizado_em": now,
+            }
+            print(f"🔍 CRIAR: dados_insert preparados")
 
-        # 4. Insere no banco
-        self.repository.inserir(dados_insert)
+            # 4. Insere no banco
+            print(f"🔍 CRIAR: Inserindo no banco...")
+            self.repository.inserir(dados_insert)
+            print(f"✅ CRIAR: Inserido com sucesso")
 
-        # 5. Insere versão inicial
-        self.repository.inserir_versao(
-            seg_id=seg_id,
-            versao=1,
-            regras_json=dados.regras_json,
-            motivo="Versão inicial",
-            alterado_por=usuario,
-        )
+            # 5. Insere versão inicial
+            print(f"🔍 CRIAR: Inserindo versão inicial...")
+            self.repository.inserir_versao(
+                seg_id=seg_id,
+                versao=1,
+                regras_json=dados.regras_json,
+                motivo="Versão inicial",
+                alterado_por=usuario,
+            )
+            print(f"✅ CRIAR: Versão inserida com sucesso")
 
-        return {"seg_id": seg_id, "seg_codigo": seg_codigo, "seg_slug": seg_slug}
+            result = {"seg_id": seg_id, "seg_codigo": seg_codigo, "seg_slug": seg_slug}
+            print(f"✅ CRIAR: Concluído com sucesso! result={result}")
+            return result
+            
+        except Exception as e:
+            erro = f"{type(e).__name__}: {str(e)}"
+            print(f"❌ CRIAR ERROR: {erro}")
+            import traceback
+            print(f"❌ CRIAR TRACEBACK:\n{traceback.format_exc()}")
+            raise
 
     def buscar_por_id(self, seg_id: str) -> Optional[Dict]:
         """Busca uma segmentação pelo ID, com detalhes completos."""
@@ -332,43 +352,60 @@ class SegmentacaoService:
 
     def clonar(self, seg_id: str, dados: CloneSegmentacaoDTO, usuario: str) -> Dict[str, str]:
         """Clona uma segmentação existente."""
-        original = self.buscar_por_id(seg_id)
-        if not original:
-            raise ValueError("Segmentação original não encontrada")
+        try:
+            print(f"🔍 CLONE: Iniciando clone de {seg_id}")
+            
+            original = self.buscar_por_id(seg_id)
+            if not original:
+                raise ValueError("Segmentação original não encontrada")
+            
+            print(f"🔍 CLONE: Original encontrado: {original.get('nome')}")
 
-        # Garante que regras_json seja um dict válido
-        regras_json = original.get("regras_json")
-        print(f"🔍 CLONE DEBUG: regras_json original = {regras_json}, type = {type(regras_json)}")
-        
-        # Se for lista ou None ou não for dict, usa dict vazio
-        if isinstance(regras_json, list):
-            print(f"⚠️ CLONE: regras_json é LISTA, convertendo para dict vazio")
-            regras_json = {}
-        elif not regras_json or not isinstance(regras_json, dict):
-            print(f"🔍 CLONE DEBUG: regras_json resetado para dict vazio")
-            regras_json = {}
+            # Garante que regras_json seja um dict válido
+            regras_json = original.get("regras_json")
+            print(f"🔍 CLONE: regras_json = {regras_json}, type = {type(regras_json)}")
+            
+            # Se for lista ou None ou não for dict, usa dict vazio
+            if isinstance(regras_json, list):
+                print(f"⚠️ CLONE: regras_json é LISTA, convertendo para dict vazio")
+                regras_json = {}
+            elif not regras_json or not isinstance(regras_json, dict):
+                print(f"🔍 CLONE: regras_json não é dict, usando dict vazio")
+                regras_json = {}
 
-        # Prepara dados do clone
-        nome_clone = dados.nome or f"{original['nome']} (Clone)"
-        create_dto = SegmentacaoCreateDTO(
-            nome=nome_clone,
-            descricao=dados.descricao or original.get("descricao"),
-            objetivo=original["objetivo"],
-            seg_tags=original.get("seg_tags"),
-            resumo=original.get("resumo"),
-            objetivo_negocio=original.get("objetivo_negocio"),
-            publico_alvo_descricao=original.get("publico_alvo_descricao"),
-            observacoes=original.get("observacoes"),
-            documentacao_md=original.get("documentacao_md"),
-            owner=dados.owner or usuario,
-            area_responsavel=dados.area_responsavel or original.get("area_responsavel"),
-            email_contato=original.get("email_contato"),
-            publico_base_id=original["publico_base_id"],
-            regras_json=regras_json,
-            tipo="clone",
-        )
-        # Cria o clone
-        return self.criar(create_dto, usuario)
+            # Prepara dados do clone
+            nome_clone = dados.nome or f"{original['nome']} (Clone)"
+            print(f"🔍 CLONE: Criando DTO com nome={nome_clone}")
+            
+            create_dto = SegmentacaoCreateDTO(
+                nome=nome_clone,
+                descricao=dados.descricao or original.get("descricao"),
+                objetivo=original["objetivo"],
+                seg_tags=original.get("seg_tags"),
+                resumo=original.get("resumo"),
+                objetivo_negocio=original.get("objetivo_negocio"),
+                publico_alvo_descricao=original.get("publico_alvo_descricao"),
+                observacoes=original.get("observacoes"),
+                documentacao_md=original.get("documentacao_md"),
+                owner=dados.owner or usuario,
+                area_responsavel=dados.area_responsavel or original.get("area_responsavel"),
+                email_contato=original.get("email_contato"),
+                publico_base_id=original["publico_base_id"],
+                regras_json=regras_json,
+                tipo="clone",
+            )
+            
+            print(f"🔍 CLONE: DTO criado, chamando criar()")
+            result = self.criar(create_dto, usuario)
+            print(f"🔍 CLONE: Sucesso! seg_id={result.get('seg_id')}")
+            return result
+            
+        except Exception as e:
+            erro = f"{type(e).__name__}: {str(e)}"
+            print(f"❌ CLONE ERROR: {erro}")
+            import traceback
+            print(f"❌ CLONE TRACEBACK:\n{traceback.format_exc()}")
+            raise
 
     def listar_versoes(self, seg_id: str) -> List[Dict]:
         return self.repository.listar_versoes(seg_id)
