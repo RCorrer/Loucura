@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FormControl, InputLabel, Select, MenuItem, FormHelperText, CircularProgress } from '@mui/material';
 import { useMetadataApi } from '../api/metadata';
 
-export default function PublicoSelector({ value, onChange, error, helperText, onLoadComplete }) {
+export default function PublicoSelector({ value, onChange, error, helperText }) {
   const { listarPublicos, loading } = useMetadataApi();
   const [publicos, setPublicos] = useState([]);
   const [carregado, setCarregado] = useState(false);
@@ -22,7 +22,7 @@ export default function PublicoSelector({ value, onChange, error, helperText, on
   }, [listarPublicos]);
 
   return (
-    <FormControl fullWidth error={!!error} sx={{ position: 'relative' }}>
+    <FormControl fullWidth error={!!error}>
       <InputLabel id="publico-select-label">Público Base</InputLabel>
       <Select
         labelId="publico-select-label"

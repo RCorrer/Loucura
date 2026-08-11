@@ -46,7 +46,6 @@ export default function BuilderSegmentacao() {
   ]);
 
   const [carregandoDados, setCarregandoDados] = useState(false);
-  const [carregandoMetadata, setCarregandoMetadata] = useState(true);
   const [error, setError] = useState(null);
   const [activeStep, setActiveStep] = useState(0);
 
@@ -81,33 +80,11 @@ export default function BuilderSegmentacao() {
           setError('Erro ao carregar segmentação');
         } finally {
           setCarregandoDados(false);
-          setCarregandoMetadata(false);
         }
       };
       carregarSegmentacao();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEdit, id]);
-
-  // ✅ Reseta estado ao mudar de edição para criação
-  useEffect(() => {
-    if (!isEdit) {
-      setDadosBasicos({
-        nome: '',
-        descricao: '',
-        objetivo: '',
-        owner: 'admin',
-        area_responsavel: '',
-        email_contato: '',
-      });
-      setPublicoSelecionado('');
-      setRegrasInclusao([{ operator: 'AND', rules: [{ campo_id: '', op: '', value: '' }] }]);
-      setRegrasExclusao([{ operator: 'OR', rules: [{ campo_id: '', op: '', value: '' }] }]);
-      setActiveStep(0);
-      setError(null);
-      setCarregandoMetadata(true);
-    }
-  }, [isEdit]);
+  }, [isEdit, id, buscar]);
 
   const handleSelectCampoInclusao = (campo) => {
     const lastIndex = regrasInclusao.length - 1;
@@ -221,7 +198,6 @@ export default function BuilderSegmentacao() {
             <PublicoSelector
               value={publicoSelecionado}
               onChange={setPublicoSelecionado}
-              onLoadComplete={() => setCarregandoMetadata(false)}
             />
             <Box sx={{ mt: 3, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
               <TextField

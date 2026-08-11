@@ -79,35 +79,6 @@ class MetadataService:
             for row in results
         ]
 
-    def listar_temas_com_campos(self):
-        """Retorna todos os temas com seus campos em uma única chamada.
-        Resolve o problema de N+1 queries no frontend.
-        """
-        temas = self.repository.get_temas()
-        resultado = []
-        
-        for tema_row in temas:
-            tema_nome = tema_row["tema"]
-            campos = self.repository.get_campos_por_tema(tema_nome)
-            
-            tema_completo = {
-                "tema": tema_nome,
-                "tema_ordem": tema_row["tema_ordem"],
-                "campos": [
-                    {
-                        "caracteristica_id": row["caracteristica_id"],
-                        "campo_label": row["campo_label"],
-                        "tipo_dado": row["tipo_dado"],
-                        "operadores": row["operadores"],
-                        "sensibilidade": row["sensibilidade"],
-                    }
-                    for row in campos
-                ]
-            }
-            resultado.append(tema_completo)
-        
-        return resultado
-
     def listar_campos_em_uso(self):
         """Retorna campos em uso em segmentações ativas."""
         results = self.repository.get_campos_em_uso()

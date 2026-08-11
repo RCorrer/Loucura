@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PageHeader, DataTable, StatusBadge, EmptyState } from '@shared';
 import { Box, Chip, TextField, MenuItem, Button, IconButton, Tooltip, InputAdornment, Alert } from '@mui/material';
 import { useSegmentacoesApi } from '../api/segmentacoes';
@@ -18,9 +18,8 @@ export default function ListaSegmentacoes() {
   const [buscaInput, setBuscaInput] = useState('');
   const [buscaAtiva, setBuscaAtiva] = useState('');
   const [meta, setMeta] = useState({ page: 1, size: 10, total: 0, total_pages: 0 });
-  const [errorMessage, setErrorMessage] = useState(null);
 
-  const carregar = useCallback(async () => {
+  const carregar = async () => {
     try {
       const response = await listar({
         ...filtros,
@@ -39,7 +38,7 @@ export default function ListaSegmentacoes() {
 
   useEffect(() => {
     carregar();
-  }, [carregar]);
+  }, [filtros.page, filtros.size, filtros.status, buscaAtiva]);
 
   useEffect(() => {
     setFiltros((prev) => ({ ...prev, page: 1 }));
@@ -59,7 +58,6 @@ export default function ListaSegmentacoes() {
     setBuscaInput('');
     setBuscaAtiva('');
     setFiltros((prev) => ({ ...prev, status: '', page: 1 }));
-    setErrorMessage(null);
   };
 
   const handleFiltroChange = (key, value) => {
@@ -76,17 +74,13 @@ export default function ListaSegmentacoes() {
 
   const handleClone = async (id) => {
     try {
-      setErrorMessage(null);
       const response = await clonar(id, { owner: 'admin' });
       await carregar();
       if (response && response.seg_id) {
         navigate(`/segmentacoes/${response.seg_id}`);
-      } else {
-        setErrorMessage('Erro ao clonar: resposta inválida da API');
       }
     } catch (err) {
       console.error('Erro ao clonar:', err);
-      setErrorMessage('Erro ao clonar segmentação: ' + (err.message || 'Erro desconhecido'));
     }
   };
 
