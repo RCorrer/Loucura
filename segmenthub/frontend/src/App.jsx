@@ -73,6 +73,7 @@ function App() {
       title="SegmentHub"
       menuItems={menuItemsWithActive}
       user="Analista"
+      headerActions={<NotificacoesPainel />}
     >
       <Routes>
         {/* Redirecionamento */}

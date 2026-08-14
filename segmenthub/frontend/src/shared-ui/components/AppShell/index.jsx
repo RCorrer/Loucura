@@ -5,7 +5,7 @@ import { tokens } from '../../theme/tokens';
 
 const drawerWidth = 260;
 
-export default function AppShell({ children, title, menuItems, user }) {
+export default function AppShell({ children, title, menuItems, user, headerActions }) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
 
   const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
@@ -53,7 +53,7 @@ export default function AppShell({ children, title, menuItems, user }) {
   );
 
   return (
-    <Box sx={{ display: 'flex' }}>
+    <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       <AppBar position="fixed" sx={{ zIndex: 1200, backgroundColor: tokens.brand.primary }}>
         <Toolbar>
           <IconButton
@@ -98,9 +98,13 @@ export default function AppShell({ children, title, menuItems, user }) {
         component="main"
         sx={{
           flexGrow: 1,
+          display: 'flex',
+          flexDirection: 'column',
           p: 3,
           mt: 8,
           width: { sm: `calc(100% - ${drawerWidth}px)` },
+          height: 'calc(100vh - 64px)',
+          overflow: 'hidden',
         }}
       >
         {children}
