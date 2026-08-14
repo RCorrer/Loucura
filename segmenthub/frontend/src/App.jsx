@@ -12,6 +12,7 @@ import ListaSegmentacoes from './pages/ListaSegmentacoes';
 import DocumentacaoSegmentacao from './pages/DocumentacaoSegmentacao';
 import DetalheSegmentacao from './pages/DetalheSegmentacao';
 import TimelineSegmentacao from './pages/TimelineSegmentacao';
+import DashboardSaude from './pages/DashboardSaude';
 
 function App() {
   const location = useLocation();
