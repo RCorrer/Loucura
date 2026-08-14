@@ -18,6 +18,7 @@ import PublicoSelector from '../components/PublicoSelector';
 import TemaMenu from '../components/TemaMenu';
 import RuleBuilder from '../components/RuleBuilder';
 import ExclusaoBuilder from '../components/ExclusaoBuilder';
+import EstimativaBadge from '../components/EstimativaBadge';
 
 const STEPS = ['Público', 'Regras de Inclusão', 'Regras de Exclusão'];
 
@@ -286,13 +287,24 @@ export default function BuilderSegmentacao() {
         </Alert>
       )}
 
-      <Stepper activeStep={activeStep} sx={{ mb: 3 }}>
+      <Stepper activeStep={activeStep} sx={{ mb: 2 }}>
         {STEPS.map((label, index) => (
           <Step key={label} completed={activeStep > index}>
             <StepLabel>{label}</StepLabel>
           </Step>
         ))}
       </Stepper>
+
+      {/* S1-FRONT-03: Estimativa em tempo real */}
+      <Box sx={{ mb: 2 }}>
+        <EstimativaBadge
+          publicoBase={publicoSelecionado}
+          regrasInclusao={regrasInclusao}
+          regrasExclusao={regrasExclusao}
+          interGroupOpInclusao={interGroupOpInclusao}
+          interGroupOpExclusao={interGroupOpExclusao}
+        />
+      </Box>
 
       <Box sx={{ flex: 1, overflow: 'auto' }}>
         {activeStep === 0 && (
