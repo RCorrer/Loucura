@@ -14,6 +14,7 @@ import DetalheSegmentacao from './pages/DetalheSegmentacao';
 import TimelineSegmentacao from './pages/TimelineSegmentacao';
 import DashboardSaude from './pages/DashboardSaude';
 import NotificacoesPainel from './components/NotificacoesPainel';
+import ChatSegmentacao from './pages/ChatSegmentacao';
 
 function App() {
   const location = useLocation();
