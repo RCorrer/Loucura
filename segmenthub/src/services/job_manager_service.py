@@ -24,6 +24,7 @@ from databricks.sdk.service.jobs import (
     Task,
     NotebookTask,
     CronSchedule,
+    JobSettings,
     JobEmailNotifications,
     QueueSettings,
 )
@@ -168,7 +169,7 @@ class JobManagerService:
             # Remove schedule (job fica sem agendamento)
             self.client.jobs.update(
                 job_id=int(job_id),
-                new_settings={"schedule": None},
+                new_settings=JobSettings(schedule=None),
             )
 
             self._registrar_log(seg_id, "pausar", job_id, None, "sucesso", usuario)
@@ -195,7 +196,7 @@ class JobManagerService:
 
             self.client.jobs.update(
                 job_id=int(job_id),
-                new_settings={"schedule": schedule},
+                new_settings=JobSettings(schedule=schedule),
             )
 
             self._registrar_log(seg_id, "reativar", job_id, None, "sucesso", usuario)
@@ -276,7 +277,7 @@ class JobManagerService:
 
             self.client.jobs.update(
                 job_id=int(job_id),
-                new_settings={"schedule": schedule},
+                new_settings=JobSettings(schedule=schedule),
             )
 
             self._registrar_log(seg_id, "atualizar_schedule", job_id, None, "sucesso",

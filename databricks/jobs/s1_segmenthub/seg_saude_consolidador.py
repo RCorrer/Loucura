@@ -154,15 +154,17 @@ print(f"✓ seg_saude atualizada para {len(saude_updates)} segmentações")
 # ============================================================
 
 for alerta in alertas_gerados:
-    titulo = f"⚠️ Saúde crítica: {alerta['nome']}"
-    mensagem = f"Problemas detectados: {'; '.join(alerta['problemas'])}"
+    titulo = f"⚠️ Saúde crítica: {alerta['nome']}".replace("'", "''")
+    mensagem = f"Problemas detectados: {'; '.join(alerta['problemas'])}".replace("'", "''")
+    notif_id = f"notif_saude_{alerta['seg_id']}_{datetime.now().strftime('%Y%m%d%H%M')}"
+    owner_safe = alerta['owner'].replace("'", "''") if alerta.get('owner') else 'system'
 
     spark.sql(f"""
       INSERT INTO {CATALOG}.{SCHEMA_SEG}.seg_notificacao
       (notif_id, destinatario, tipo, seg_id, titulo, mensagem, lida, criado_em)
       VALUES (
-        '{f"notif_saude_{alerta['seg_id']}_{datetime.now().strftime('%Y%m%d%H%M')}"  }',
-        '{alerta['owner']}',
+        '{notif_id}',
+        '{owner_safe}',
         'alerta_saude',
         '{alerta['seg_id']}',
         '{titulo}',
