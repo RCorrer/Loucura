@@ -36,6 +36,17 @@ export const useSegmentacoesApi = () => {
   // S1-FRONT-04: Destino e Vigência
   const buscarDestinos = useCallback((id) => request(`${BASE_URL}/${id}/destinos`), [request]);
 
+  // S1-FRONT-05: Validação, versões, execuções, estados
+  const validar = useCallback((id) => request(`${BASE_URL}/${id}/validar`, { method: 'POST' }), [request]);
+
+  const enviarAprovacao = useCallback((id) => request(`${BASE_URL}/${id}/enviar-aprovacao`, { method: 'POST' }), [request]);
+
+  const listarExecucoes = useCallback((id) => request(`${BASE_URL}/${id}/execucoes`), [request]);
+
+  const listarVersoes = useCallback((id) => request(`${BASE_URL}/${id}/versoes`), [request]);
+
+  const listarEstados = useCallback((id) => request(`${BASE_URL}/${id}/estados`), [request]);
+
   const atualizarDestinos = useCallback(
     (id, destinos) => request(`${BASE_URL}/${id}/destinos`, { method: 'PUT', body: JSON.stringify(destinos) }),
     [request]

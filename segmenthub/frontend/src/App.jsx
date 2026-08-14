@@ -10,6 +10,7 @@ import { Divider } from '@mui/material';
 import BuilderSegmentacao from './pages/BuilderSegmentacao';
 import ListaSegmentacoes from './pages/ListaSegmentacoes';
 import DocumentacaoSegmentacao from './pages/DocumentacaoSegmentacao';
+import DetalheSegmentacao from './pages/DetalheSegmentacao';
 
 function App() {
   const location = useLocation();
