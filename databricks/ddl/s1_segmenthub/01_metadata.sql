@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS plataforma.metadata.catalogo_publicos (
   nome           STRING,
   descricao      STRING,
   tabela_fisica  STRING   NOT NULL,
+  join_key       STRING   NOT NULL COMMENT 'Coluna PK da tabela base (ex: cpf_cnpj)',
   criado_por_time STRING,
   ativo          BOOLEAN
 ) USING DELTA

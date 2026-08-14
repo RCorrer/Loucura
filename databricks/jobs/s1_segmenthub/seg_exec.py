@@ -214,9 +214,9 @@ for tabela, join_key in tabelas_todas:
     if tabela != tabela_base:
         joins_sql += f"\n  LEFT JOIN {tabela} ON {tabela}.{join_key} = {tabela_base}.{join_key_base}"
 
-# Query final
+# Query final — alias cpf_cnpj alinhado com DDL seg_resultado_corrente
 query_sql = f"""
-SELECT DISTINCT {tabela_base}.{join_key_base} AS cliente_id
+SELECT DISTINCT {tabela_base}.{join_key_base} AS cpf_cnpj
 FROM {tabela_base}{joins_sql}
 WHERE ({inclusao_where})
 """
@@ -254,25 +254,27 @@ df_resultado.createOrReplaceTempView("resultado_novo")
 spark.sql(f"""
   MERGE INTO {CATALOG}.{SCHEMA_SEG}.seg_resultado_corrente AS target
   USING (
-    SELECT '{SEG_ID}' AS seg_id, cliente_id
+    SELECT '{SEG_ID}' AS seg_id, cpf_cnpj
     FROM resultado_novo
   ) AS source
-  ON target.seg_id = source.seg_id AND target.cliente_id = source.cliente_id
-  WHEN NOT MATCHED THEN INSERT (seg_id, cliente_id, incluido_em)
-    VALUES (source.seg_id, source.cliente_id, current_timestamp())
+  ON target.seg_id = source.seg_id AND target.cpf_cnpj = source.cpf_cnpj
+  WHEN NOT MATCHED THEN INSERT (seg_id, cpf_cnpj, exec_id, entrou_em)
+    VALUES (source.seg_id, source.cpf_cnpj, '{exec_id}', current_timestamp())
   WHEN NOT MATCHED BY SOURCE AND target.seg_id = '{SEG_ID}' THEN DELETE
 """)
 
 print(f"✓ seg_resultado_corrente atualizado (MERGE)")
 
 # 4b. INSERT em seg_resultado_historico (auditoria)
+# DDL order: exec_id, seg_id, versao_usada, cpf_cnpj, snapshot_em
 spark.sql(f"""
   INSERT INTO {CATALOG}.{SCHEMA_SEG}.seg_resultado_historico
-  SELECT '{SEG_ID}' AS seg_id,
-         '{exec_id}' AS exec_id,
-         {seg['versao_atual']} AS versao,
-         cliente_id,
-         current_timestamp() AS calculado_em
+  (exec_id, seg_id, versao_usada, cpf_cnpj, snapshot_em)
+  SELECT '{exec_id}',
+         '{SEG_ID}',
+         {seg['versao_atual']},
+         cpf_cnpj,
+         current_timestamp()
   FROM resultado_novo
 """)
 
@@ -388,7 +390,7 @@ spark.sql(f"""
     ultima_verificacao = current_timestamp(),
     variacao_publico_pct = {variacao_pct},
     taxa_sucesso_exec = {taxa_sucesso},
-    tempo_medio_exec_seg = {tempo_exec},
+    tempo_medio_exec_seg = CAST({tempo_exec} AS INT),
     alertas_json = '{json.dumps(alertas)}',
     publico_atual = {qtd_clientes}
   WHEN NOT MATCHED THEN INSERT
@@ -396,7 +398,7 @@ spark.sql(f"""
      taxa_sucesso_exec, tempo_medio_exec_seg, alertas_json, publico_atual)
   VALUES
     ('{SEG_ID}', '{health_status}', current_timestamp(), {variacao_pct},
-     {taxa_sucesso}, {tempo_exec}, '{json.dumps(alertas)}', {qtd_clientes})
+     {taxa_sucesso}, CAST({tempo_exec} AS INT), '{json.dumps(alertas)}', {qtd_clientes})
 """)
 
 print(f"✓ Saúde atualizada: {health_status.upper()} (variação: {variacao_pct:+.1f}%)")
@@ -421,7 +423,7 @@ if outros_seg_ids:
 
     # Resultado do segmento atual (já temos em memória)
     df_meu_resultado = spark.sql(f"""
-      SELECT cliente_id FROM {CATALOG}.{SCHEMA_SEG}.seg_resultado_corrente
+      SELECT cpf_cnpj FROM {CATALOG}.{SCHEMA_SEG}.seg_resultado_corrente
       WHERE seg_id = '{SEG_ID}'
     """)
     meu_count = qtd_clientes
@@ -429,13 +431,13 @@ if outros_seg_ids:
     overlap_rows = []
     for outro_id in outros_seg_ids:
         df_outro = spark.sql(f"""
-          SELECT cliente_id FROM {CATALOG}.{SCHEMA_SEG}.seg_resultado_corrente
+          SELECT cpf_cnpj FROM {CATALOG}.{SCHEMA_SEG}.seg_resultado_corrente
           WHERE seg_id = '{outro_id}'
         """)
         outro_count = df_outro.count()
 
         # Interseção
-        em_comum = df_meu_resultado.join(df_outro, "cliente_id", "inner").count()
+        em_comum = df_meu_resultado.join(df_outro, "cpf_cnpj", "inner").count()
 
         if em_comum > 0:
             pct_sobre_a = round((em_comum / meu_count) * 100, 2) if meu_count > 0 else 0
