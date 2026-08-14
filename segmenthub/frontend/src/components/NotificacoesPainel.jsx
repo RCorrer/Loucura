@@ -52,17 +52,23 @@ export default function NotificacoesPainel() {
 
   const [anchorEl, setAnchorEl] = useState(null);
   const intervalRef = useRef(null);
+  const fetchRef = useRef(fetchNotifications);
 
-  // Polling
+  // Mantém ref atualizada sem re-disparar effect
+  useEffect(() => {
+    fetchRef.current = fetchNotifications;
+  });
+
+  // Polling estável (dep array vazio — não reseta a cada render)
   useEffect(() => {
     intervalRef.current = setInterval(() => {
-      fetchNotifications();
+      fetchRef.current();
     }, POLL_INTERVAL_MS);
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [fetchNotifications]);
+  }, []);
 
   const handleOpen = (event) => {
     setAnchorEl(event.currentTarget);

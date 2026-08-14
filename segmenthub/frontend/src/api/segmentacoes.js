@@ -7,8 +7,10 @@ export const useSegmentacoesApi = () => {
   const { request, loading, error } = useApi();
 
   const listar = useCallback((filtros = {}) => {
-    const params = new URLSearchParams(filtros).toString();
-    return request(`${BASE_URL}?${params}`);
+    const params = new URLSearchParams(
+      Object.entries(filtros).filter(([, v]) => v !== null && v !== undefined && v !== '')
+    ).toString();
+    return request(`${BASE_URL}${params ? `?${params}` : ''}`);
   }, [request]);
 
   const buscar = useCallback((id) => request(`${BASE_URL}/${id}`), [request]);

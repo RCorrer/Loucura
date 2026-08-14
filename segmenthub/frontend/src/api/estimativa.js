@@ -16,7 +16,6 @@ export const useEstimativaApi = () => {
     (regrasJson) =>
       request(`${BASE_URL}/preview`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(regrasJson),
       }),
     [request]

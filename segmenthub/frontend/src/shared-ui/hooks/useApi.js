@@ -14,7 +14,16 @@ export function useApi() {
       });
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.erro || `Erro ${response.status}`);
+        const detail = errData.detail;
+        const msg = typeof detail === 'string'
+          ? detail
+          : typeof detail === 'object' && detail !== null
+            ? (detail.erros || detail.message || JSON.stringify(detail))
+            : `Erro ${response.status}`;
+        const error = new Error(msg);
+        error.status = response.status;
+        error.data = errData;
+        throw error;
       }
       return await response.json();
     } catch (err) {

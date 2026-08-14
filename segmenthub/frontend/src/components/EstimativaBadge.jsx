@@ -134,12 +134,10 @@ export default function EstimativaBadge({
       const res = await calcularPreview(payload);
       setResultado(res);
     } catch (err) {
-      // Tratar erro 422 (validação) separado de erros genéricos
-      if (err?.status === 422 || err?.response?.status === 422) {
-        const detail = err?.data?.detail || err?.response?.data?.detail || err?.message;
-        const mensagemErro =
-          typeof detail === 'object' ? detail.erros || JSON.stringify(detail) : detail;
-        setErro(mensagemErro);
+      // useApi agora propaga err.status e err.data
+      if (err?.status === 422) {
+        // Mensagem já vem parseada no err.message pelo useApi
+        setErro(err.message || 'Regras inválidas');
       } else {
         setErro(err?.message || 'Erro ao calcular estimativa');
       }

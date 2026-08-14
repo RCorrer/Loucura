@@ -6,7 +6,6 @@ import AddIcon from '@mui/icons-material/Add';
 import HealthAndSafetyIcon from '@mui/icons-material/HealthAndSafety';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import ChatIcon from '@mui/icons-material/Chat';
-import { Divider } from '@mui/material';
 import BuilderSegmentacao from './pages/BuilderSegmentacao';
 import ListaSegmentacoes from './pages/ListaSegmentacoes';
 import DocumentacaoSegmentacao from './pages/DocumentacaoSegmentacao';

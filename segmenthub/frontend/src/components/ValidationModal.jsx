@@ -92,7 +92,7 @@ export default function ValidationModal({ open, onClose, segId, segData, onAprov
     setLoadingAprovar(true);
     setErro(null);
     try {
-      await aprovar(segId, { checklist_json: checklist });
+      await aprovar(segId, checklist);
       onAprovado?.();
       onClose();
     } catch (err) {

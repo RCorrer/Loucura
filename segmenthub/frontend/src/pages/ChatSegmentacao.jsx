@@ -54,16 +54,21 @@ export default function ChatSegmentacao() {
 
   // Envia mensagem com contexto (se houver seg aberta)
   const handleSendMessage = useCallback(async (content) => {
-    const response = await sendMessage(content);
+    try {
+      const response = await sendMessage(content);
 
-    // Se retornou regras, mostra botão para visualizar/aplicar
-    if (response?.regras_json) {
-      setRegrasDialog({ open: false, regras: response.regras_json });
-    }
+      // Se retornou regras, mostra botão para visualizar/aplicar
+      if (response?.regras_json) {
+        setRegrasDialog({ open: false, regras: response.regras_json });
+      }
 
-    // Se precisa confirmação, abre dialog
-    if (response?.precisa_confirmacao) {
-      setConfirmDialog({ open: true, msg: response });
+      // Se precisa confirmação, abre dialog
+      if (response?.precisa_confirmacao) {
+        setConfirmDialog({ open: true, msg: response });
+      }
+    } catch (err) {
+      // Erro já tratado pelo useChat (exibe mensagem no painel)
+      console.error('[ChatSegmentacao] Erro ao enviar:', err?.message);
     }
   }, [sendMessage]);
 
