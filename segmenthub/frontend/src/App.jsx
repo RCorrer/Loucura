@@ -84,16 +84,16 @@ function App() {
         <Route path="/segmentacoes/nova" element={<BuilderSegmentacao />} />
         <Route path="/segmentacoes/:id/editar" element={<BuilderSegmentacao />} />
 
-        {/* Futuras rotas (placeholders para desenvolvimento) */}
-        <Route path="/segmentacoes/:id" element={<div>Detalhe da Segmentação (em breve)</div>} />
-        <Route path="/segmentacoes/:id/timeline" element={<div>Timeline (em breve)</div>} />
-        <Route path="/segmentacoes/:id/validar" element={<div>Validação (em breve)</div>} />
-        <Route path="/segmentacoes/:id/documentacao" element={<div>Documentação (em breve)</div>} />
+        {/* Detalhe, Timeline, Validação, Documentação */}
+        <Route path="/segmentacoes/:id" element={<DetalheSegmentacao />} />
+        <Route path="/segmentacoes/:id/timeline" element={<TimelineSegmentacao />} />
+        <Route path="/segmentacoes/:id/validar" element={<DetalheSegmentacao />} />
+        <Route path="/segmentacoes/:id/documentacao" element={<DocumentacaoSegmentacao />} />
 
         {/* Outras seções */}
-        <Route path="/saude" element={<div>Dashboard de Saúde (em breve)</div>} />
-        <Route path="/admin/catalogo" element={<div>Admin Catálogo (em breve)</div>} />
-        <Route path="/chat" element={<div>Chat (em breve)</div>} />
+        <Route path="/saude" element={<DashboardSaude />} />
+        <Route path="/admin/catalogo" element={<AdminCatalogo />} />
+        <Route path="/chat" element={<ChatSegmentacao />} />
       </Routes>
     </AppShell>
   );
