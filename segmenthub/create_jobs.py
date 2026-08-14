@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """
-Script para criar os Jobs no Databricks Workflows a partir dos notebooks.
-Requer databricks-sdk instalado e credenciais configuradas.
+[DEPRECATED] Este script foi substituído pela arquitetura job-per-segment.
+
+A criação de jobs agora é feita pelo JobManagerService (backend)
+automaticamente quando uma segmentação é ativada.
+
+Veja: databricks/jobs/s1_segmenthub/JOBS_MANIFEST.md
 """
 
 import os
