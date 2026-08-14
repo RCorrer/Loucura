@@ -47,6 +47,21 @@ export const useSegmentacoesApi = () => {
 
   const listarEstados = useCallback((id) => request(`${BASE_URL}/${id}/estados`), [request]);
 
+  // S1-FRONT-06: Timeline e Comentários
+  const obterTimeline = useCallback((id) => request(`${BASE_URL}/${id}/timeline`), [request]);
+
+  const listarComentarios = useCallback((id) => request(`${BASE_URL}/${id}/comentarios`), [request]);
+
+  const criarComentario = useCallback(
+    (id, payload) => request(`${BASE_URL}/${id}/comentarios`, { method: 'POST', body: JSON.stringify(payload) }),
+    [request]
+  );
+
+  const editarComentario = useCallback(
+    (comentarioId, payload) => request(`/api/comentarios/${comentarioId}`, { method: 'PUT', body: JSON.stringify(payload) }),
+    [request]
+  );
+
   const atualizarDestinos = useCallback(
     (id, destinos) => request(`${BASE_URL}/${id}/destinos`, { method: 'PUT', body: JSON.stringify(destinos) }),
     [request]
