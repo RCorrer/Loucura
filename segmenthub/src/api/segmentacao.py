@@ -248,10 +248,17 @@ async def executar_segmentacao(
     """
     service = SegmentacaoService()
     try:
-        exec_id = service.executar(seg_id, origem="manual")
-        return {"exec_id": exec_id, "mensagem": "Execução disparada com sucesso"}
+        resultado = service.executar(seg_id, origem="manual", usuario=user["usuario_id"])
+        return {
+            "exec_id": resultado["exec_id"],
+            "run_id": resultado["run_id"],
+            "job_id": resultado["job_id"],
+            "mensagem": "Execução disparada com sucesso",
+        }
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao disparar execução: {str(e)}")
 
 
 @router.post("/{seg_id}/clonar", response_model=dict)
@@ -321,7 +328,7 @@ async def atualizar_vigencia(
     """
     service = SegmentacaoService()
     try:
-        service.atualizar_vigencia(seg_id, dados)
+        service.atualizar_vigencia(seg_id, dados, usuario=user["usuario_id"])
         return {"mensagem": "Vigência atualizada com sucesso"}
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))

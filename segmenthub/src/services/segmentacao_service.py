@@ -22,6 +22,7 @@ from src.models.dto.segmentacao_dto import (
 from src.repositories.segmentacao_repository import SegmentacaoRepository
 from src.core.validator import RegraValidator
 from src.core.query_engine import QueryEngine
+from src.services.job_manager_service import JobManagerService
 from src.exceptions.custom_exceptions import TemaNotFoundError, CampoNotFoundError
 
 
@@ -32,6 +33,7 @@ class SegmentacaoService:
         self.repository = SegmentacaoRepository()
         self.validator = RegraValidator()
         self.engine = QueryEngine()
+        self.job_manager = JobManagerService()
 
     # ==================== HELPERS ====================
 
@@ -302,23 +304,65 @@ class SegmentacaoService:
             # Verifica se há checklist? (será feito no aprovar)
             pass
 
-        if novo_status == "ativa" and status_atual == "aprovada":
-            # Ao ativar, poderia disparar recálculo imediato (Job)
-            pass
-
         # Realiza transição
-        return self.repository.atualizar_status(seg_id, novo_status, motivo)
+        result = self.repository.atualizar_status(seg_id, novo_status, motivo)
+
+        # ===== Integração com JobManager (pós-transição) =====
+        try:
+            if novo_status == "ativa" and status_atual in ("aprovada", "encerrada"):
+                # Ativar: cria job OU reativa job existente
+                job_id_existente = atual.get("job_id_databricks")
+                if job_id_existente:
+                    # Reativação: restaura schedule
+                    cron = atual.get("agendamento_cron", "0 0 0 * * ?")
+                    self.job_manager.reativar_job(seg_id, job_id_existente, cron)
+                else:
+                    # Primeira ativação: cria job
+                    job_id = self.job_manager.criar_job(
+                        seg_id=seg_id,
+                        seg_codigo=atual.get("seg_codigo", seg_id),
+                        agendamento_cron=atual.get("agendamento_cron", "0 0 0 * * ?"),
+                        owner=atual.get("owner", ""),
+                        email_contato=atual.get("email_contato", ""),
+                        area_responsavel=atual.get("area_responsavel", ""),
+                    )
+                    self.repository.atualizar(seg_id, {"job_id_databricks": job_id})
+
+            elif novo_status == "pausada":
+                # Pausar: remove schedule do job
+                job_id = atual.get("job_id_databricks")
+                if job_id:
+                    self.job_manager.pausar_job(seg_id, job_id)
+
+            elif novo_status in ("encerrada", "arquivada"):
+                # Encerrar/Arquivar: deleta job
+                job_id = atual.get("job_id_databricks")
+                if job_id:
+                    self.job_manager.deletar_job(seg_id, job_id)
+                    # Limpa referência (para arquivada, não vai reativar)
+                    if novo_status == "arquivada":
+                        self.repository.atualizar(seg_id, {"job_id_databricks": None})
+
+        except Exception as e:
+            # Log do erro mas não reverte a transição de status
+            # (o consolidador de saúde detectará a inconsistência)
+            import logging
+            logging.getLogger(__name__).error(
+                f"Erro no JobManager ao transicionar {seg_id} para {novo_status}: {e}"
+            )
+
+        return result
 
     def aprovar(self, seg_id: str, checklist: Dict[str, Any], usuario: str) -> bool:
-        """Aprova uma segmentação e dispara Job (simulado)."""
+        """Aprova uma segmentação (transição para status 'aprovada')."""
         atual = self.buscar_por_id(seg_id)
         if not atual:
             raise ValueError("Segmentação não encontrada")
         if atual["status"] != "em_aprovacao":
             raise ValueError(f"Segmentação '{seg_id}' não está em aprovação (status atual: {atual['status']})")
 
-        # 1. Valida checklist (simples)
-        if not checklist or not checklist.get("aprovado"):
+        # 1. Valida checklist
+        if not checklist:
             raise ValueError("Checklist de aprovação não preenchido")
 
         # 2. Atualiza status para 'aprovada'
@@ -328,31 +372,34 @@ class SegmentacaoService:
         self.repository.atualizar(seg_id, {
             "aprovado_por": usuario,
             "aprovado_em": datetime.now(),
-            "checklist_validacao_json": checklist,
+            "checklist_validacao_json": json.dumps(checklist) if isinstance(checklist, dict) else checklist,
         })
 
-        # 4. Dispara Job (na POC, apenas registra)
-        # Em produção, isso chamaria o Job S1-JOB-01
-        # Por enquanto, apenas registramos
-        self.repository.executar_segmentacao(seg_id, f"exec_{seg_id}_{datetime.now().strftime('%Y%m%d_%H%M')}")
-
-        # 5. Emite evento (será implementado em S1-JOB-01)
-        # self._emitir_evento(seg_id, 'aprovada')
+        # 4. Não dispara execução aqui — o job será criado quando
+        #    o usuário chamar ativar(seg_id). Aprovada != Ativa.
 
         return True
 
-    def executar(self, seg_id: str, origem: str = "manual") -> str:
-        """Executa manualmente uma segmentação."""
+    def executar(self, seg_id: str, origem: str = "manual", usuario: str = "system") -> Dict[str, str]:
+        """Executa manualmente uma segmentação via Databricks Jobs run_now."""
         atual = self.buscar_por_id(seg_id)
         if not atual:
             raise ValueError("Segmentação não encontrada")
         if atual["status"] not in ["ativa", "aprovada"]:
             raise ValueError(f"Segmentação '{seg_id}' não está ativa ou aprovada")
 
+        job_id = atual.get("job_id_databricks")
+        if not job_id:
+            raise ValueError(f"Segmentação '{seg_id}' não possui job configurado. Ative-a primeiro.")
+
+        # Dispara run_now no Databricks
+        run_id = self.job_manager.executar_agora(seg_id, job_id, origem, usuario)
+
+        # Registra execução localmente (status será atualizado pelo notebook ao finalizar)
         exec_id = f"exec_{seg_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         self.repository.executar_segmentacao(seg_id, exec_id)
-        # Em produção, aqui chamaria o Job
-        return exec_id
+
+        return {"exec_id": exec_id, "run_id": run_id, "job_id": job_id}
 
     # ==================== DESTINO E VIGÊNCIA ====================
 
@@ -368,13 +415,22 @@ class SegmentacaoService:
         """Busca destinos configurados."""
         return self.repository.buscar_destinos(seg_id)
 
-    def atualizar_vigencia(self, seg_id: str, dados: Dict) -> bool:
-        """Atualiza vigência e agendamento."""
+    def atualizar_vigencia(self, seg_id: str, dados: Dict, usuario: str = "system") -> bool:
+        """Atualiza vigência e agendamento. Se o cron mudar, atualiza o job."""
         # Validar cron se fornecido
-        if dados.get("agendamento_cron"):
-            # validação simples
-            pass
-        return self.repository.atualizar_vigencia(seg_id, dados)
+        novo_cron = dados.get("agendamento_cron")
+
+        # Persiste no banco
+        resultado = self.repository.atualizar_vigencia(seg_id, dados)
+
+        # Se cron mudou e segmentação tem job, atualiza schedule no Databricks
+        if novo_cron:
+            atual = self.buscar_por_id(seg_id)
+            job_id = atual.get("job_id_databricks") if atual else None
+            if job_id and atual.get("status") == "ativa":
+                self.job_manager.atualizar_schedule(seg_id, job_id, novo_cron, usuario)
+
+        return resultado
 
     # ==================== CLONAR ====================
 
