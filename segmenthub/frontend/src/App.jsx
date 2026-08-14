@@ -9,6 +9,7 @@ import ChatIcon from '@mui/icons-material/Chat';
 import { Divider } from '@mui/material';
 import BuilderSegmentacao from './pages/BuilderSegmentacao';
 import ListaSegmentacoes from './pages/ListaSegmentacoes';
+import DocumentacaoSegmentacao from './pages/DocumentacaoSegmentacao';
 
 function App() {
   const location = useLocation();

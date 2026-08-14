@@ -33,6 +33,19 @@ export const useSegmentacoesApi = () => {
 
   const executar = useCallback((id) => request(`${BASE_URL}/${id}/executar`, { method: 'POST' }), [request]);
 
+  // S1-FRONT-04: Destino e Vigência
+  const buscarDestinos = useCallback((id) => request(`${BASE_URL}/${id}/destinos`), [request]);
+
+  const atualizarDestinos = useCallback(
+    (id, destinos) => request(`${BASE_URL}/${id}/destinos`, { method: 'PUT', body: JSON.stringify(destinos) }),
+    [request]
+  );
+
+  const atualizarVigencia = useCallback(
+    (id, dados) => request(`${BASE_URL}/${id}/vigencia`, { method: 'PUT', body: JSON.stringify(dados) }),
+    [request]
+  );
+
   return {
     listar,
     buscar,
@@ -46,6 +59,9 @@ export const useSegmentacoesApi = () => {
     reativar,
     encerrar,
     executar,
+    buscarDestinos,
+    atualizarDestinos,
+    atualizarVigencia,
     loading,
     error,
   };
