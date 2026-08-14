@@ -106,9 +106,11 @@ async def arquivar_segmentacao(
     Arquiva uma segmentação (soft delete).
     """
     service = SegmentacaoService()
-    if service.arquivar(seg_id):
+    try:
+        service.arquivar(seg_id, usuario=user["usuario_id"])
         return {"mensagem": "Segmentação arquivada com sucesso"}
-    raise HTTPException(status_code=404, detail="Segmentação não encontrada")
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
 
 # ==================== CICLO DE VIDA ====================

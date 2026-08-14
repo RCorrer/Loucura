@@ -45,6 +45,10 @@ export default function BuilderSegmentacao() {
     { operator: 'OR', rules: [{ campo_id: '', op: '', value: '' }] }
   ]);
 
+  // Operadores inter-grupo: como os GRUPOS se conectam entre si
+  const [interGroupOpInclusao, setInterGroupOpInclusao] = useState('OR');
+  const [interGroupOpExclusao, setInterGroupOpExclusao] = useState('OR');
+
   const [carregandoDados, setCarregandoDados] = useState(false);
   const [carregandoMetadata, setCarregandoMetadata] = useState(true);
   const [error, setError] = useState(null);
@@ -69,12 +73,30 @@ export default function BuilderSegmentacao() {
           if (data.regras_json) {
             const inclusao = data.regras_json.inclusao;
             const exclusao = data.regras_json.exclusao;
-            setRegrasInclusao(
-              Array.isArray(inclusao) ? inclusao : [inclusao || { operator: 'AND', rules: [] }]
-            );
-            setRegrasExclusao(
-              Array.isArray(exclusao) ? exclusao : [exclusao || { operator: 'OR', rules: [] }]
-            );
+
+            // Se inclusao é um RegraNo com sub-RegraNos (estrutura aninhada),
+            // decompor em grupos + inter-group operator
+            if (inclusao && inclusao.rules && inclusao.rules.length > 0 && inclusao.rules[0]?.rules) {
+              // Estrutura aninhada: {operator: 'OR', rules: [{operator:'AND', rules:[...]}, ...]}
+              setInterGroupOpInclusao(inclusao.operator || 'OR');
+              setRegrasInclusao(inclusao.rules);
+            } else if (inclusao) {
+              // Estrutura flat legada: {operator: 'AND', rules: [folha, folha, ...]}
+              setRegrasInclusao([inclusao]);
+              setInterGroupOpInclusao('OR');
+            } else {
+              setRegrasInclusao([{ operator: 'AND', rules: [] }]);
+            }
+
+            if (exclusao && exclusao.rules && exclusao.rules.length > 0 && exclusao.rules[0]?.rules) {
+              setInterGroupOpExclusao(exclusao.operator || 'OR');
+              setRegrasExclusao(exclusao.rules);
+            } else if (exclusao) {
+              setRegrasExclusao([exclusao]);
+              setInterGroupOpExclusao('OR');
+            } else {
+              setRegrasExclusao([{ operator: 'OR', rules: [] }]);
+            }
           }
         } catch (err) {
           console.error(err);
@@ -103,6 +125,8 @@ export default function BuilderSegmentacao() {
       setPublicoSelecionado('');
       setRegrasInclusao([{ operator: 'AND', rules: [{ campo_id: '', op: '', value: '' }] }]);
       setRegrasExclusao([{ operator: 'OR', rules: [{ campo_id: '', op: '', value: '' }] }]);
+      setInterGroupOpInclusao('OR');
+      setInterGroupOpExclusao('OR');
       setActiveStep(0);
       setError(null);
       setCarregandoMetadata(true);
@@ -142,10 +166,65 @@ export default function BuilderSegmentacao() {
       setError('Selecione um público-base');
       return;
     }
+    // Helper: verifica se uma regra tem valor preenchido
+    const regraTemValor = (rule) => {
+      if (rule.op === 'is_null' || rule.op === 'is_not_null') return true;
+      // value pode ser 0, false, [] — só rejeita '' e null/undefined
+      return rule.value !== '' && rule.value !== null && rule.value !== undefined;
+    };
+
     const temRegraValida = regrasInclusao.some(group =>
-      group.rules.some(rule => rule.campo_id && rule.op && rule.value)
+      group.rules.some(rule => rule.campo_id && rule.op && regraTemValor(rule))
     );
     if (!temRegraValida) {
+      setError('Adicione pelo menos uma regra de inclusão válida');
+      return;
+    }
+
+    // Filtra regras incompletas e converte value para tipo correto
+    const prepararRegras = (rules) =>
+      rules
+        .filter(r => r.campo_id && r.op && regraTemValor(r))
+        .map(r => {
+          let value = r.value;
+          // Coerce: string numérica -> number (evita enviar "25" ao invés de 25)
+          if (typeof value === 'string' && value !== '' && !isNaN(Number(value))) {
+            value = Number(value);
+          }
+          // Coerce: string boolean -> boolean
+          if (typeof value === 'string' && (value.toLowerCase() === 'true' || value.toLowerCase() === 'false')) {
+            value = value.toLowerCase() === 'true';
+          }
+          // Operadores sem valor
+          if (r.op === 'is_null' || r.op === 'is_not_null') {
+            value = null;
+          }
+          return { campo_id: r.campo_id, op: r.op, value };
+        });
+
+    // Monta cada grupo como um RegraNo individual
+    const buildRegraNo = (groups, interGroupOp) => {
+      const gruposValidos = groups
+        .map(group => ({
+          operator: group.operator || 'AND',
+          rules: prepararRegras(group.rules),
+        }))
+        .filter(g => g.rules.length > 0);
+
+      if (gruposValidos.length === 0) return null;
+      // Se só 1 grupo, envia flat (compatível com legado)
+      if (gruposValidos.length === 1) return gruposValidos[0];
+      // Múltiplos grupos: wrapper RegraNo com inter-group operator
+      return {
+        operator: interGroupOp,
+        rules: gruposValidos,
+      };
+    };
+
+    const inclusaoNo = buildRegraNo(regrasInclusao, interGroupOpInclusao);
+    const exclusaoNo = buildRegraNo(regrasExclusao, interGroupOpExclusao);
+
+    if (!inclusaoNo) {
       setError('Adicione pelo menos uma regra de inclusão válida');
       return;
     }
@@ -155,8 +234,8 @@ export default function BuilderSegmentacao() {
       publico_base_id: publicoSelecionado,
       regras_json: {
         publico_base: publicoSelecionado,
-        inclusao: regrasInclusao,
-        exclusao: regrasExclusao.length > 0 ? regrasExclusao : null,
+        inclusao: inclusaoNo,
+        exclusao: exclusaoNo,
       },
     };
 
@@ -263,15 +342,17 @@ export default function BuilderSegmentacao() {
         )}
 
         {activeStep === 1 && (
-          <Paper sx={{ p: 3 }}>
-            <Box sx={{ display: 'flex', gap: 3 }}>
-              <Box sx={{ flex: '1 1 40%', maxHeight: 400, overflow: 'auto' }}>
+          <Paper sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <Box sx={{ display: 'flex', gap: 3, flex: 1, minHeight: 0 }}>
+              <Box sx={{ flex: '1 1 40%', overflow: 'auto' }}>
                 <TemaMenu onSelectCampo={handleSelectCampoInclusao} />
               </Box>
-              <Box sx={{ flex: '1 1 60%' }}>
+              <Box sx={{ flex: '1 1 60%', overflow: 'auto' }}>
                 <RuleBuilder
                   value={regrasInclusao}
                   onChange={setRegrasInclusao}
+                  interGroupOperator={interGroupOpInclusao}
+                  onInterGroupOperatorChange={setInterGroupOpInclusao}
                 />
               </Box>
             </Box>
@@ -279,15 +360,17 @@ export default function BuilderSegmentacao() {
         )}
 
         {activeStep === 2 && (
-          <Paper sx={{ p: 3 }}>
-            <Box sx={{ display: 'flex', gap: 3 }}>
-              <Box sx={{ flex: '1 1 40%', maxHeight: 400, overflow: 'auto' }}>
+          <Paper sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <Box sx={{ display: 'flex', gap: 3, flex: 1, minHeight: 0 }}>
+              <Box sx={{ flex: '1 1 40%', overflow: 'auto' }}>
                 <TemaMenu onSelectCampo={handleSelectCampoExclusao} />
               </Box>
-              <Box sx={{ flex: '1 1 60%' }}>
+              <Box sx={{ flex: '1 1 60%', overflow: 'auto' }}>
                 <ExclusaoBuilder
                   value={regrasExclusao}
                   onChange={setRegrasExclusao}
+                  interGroupOperator={interGroupOpExclusao}
+                  onInterGroupOperatorChange={setInterGroupOpExclusao}
                 />
               </Box>
             </Box>

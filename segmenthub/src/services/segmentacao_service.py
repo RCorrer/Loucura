@@ -153,18 +153,19 @@ class SegmentacaoService:
         if not dados:
             return None
 
-        # Converte regras_json de string para dict
-        if dados.get("regras_json"):
+        # O repository já faz json.loads no regras_json.
+        # Aqui só protegemos contra edge cases (string residual, lista, None).
+        regras = dados.get("regras_json")
+        if isinstance(regras, str):
             try:
-                parsed = json.loads(dados["regras_json"])
-                # Se for lista, converte para dict vazio
-                if isinstance(parsed, list):
-                    print(f"⚠️ regras_json é uma LISTA, convertendo para dict vazio")
-                    dados["regras_json"] = {}
-                else:
-                    dados["regras_json"] = parsed
-            except:
+                parsed = json.loads(regras)
+                dados["regras_json"] = parsed if isinstance(parsed, dict) else {}
+            except (json.JSONDecodeError, TypeError):
                 dados["regras_json"] = {}
+        elif isinstance(regras, list):
+            dados["regras_json"] = {}
+        # Se já for dict ou None, não mexe
+
         return dados
 
     def listar(
@@ -210,38 +211,65 @@ class SegmentacaoService:
         if not atual:
             raise ValueError("Segmentação não encontrada")
 
-        # 2. Se estiver ativa e alterar regras, criar nova versão rascunho
+        # 2. Se estiver ativa e alterar regras, criar nova versão (sem quebrar produção)
         if atual["status"] == "ativa" and dados.regras_json:
             # Valida novas regras
             erros = self._validar_regras(dados.regras_json)
             if erros:
                 raise ValueError(f"Regras inválidas: {erros}")
 
-            # Cria nova versão
+            # Cria nova versão draft em seg_versao (produção continua com versao_atual)
             nova_versao = atual["versao_atual"] + 1
+            motivo = getattr(dados, 'nota_versao', None) or "Edição de segmentação ativa"
             self.repository.inserir_versao(
                 seg_id=seg_id,
                 versao=nova_versao,
                 regras_json=dados.regras_json,
-                motivo="Edição de segmentação ativa",
+                motivo=motivo,
                 alterado_por=usuario,
             )
-            # Atualiza versão na definição
-            self.repository.atualizar(seg_id, {
-                "versao_atual": nova_versao,
-                "status": "rascunho",  # nova versão fica como rascunho
-            })
+            # NÃO atualiza versao_atual nem status aqui.
+            # Produção continua rodando com a versão atual.
+            # A nova versão só vira versao_atual quando for aprovada.
 
-        # 3. Atualiza campos normais
+        # 3. Se NÃO ativa e alterar regras, atualiza direto na seg_definicao
+        elif dados.regras_json and atual["status"] in ("rascunho", "em_aprovacao"):
+            erros = self._validar_regras(dados.regras_json)
+            if erros:
+                raise ValueError(f"Regras inválidas: {erros}")
+            self.repository.atualizar(seg_id, {
+                "regras_json": json.dumps(dados.regras_json),
+                "atualizado_em": datetime.now(),
+            })
+            # Atualiza também a versão corrente em seg_versao
+            self.repository.inserir_versao(
+                seg_id=seg_id,
+                versao=atual["versao_atual"],
+                regras_json=dados.regras_json,
+                motivo="Edição de rascunho",
+                alterado_por=usuario,
+            )
+
+        # 4. Atualiza campos normais (exceto regras_json, já tratado acima)
         dados_update = dados.model_dump(exclude_unset=True, exclude={"regras_json"})
         if dados_update:
             self.repository.atualizar(seg_id, dados_update)
 
         return True
 
-    def arquivar(self, seg_id: str) -> bool:
-        """Arquiva uma segmentação (soft delete)."""
-        return self.repository.arquivar(seg_id)
+    def arquivar(self, seg_id: str, usuario: str = "system") -> bool:
+        """Arquiva uma segmentação (soft delete) com auditoria."""
+        atual = self.buscar_por_id(seg_id)
+        if not atual:
+            raise ValueError("Segmentação não encontrada")
+        if atual["status"] == "arquivada":
+            raise ValueError("Segmentação já está arquivada")
+
+        # Registra transição no histórico (auditoria)
+        self.repository.atualizar_status(seg_id, "arquivada", motivo="Arquivamento")
+        # Desabilita (soft delete — não aparece mais nas listagens)
+        self.repository.atualizar(seg_id, {"habilitado": False})
+        return True
 
     # ==================== CICLO DE VIDA ====================
 
@@ -256,7 +284,7 @@ class SegmentacaoService:
         # Valida transições permitidas
         transicoes = {
             "rascunho": ["em_aprovacao", "arquivada"],
-            "em_aprovacao": ["aprovada", "rascunho"],
+            "em_aprovacao": ["aprovada", "rascunho", "arquivada"],
             "aprovada": ["ativa", "arquivada"],
             "ativa": ["pausada", "encerrada", "arquivada"],
             "pausada": ["ativa", "encerrada"],

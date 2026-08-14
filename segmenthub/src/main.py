@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Depends, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 import os
 import logging
 
@@ -101,24 +101,29 @@ app.include_router(saude.router, prefix="/api")
 app.include_router(metadata_admin.router, prefix="/api")
 
 # ============================================================
-# Static files (frontend build)
+# Static files + SPA fallback
 # ============================================================
 static_dir = os.path.join(os.path.dirname(__file__), "..", "static")
+
 if os.path.exists(static_dir):
-    app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
+    # Serve assets buildados (JS/CSS/images) em /assets
+    assets_dir = os.path.join(static_dir, "assets")
+    if os.path.exists(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="static-assets")
+
+    # SPA fallback: qualquer rota não-API serve index.html (React Router resolve)
+    @app.get("/{full_path:path}")
+    async def spa(full_path: str):
+        index_path = os.path.join(static_dir, "index.html")
+        if os.path.exists(index_path):
+            return FileResponse(index_path)
+        return Response(status_code=404)
 else:
     logger.warning("Pasta 'static' não encontrada. Frontend não será servido.")
-    @app.get("/")
-    async def root():
-        return {"message": "SegmentHub API - Frontend não construído"}
 
-# Fallback para SPA (se o frontend estiver buildado)
-@app.get("/{full_path:path}")
-async def spa(full_path: str):
-    index_path = os.path.join(static_dir, "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
-    return {"message": "Not found"}
+    @app.get("/{full_path:path}")
+    async def spa_fallback(full_path: str):
+        return {"message": "Frontend não construído. Execute npm run build."}
 
 # ============================================================
 # Ponto de entrada (para execução local)

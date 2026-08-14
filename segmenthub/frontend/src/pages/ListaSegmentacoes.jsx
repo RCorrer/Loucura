@@ -217,8 +217,7 @@ export default function ListaSegmentacoes() {
       ) : (
         <Box sx={{ 
           flex: 1, 
-          minHeight: 400,  // Altura mínima para evitar colapso no loading
-          height: '100%' 
+          minHeight: 0,  // Necessário para flex shrink funcionar com DataGrid
         }}>
           <DataTable
             key={`page-${meta.page}-${meta.size}`}

@@ -103,8 +103,30 @@ class RegraValidator:
 
         return erros
 
-    def _validar_valor(self, value: Any, tipo_dado: str, valores_dominio: Optional[List]) -> bool:
+    def _validar_valor(self, value: Any, tipo_dado: str, valores_dominio: Optional[List], op: str = "") -> bool:
         """Valida se o valor é compatível com o tipo de dado e domínio."""
+        # Operadores que não usam valor
+        if op in ("is_null", "is_not_null"):
+            return True  # value deve ser None, mas não é erro se vier algo
+
+        # Operadores de lista: validar cada elemento
+        if op in ("in", "not_in"):
+            if not isinstance(value, list):
+                return False
+            return all(self._validar_valor_escalar(v, tipo_dado, valores_dominio) for v in value)
+
+        if op == "between":
+            if not isinstance(value, list) or len(value) != 2:
+                return False
+            return all(self._validar_valor_escalar(v, tipo_dado, valores_dominio) for v in value)
+
+        # Operadores escalares
+        return self._validar_valor_escalar(value, tipo_dado, valores_dominio)
+
+    def _validar_valor_escalar(self, value: Any, tipo_dado: str, valores_dominio: Optional[List]) -> bool:
+        """Valida um valor escalar contra tipo e domínio."""
+        if value is None:
+            return False
         if tipo_dado == "numeric":
             return isinstance(value, (int, float))
         elif tipo_dado == "categorical":
@@ -114,7 +136,6 @@ class RegraValidator:
         elif tipo_dado == "boolean":
             return isinstance(value, bool)
         elif tipo_dado == "date":
-            # Simplificado: aceita string ISO ou datetime
             return isinstance(value, str)
         else:
             return True
