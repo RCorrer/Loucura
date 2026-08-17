@@ -8,6 +8,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import EditIcon from '@mui/icons-material/Edit';
 import SearchIcon from '@mui/icons-material/Search';
+import PendingActionsIcon from '@mui/icons-material/PendingActions';
 
 export default function ListaSegmentacoes() {
   const navigate = useNavigate();
@@ -19,6 +20,18 @@ export default function ListaSegmentacoes() {
   const [buscaAtiva, setBuscaAtiva] = useState('');
   const [meta, setMeta] = useState({ page: 1, size: 10, total: 0, total_pages: 0 });
   const [errorMessage, setErrorMessage] = useState(null);
+  const [pendentes, setPendentes] = useState(0);
+
+  // Conta segmentações pendentes de aprovação
+  useEffect(() => {
+    const contarPendentes = async () => {
+      try {
+        const resp = await listar({ status: 'em_aprovacao', page: 1, size: 1 });
+        setPendentes(resp.meta?.total || 0);
+      } catch { /* silent */ }
+    };
+    contarPendentes();
+  }, [listar]);
 
   const carregar = useCallback(async () => {
     try {
@@ -197,6 +210,16 @@ export default function ListaSegmentacoes() {
         <Button variant="outlined" onClick={handleLimparBusca}>
           Limpar
         </Button>
+        {pendentes > 0 && (
+          <Chip
+            icon={<PendingActionsIcon />}
+            label={`${pendentes} pendente${pendentes > 1 ? 's' : ''} de aprovação`}
+            color="warning"
+            variant="outlined"
+            onClick={() => handleFiltroChange('status', 'em_aprovacao')}
+            sx={{ cursor: 'pointer' }}
+          />
+        )}
       </Box>
 
       {errorMessage && (
