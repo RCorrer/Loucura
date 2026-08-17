@@ -159,8 +159,40 @@ O campo `ativo` controla a **visibilidade no S1** em 3 pontos:
 | Ponto de uso | Filtro | Efeito quando `ativo = false` |
 |---|---|---|
 | TemaMenu do Builder (frontend) | `GET /metadata/temas-completos` → `WHERE ativo = true` | Campo **não aparece** para seleção |
-| Estimativa (query_engine.py) | Não filtra (usa `campo_id` do JSON salvo) | Funciona se a regra já existia |
+| Estimativa (query_engine.py) | `_carregar_catalogo()` → `WHERE ativo = true` | **`ValueError`** — campo não encontrado |
 | Job seg_exec (execução real) | `catalogo_df.filter("ativo = true")` | **`ValueError`** — campo não encontrado |
+
+### Resolução de Campos: caracteristica_id → tabela_fisica.campo_fisico
+
+O frontend grava `campo_id = caracteristica_id` (ex: `"caract_idade"`). Esse é um **identificador lógico** — não é o nome da coluna física. Ambas as engines de SQL resolvem via catálogo:
+
+```
+Frontend state:           { campo_id: "caract_idade", op: ">", value: 18 }
+                                      │
+                          catalogo_caracteristicas
+                          WHERE caracteristica_id = 'caract_idade'
+                                      │
+                                      ▼
+                          campo_fisico: "idade"
+                          tabela_fisica: "plataforma.caracteristicas.customer_features_wide"
+                          join_key: "cpf_cnpj"
+                                      │
+                                      ▼
+            SQL gerado: plataforma.caracteristicas.customer_features_wide.idade > ?
+```
+
+**Comparação das engines:**
+
+| Aspecto | seg_exec (Job — Spark) | query_engine (Estimativa — SQL Warehouse) |
+|---|---|---|
+| Resolve campo_id → físico | `catalogo_df.filter(F.col("caracteristica_id") == campo_id)` | `_resolver_campo()` via cache do catálogo |
+| Monta JOINs dinâmicos | `extrair_tabelas()` recursivo | `_tabelas_usadas` (set acumulado em `_resolver_campo`) |
+| Resolve público base | `catalogo_publicos` → `tabela_fisica` + `join_key` | `_cache_publicos` → `tabela_fisica` + `join_key` |
+| Exclusão | `AND NOT (...)` | `AND NOT (...)` |
+| Parametrização | Valores inline (escape via `sql_val()`) | Params posicionais (`?`) |
+| Operadores extras | contains, starts_with | contains, starts_with |
+
+**Tabelas envolvidas podem variar por regra:** Se o usuário combina campos de tabelas diferentes (ex: `customer_features_wide` + `customer_digital_behavior`), ambas engines geram LEFT JOINs dinâmicos automaticamente com base no `join_key` de cada campo no catálogo.
 
 ### Edge Case: Campo desativado após uso em regras
 
