@@ -102,6 +102,7 @@ print(f"✓ Regras carregadas (público base: {regras.get('publico_base')})")
 
 # COMMAND ----------
 
+# DBTITLE 1,Step 2: Montar query SQL a partir das regras
 # ============================================================
 # STEP 2: Montar e executar query SQL a partir das regras
 # ============================================================
@@ -136,27 +137,37 @@ def build_condition(node: dict, catalogo_df) -> str:
 
             col_fisico = f"{campo_info['tabela_fisica']}.{campo_info['campo_fisico']}"
 
+            # Helper: formata valor para SQL com escape de aspas
+            def sql_val(v):
+                if isinstance(v, bool):
+                    return str(v).lower()  # True → true (Spark syntax)
+                if isinstance(v, str):
+                    escaped = v.replace("'", "''")
+                    return f"'{escaped}'"
+                return str(v)
+
             # Monta condição SQL
             if op == "is_null":
                 conditions.append(f"{col_fisico} IS NULL")
             elif op == "is_not_null":
                 conditions.append(f"{col_fisico} IS NOT NULL")
             elif op == "in":
-                vals = ", ".join([f"'{v}'" if isinstance(v, str) else str(v) for v in value])
+                vals = ", ".join([sql_val(v) for v in value])
                 conditions.append(f"{col_fisico} IN ({vals})")
             elif op == "not_in":
-                vals = ", ".join([f"'{v}'" if isinstance(v, str) else str(v) for v in value])
+                vals = ", ".join([sql_val(v) for v in value])
                 conditions.append(f"{col_fisico} NOT IN ({vals})")
             elif op == "between":
-                conditions.append(f"{col_fisico} BETWEEN {value[0]} AND {value[1]}")
+                conditions.append(f"{col_fisico} BETWEEN {sql_val(value[0])} AND {sql_val(value[1])}")
             elif op == "contains":
-                conditions.append(f"{col_fisico} LIKE '%{value}%'")
+                escaped = str(value).replace("'", "''")
+                conditions.append(f"{col_fisico} LIKE '%{escaped}%'")
             elif op == "starts_with":
-                conditions.append(f"{col_fisico} LIKE '{value}%'")
+                escaped = str(value).replace("'", "''")
+                conditions.append(f"{col_fisico} LIKE '{escaped}%'")
             else:
                 # Operadores simples: =, !=, >, <, >=, <=
-                v = f"'{value}'" if isinstance(value, str) else str(value)
-                conditions.append(f"{col_fisico} {op} {v}")
+                conditions.append(f"{col_fisico} {op} {sql_val(value)}")
 
     operator = f" {node.get('operator', 'AND')} "
     return operator.join(conditions)
