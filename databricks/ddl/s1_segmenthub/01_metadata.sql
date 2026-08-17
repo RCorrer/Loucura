@@ -20,7 +20,16 @@ CREATE TABLE IF NOT EXISTS plataforma.metadata.catalogo_caracteristicas (
   ativo             BOOLEAN,
   descricao         STRING
 ) USING DELTA
+CLUSTER BY (tema)
+TBLPROPERTIES (
+  'delta.autoOptimize.optimizeWrite' = 'true',
+  'delta.targetFileSize' = '32MB'
+)
 COMMENT 'Mapeia campo amigável -> coluna física (RuleBuilder). Hospeda flags de outros sistemas (desacoplado)';
+
+-- Bloom Filter Index para lookups rápidos de características
+CREATE BLOOMFILTER INDEX IF NOT EXISTS ON plataforma.metadata.catalogo_caracteristicas
+FOR COLUMNS (caracteristica_id, campo_label);
 
 CREATE TABLE IF NOT EXISTS plataforma.metadata.catalogo_publicos (
   publico_id     STRING   NOT NULL,
@@ -31,6 +40,7 @@ CREATE TABLE IF NOT EXISTS plataforma.metadata.catalogo_publicos (
   criado_por_time STRING,
   ativo          BOOLEAN
 ) USING DELTA
+TBLPROPERTIES ('delta.autoOptimize.optimizeWrite' = 'true')
 COMMENT 'Públicos-base pré-definidos (ponto de partida da segmentação)';
 
 -- View: campos em uso por segmentações ativas (proteção de metadado).

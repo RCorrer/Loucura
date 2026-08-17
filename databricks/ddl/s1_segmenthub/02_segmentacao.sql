@@ -36,7 +36,18 @@ CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_definicao (
   atualizado_em            TIMESTAMP DEFAULT current_timestamp(),
   habilitado               BOOLEAN  DEFAULT true
 ) USING DELTA
+CLUSTER BY (status, objetivo, owner)
+TBLPROPERTIES (
+  'delta.autoOptimize.optimizeWrite' = 'true',
+  'delta.autoOptimize.autoCompact' = 'true',
+  'delta.targetFileSize' = '128MB',
+  'delta.tuneFileSizesForRewrites' = 'true'
+)
 COMMENT 'Natureza do segmento. CONTRATO-CHAVE: lido por S2, S3 e S4 (dimensão de eficiência)';
+
+-- Bloom Filter Index para buscas rápidas
+CREATE BLOOMFILTER INDEX IF NOT EXISTS ON plataforma.segmentacao.seg_definicao
+FOR COLUMNS (seg_id, seg_codigo, seg_slug);
 
 CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_execucao (
   exec_id         STRING   NOT NULL COMMENT 'exec_YYYYMMDD_HHMM_xxxx',
@@ -50,7 +61,18 @@ CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_execucao (
   run_id          STRING,
   job_run_url     STRING
 ) USING DELTA
+CLUSTER BY (seg_id, status)
+TBLPROPERTIES (
+  'delta.autoOptimize.optimizeWrite' = 'true',
+  'delta.autoOptimize.autoCompact' = 'true',
+  'delta.targetFileSize' = '256MB',
+  'delta.deletedFileRetentionDuration' = 'interval 30 days'
+)
 COMMENT 'Registro de cada execução/recálculo';
+
+-- Bloom Filter Index para buscas rápidas
+CREATE BLOOMFILTER INDEX IF NOT EXISTS ON plataforma.segmentacao.seg_execucao
+FOR COLUMNS (exec_id, seg_id, job_id);
 
 CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_resultado_corrente (
   seg_id    STRING   NOT NULL,
@@ -58,8 +80,20 @@ CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_resultado_corrente (
   exec_id   STRING,
   entrou_em TIMESTAMP DEFAULT current_timestamp()
 ) USING DELTA
-CLUSTER BY (seg_id)
+CLUSTER BY (seg_id, cpf_cnpj)
+TBLPROPERTIES (
+  'delta.autoOptimize.optimizeWrite' = 'true',
+  'delta.autoOptimize.autoCompact' = 'true',
+  'delta.targetFileSize' = '512MB',
+  'delta.tuneFileSizesForRewrites' = 'true',
+  'delta.checkpoint.writeStatsAsStruct' = 'true',
+  'delta.checkpoint.writeStatsAsJson' = 'false'
+)
 COMMENT 'Estado ATUAL por segmento (MERGE). CONTRATO: lido por S2 e S3';
+
+-- Bloom Filter Index CRÍTICO para lookups por CPF/ID
+CREATE BLOOMFILTER INDEX IF NOT EXISTS ON plataforma.segmentacao.seg_resultado_corrente
+FOR COLUMNS (cpf_cnpj, seg_id);
 
 CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_resultado_historico (
   exec_id      STRING   NOT NULL,
@@ -68,7 +102,20 @@ CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_resultado_historico (
   cpf_cnpj     STRING   NOT NULL,
   snapshot_em  TIMESTAMP DEFAULT current_timestamp()
 ) USING DELTA
+CLUSTER BY (seg_id, exec_id)
+TBLPROPERTIES (
+  'delta.autoOptimize.optimizeWrite' = 'true',
+  'delta.autoOptimize.autoCompact' = 'true',
+  'delta.targetFileSize' = '1GB',
+  'delta.tuneFileSizesForRewrites' = 'true',
+  'delta.deletedFileRetentionDuration' = 'interval 90 days',
+  'delta.logRetentionDuration' = 'interval 365 days'
+)
 COMMENT 'Append-only: snapshot por execução (auditoria/overlap)';
+
+-- Bloom Filter Index para auditoria rápida
+CREATE BLOOMFILTER INDEX IF NOT EXISTS ON plataforma.segmentacao.seg_resultado_historico
+FOR COLUMNS (exec_id, seg_id);
 
 CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_overlap (
   seg_id_a          STRING   NOT NULL,
@@ -78,6 +125,7 @@ CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_overlap (
   pct_sobre_b       DOUBLE,
   calculado_em      TIMESTAMP DEFAULT current_timestamp()
 ) USING DELTA
+CLUSTER BY (seg_id_a)
 COMMENT 'Sobreposição entre segmentos (alerta de fadiga)';
 
 CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_comentario (
@@ -93,6 +141,7 @@ CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_comentario (
   criado_em        TIMESTAMP DEFAULT current_timestamp(),
   editado_em       TIMESTAMP
 ) USING DELTA
+CLUSTER BY (seg_id)
 COMMENT 'Thread de comentários colaborativos';
 
 CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_notificacao (
@@ -105,6 +154,7 @@ CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_notificacao (
   lida         BOOLEAN  DEFAULT false,
   criado_em    TIMESTAMP DEFAULT current_timestamp()
 ) USING DELTA
+CLUSTER BY (destinatario)
 COMMENT 'Notificações in-app do S1';
 
 CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_saude (
@@ -117,4 +167,55 @@ CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_saude (
   alertas_json         STRING,
   publico_atual        BIGINT
 ) USING DELTA
+CLUSTER BY (health_status)
 COMMENT 'Estado de saúde por segmentação (populado por Job)';
+
+-- =====================================================
+-- TABELAS ADICIONAIS (versionamento e destinos)
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_versao (
+  versao_id   STRING NOT NULL,
+  seg_id      STRING NOT NULL,
+  versao      INT NOT NULL,
+  regras_json STRING,
+  motivo      STRING,
+  alterado_por STRING,
+  alterado_em TIMESTAMP DEFAULT current_timestamp()
+) USING DELTA
+CLUSTER BY (seg_id, versao)
+TBLPROPERTIES (
+  'delta.autoOptimize.optimizeWrite' = 'true',
+  'delta.targetFileSize' = '64MB'
+)
+COMMENT 'Histórico de versões da segmentação (cada alteração de regras gera nova versão)';
+
+CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_historico_estado (
+  hist_id         STRING NOT NULL,
+  seg_id          STRING NOT NULL,
+  estado_anterior STRING,
+  estado_novo     STRING,
+  motivo          STRING,
+  alterado_por    STRING,
+  alterado_em     TIMESTAMP DEFAULT current_timestamp()
+) USING DELTA
+CLUSTER BY (seg_id)
+TBLPROPERTIES ('delta.autoOptimize.optimizeWrite' = 'true')
+COMMENT 'Auditoria de mudanças de status da segmentação';
+
+CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_destino (
+  seg_id     STRING NOT NULL,
+  destino    STRING NOT NULL,
+  habilitado BOOLEAN DEFAULT true,
+  criado_em  TIMESTAMP DEFAULT current_timestamp()
+) USING DELTA
+CLUSTER BY (seg_id)
+COMMENT 'Destinos de publicação da segmentação (S2, S3, S4)';
+
+-- =====================================================
+-- MANUTENÇÃO PERIÓDICA (executar mensalmente)
+-- =====================================================
+-- OPTIMIZE plataforma.segmentacao.seg_resultado_corrente;
+-- OPTIMIZE plataforma.segmentacao.seg_resultado_historico;
+-- VACUUM plataforma.segmentacao.seg_resultado_historico RETAIN 90 HOURS;
+-- VACUUM plataforma.segmentacao.seg_execucao RETAIN 720 HOURS;
