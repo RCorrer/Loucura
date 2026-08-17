@@ -1,5 +1,5 @@
 """
-DTOs para o módulo de saúde e overlap.
+DTOs para o módulo de saúde.
 """
 
 from pydantic import BaseModel
@@ -28,19 +28,3 @@ class SaudeDashboardDTO(BaseModel):
     sem_dados: int
     ultima_atualizacao: Optional[datetime]
     detalhes: List[SaudeDTO]
-
-
-class OverlapDTO(BaseModel):
-    """DTO para sobreposição entre segmentos."""
-    seg_id_a: str
-    seg_id_b: str
-    clientes_em_comum: int
-    pct_sobre_a: Optional[float]
-    pct_sobre_b: Optional[float]
-    calculado_em: Optional[datetime]
-
-
-class OverlapListaDTO(BaseModel):
-    """DTO para lista de sobreposições de um segmento."""
-    seg_id: str
-    overlaps: List[OverlapDTO]

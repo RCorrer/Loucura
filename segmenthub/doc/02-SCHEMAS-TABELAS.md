@@ -29,7 +29,7 @@
   │  _CORRENTE        _HISTORICO                                                  │
   │  │                                                                            │
   │  ▼                                                                            │
-  │  SEG_OVERLAP                                                                   │
+  │  (seg_overlap removido — funcionalidade descontinuada)                          │
   │                                                                                │
   │  CATALOGO_CARACTERISTICAS ──▶ CATALOGO_GOVERNANCA_HIST                          │
   │                                                                                │
@@ -289,18 +289,9 @@ Health status por segmentação (populado pelo job de saúde).
 
 ---
 
-### `seg_overlap`
+### ~~`seg_overlap`~~ (REMOVIDA)
 
-Sobreposição entre segmentos (alerta de fadiga).
-
-| Coluna | Tipo | Descrição |
-|---|---|---|
-| `seg_id_a` | STRING PK (composta) | Segmento A |
-| `seg_id_b` | STRING PK (composta) | Segmento B |
-| `clientes_em_comum` | BIGINT | Interseção |
-| `pct_sobre_a` | DOUBLE | % do A que está em B |
-| `pct_sobre_b` | DOUBLE | % do B que está em A |
-| `calculado_em` | TIMESTAMP | Data do cálculo |
+> Funcionalidade de overlap descontinuada. Tabela removida do schema.
 
 ---
 

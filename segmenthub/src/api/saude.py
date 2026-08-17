@@ -1,5 +1,5 @@
 """
-Endpoints de saúde e overlap (S1-BACK-09).
+Endpoints de saúde (S1-BACK-09).
 """
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -33,19 +33,3 @@ async def detalhe_saude(
     if not dados:
         raise HTTPException(status_code=404, detail="Dados de saúde não encontrados para esta segmentação")
     return dados
-
-
-@router.get("/{seg_id}/overlap")
-async def listar_overlaps(
-    seg_id: str,
-    user: dict = Depends(require_perfil(["admin", "analista"])),
-):
-    """
-    Retorna sobreposições de um segmento com outros.
-    """
-    service = SaudeService()
-    dados = service.listar_overlaps(seg_id)
-    return {
-        "seg_id": seg_id,
-        "overlaps": dados
-    }

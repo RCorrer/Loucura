@@ -54,17 +54,7 @@ JOBS = [
         "timeout_seconds": 600,
         "max_retries": 1,
     },
-    {
-        "name": "S1-JOB-04 - seg_overlap",
-        "notebook_path": f"{NOTEBOOK_BASE_PATH}/seg_overlap",
-        "parameters": [],
-        "schedule": {
-            "quartz_cron_expression": "0 0 * * * ?",  # Diário
-            "timezone_id": "America/Sao_Paulo"
-        },
-        "timeout_seconds": 600,
-        "max_retries": 1,
-    },
+    # seg_overlap REMOVIDO — funcionalidade descontinuada
 ]
 
 # ============================================================

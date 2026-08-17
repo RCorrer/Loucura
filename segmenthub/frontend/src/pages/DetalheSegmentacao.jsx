@@ -83,6 +83,7 @@ export default function DetalheSegmentacao() {
   const [destinos, setDestinos] = useState([]);
   const [execucoes, setExecucoes] = useState([]);
   const [versoes, setVersoes] = useState([]);
+  const [saude, setSaude] = useState(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '' });
@@ -93,20 +94,18 @@ export default function DetalheSegmentacao() {
     setCarregando(true);
     setErro(null);
     try {
-      const [segData, destData, execData, versData, saudeData, overlapData] = await Promise.all([
+      const [segData, destData, execData, versData, saudeData] = await Promise.all([
         buscar(id),
         buscarDestinos(id),
         listarExecucoes(id),
         listarVersoes(id),
         obterSaude(id).catch(() => null),
-        obterOverlap(id).catch(() => ({ overlaps: [] })),
       ]);
       setSeg(segData);
       setDestinos(destData || []);
       setExecucoes(Array.isArray(execData) ? execData : execData?.data || []);
       setVersoes(Array.isArray(versData) ? versData : versData?.data || []);
       setSaude(saudeData);
-      setOverlaps(overlapData?.overlaps || []);
     } catch (err) {
       setErro(err?.message || 'Erro ao carregar segmentação');
     } finally {
@@ -433,35 +432,6 @@ export default function DetalheSegmentacao() {
             )}
           </Grid>
         </Paper>
-
-        {/* Overlap */}
-        {overlaps.length > 0 && (
-          <Paper sx={{ p: 2, mb: 2 }}>
-            <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-              Sobreposições (Overlap)
-            </Typography>
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Segmento</TableCell>
-                    <TableCell>Clientes em Comum</TableCell>
-                    <TableCell>% deste seg.</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {overlaps.slice(0, 10).map((o) => (
-                    <TableRow key={o.seg_id_b || o.seg_codigo_b}>
-                      <TableCell>{o.seg_codigo_b || o.seg_id_b}</TableCell>
-                      <TableCell>{o.clientes_em_comum?.toLocaleString('pt-BR') || '-'}</TableCell>
-                      <TableCell>{o.pct_overlap ? `${(o.pct_overlap * 100).toFixed(1)}%` : '-'}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Paper>
-        )}
 
         {/* Comentários */}
         <Paper sx={{ p: 2, mb: 2 }}>

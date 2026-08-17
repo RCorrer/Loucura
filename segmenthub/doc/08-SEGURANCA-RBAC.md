@@ -91,7 +91,7 @@ WHERE usuario_id = ?
 | Executar manualmente | ✅ | ✅ |
 | Clonar | ✅ | ✅ |
 | Comentar / mencionar | ✅ | ✅ |
-| Ver saúde / overlap | ✅ | ✅ |
+| Ver saúde | ✅ | ✅ |
 | **Admin catálogo (flags)** | ❌ | ✅ |
 | **Admin histórico governança** | ❌ | ✅ |
 | Usar chatbot | ✅ | ✅ |

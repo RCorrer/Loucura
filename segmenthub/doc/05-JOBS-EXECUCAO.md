@@ -54,7 +54,7 @@ Notebook parametrizado que executa **1 segmentação**.
 | `seg_id` | STRING | ID da segmentação a executar |
 | `origem_execucao` | STRING | `agendada` / `manual` / `reativacao` |
 
-### Fluxo de Execução (6 Steps)
+### Fluxo de Execução (6 Steps — sem overlap)
 
 ```
   ┌──────────────────────────────────────────────────────────────────────────┐
@@ -83,10 +83,6 @@ Notebook parametrizado que executa **1 segmentação**.
   │    ① Calcula variação % vs. execução anterior                                │
   │    ② Taxa de sucesso (últimas 10 execuções)                                  │
   │    ③ MERGE seg_saude (health: verde/amarelo/vermelho)                        │
-  │                                                                              │
-  │  STEP 7 ─ Overlap incremental                                                │
-  │    Para cada outro segmento ativo:                                           │
-  │      INNER JOIN → clientes_em_comum → MERGE seg_overlap                      │
   │                                                                              │
   │  EXIT: sucesso ✅                                                             │
   └──────────────────────────────────────────────────────────────────────────┘
@@ -182,7 +178,7 @@ Job periódico (6 em 6h) que monitora **todas** as segmentações.
 | Segmentações ativas | ~1.000 |
 | Jobs criados | ~1.000 (1:1) |
 | Execuções/dia | ~800 (mix diário + semanal) |
-| Overlap: pares/execução | ~999 (incremental, não 500K) |
+| Overlap | Removido (funcionalidade descontinuada) |
 | Tempo médio por execução | 30-120s (serverless) |
 
 ---
@@ -207,7 +203,7 @@ A arquitetura atual (v2) substituiu o modelo anterior:
 | 1 job central (seg_exec) | Gargalo de concorrência com 1000 segs | Jobs individuais `S1-SEG-{codigo}` |
 | seg_guardiao (vigência) | Redundante | Schedule nativo do Databricks Jobs |
 | seg_saude (tudo) | Monolítico | `seg_saude_consolidador` (infra) + saúde inline no `seg_exec` |
-| seg_overlap (O(n²)) | Inviável com 1000 segs | Overlap incremental dentro de `seg_exec` (Step 7) |
+| seg_overlap (O(n²)) | Inviável com 1000 segs | Removido — funcionalidade descontinuada |
 
 ---
 

@@ -17,7 +17,7 @@ O **SegmentHub** é o motor de segmentação da Plataforma CDP. Permite que anal
 | Chatbot IA | Criação de segmentações via linguagem natural (Agent Framework + MCP) |
 | Governança | Controle de acesso a características por sistema (S2/S3) com histórico auditável |
 | Execução Automatizada | Arquitetura job-per-segment com schedule individual |
-| Monitoramento | Health checks automáticos, overlap detection, alertas proativos |
+| Monitoramento | Health checks automáticos, alertas proativos |
 
 ---
 
@@ -171,7 +171,7 @@ segmenthub/
   │ • Job-per-segment (1:1) │   │ • Health status auto    │
   │ • HyperLogLog para      │   │ • Notificações          │
   │   estimativas           │   │   proativas             │
-  │ • Overlap incremental   │   │ • Auditoria completa    │
+  │ • Delta MERGE atômico   │   │ • Auditoria completa    │
   │ • Delta MERGE atômico   │   │   (histórico estados)   │
   │                         │   │ • Job run URLs          │
   │                         │   │   rastreáveis           │
