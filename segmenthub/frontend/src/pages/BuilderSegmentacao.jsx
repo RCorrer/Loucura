@@ -12,6 +12,8 @@ import {
   StepLabel,
   Paper,
   MenuItem,
+  Typography,
+  Divider,
 } from '@mui/material';
 import { useSegmentacoesApi } from '../api/segmentacoes';
 import PublicoSelector from '../components/PublicoSelector';
@@ -20,7 +22,7 @@ import RuleBuilder from '../components/RuleBuilder';
 import ExclusaoBuilder from '../components/ExclusaoBuilder';
 import EstimativaBadge from '../components/EstimativaBadge';
 
-const STEPS = ['Público', 'Regras de Inclusão', 'Regras de Exclusão'];
+const STEPS = ['Público', 'Regras de Inclusão', 'Regras de Exclusão', 'Metadados'];
 
 export default function BuilderSegmentacao() {
   const navigate = useNavigate();
@@ -36,6 +38,13 @@ export default function BuilderSegmentacao() {
     owner: 'admin',
     area_responsavel: '',
     email_contato: '',
+    seg_tags: [],
+    resumo: '',
+    objetivo_negocio: '',
+    publico_alvo_descricao: '',
+    observacoes: '',
+    documentacao_md: '',
+    tipo: 'direta',
   });
 
   const [publicoSelecionado, setPublicoSelecionado] = useState('');
@@ -69,6 +78,13 @@ export default function BuilderSegmentacao() {
             owner: data.owner || 'admin',
             area_responsavel: data.area_responsavel || '',
             email_contato: data.email_contato || '',
+            seg_tags: data.seg_tags || [],
+            resumo: data.resumo || '',
+            objetivo_negocio: data.objetivo_negocio || '',
+            publico_alvo_descricao: data.publico_alvo_descricao || '',
+            observacoes: data.observacoes || '',
+            documentacao_md: data.documentacao_md || '',
+            tipo: data.tipo || 'direta',
           });
           setPublicoSelecionado(data.publico_base_id || '');
           if (data.regras_json) {
@@ -385,6 +401,108 @@ export default function BuilderSegmentacao() {
                   onInterGroupOperatorChange={setInterGroupOpExclusao}
                 />
               </Box>
+            </Box>
+          </Paper>
+        )}
+
+        {activeStep === 3 && (
+          <Paper sx={{ p: 3, overflow: 'auto' }}>
+            <Typography variant="h6" gutterBottom>
+              Metadados e Documentação
+            </Typography>
+            <Divider sx={{ mb: 3 }} />
+            
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2 }}>
+              Informações Básicas
+            </Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 3 }}>
+              <TextField
+                label="Tipo"
+                value={dadosBasicos.tipo}
+                onChange={(e) => setDadosBasicos({ ...dadosBasicos, tipo: e.target.value })}
+                select
+                fullWidth
+              >
+                <MenuItem value="direta">Direta</MenuItem>
+                <MenuItem value="composta">Composta</MenuItem>
+              </TextField>
+              <TextField
+                label="Email de Contato"
+                value={dadosBasicos.email_contato}
+                onChange={(e) => setDadosBasicos({ ...dadosBasicos, email_contato: e.target.value })}
+                type="email"
+                fullWidth
+              />
+            </Box>
+
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2 }}>
+              Tags e Categorização
+            </Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 2, mb: 3 }}>
+              <TextField
+                label="Tags (separadas por vírgula)"
+                value={dadosBasicos.seg_tags.join(', ')}
+                onChange={(e) => setDadosBasicos({ 
+                  ...dadosBasicos, 
+                  seg_tags: e.target.value.split(',').map(t => t.trim()).filter(t => t) 
+                })}
+                fullWidth
+                helperText="Ex: marketing, cliente-novo, campanha-2024"
+              />
+            </Box>
+
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2 }}>
+              Descrições Detalhadas
+            </Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 3 }}>
+              <TextField
+                label="Resumo"
+                value={dadosBasicos.resumo}
+                onChange={(e) => setDadosBasicos({ ...dadosBasicos, resumo: e.target.value })}
+                fullWidth
+                multiline
+                rows={2}
+              />
+              <TextField
+                label="Objetivo de Negócio"
+                value={dadosBasicos.objetivo_negocio}
+                onChange={(e) => setDadosBasicos({ ...dadosBasicos, objetivo_negocio: e.target.value })}
+                fullWidth
+                multiline
+                rows={2}
+              />
+              <TextField
+                label="Descrição do Público-Alvo"
+                value={dadosBasicos.publico_alvo_descricao}
+                onChange={(e) => setDadosBasicos({ ...dadosBasicos, publico_alvo_descricao: e.target.value })}
+                fullWidth
+                multiline
+                rows={2}
+                sx={{ gridColumn: 'span 2' }}
+              />
+            </Box>
+
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2 }}>
+              Notas e Documentação
+            </Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 2 }}>
+              <TextField
+                label="Observações"
+                value={dadosBasicos.observacoes}
+                onChange={(e) => setDadosBasicos({ ...dadosBasicos, observacoes: e.target.value })}
+                fullWidth
+                multiline
+                rows={3}
+              />
+              <TextField
+                label="Documentação (Markdown)"
+                value={dadosBasicos.documentacao_md}
+                onChange={(e) => setDadosBasicos({ ...dadosBasicos, documentacao_md: e.target.value })}
+                fullWidth
+                multiline
+                rows={6}
+                helperText="Use Markdown para documentação técnica detalhada"
+              />
             </Box>
           </Paper>
         )}
