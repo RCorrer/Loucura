@@ -97,6 +97,39 @@ Tabelas/views que o S1 expõe para outros sistemas lerem.
 
 **Regra #4 detalhada:** O S1 hospeda as flags `usavel_em_peca`, `usavel_em_visao360`, `bloco_visao360` e o admin as edita via `/api/metadata/admin/campos/{id}/flags`. Porém, a lógica de segmentação do S1 **nunca** consulta essas flags. S2 e S3 as acessam diretamente via GRANT SELECT na tabela.
 
+### Governança de Campos — Fluxo Completo
+
+O Admin Catálogo (`/admin/catalogo`) expõe **3 controles independentes** por campo, editáveis inline na tabela:
+
+| Switch | Flag no Delta | Quem é afetado | Exemplo de uso |
+|---|---|---|---|
+| **Ativo (S1)** | `ativo` | TemaMenu do Builder — campo aparece nas regras | Desligar impede uso em segmentação |
+| **S2 (Visão 360)** | `usavel_em_visao360` | S2 filtra `WHERE usavel_em_visao360 = true` | Desligar oculta da Visão 360 |
+| **S3 (Peças)** | `usavel_em_peca` | S3 filtra `WHERE usavel_em_peca = true` | Desligar impede personalização |
+
+**Independência total:** Um campo pode estar ativo para segmentação mas oculto do S2, visível no S2 mas indisponível para regras, ou liberado para S3 mas bloqueado no S2.
+
+**Fluxo técnico (toggle inline):**
+
+```
+Admin clica Switch S3           PUT /api/metadata/admin/campos/{id}/flags
+(AdminCatalogo.jsx)       ───▶  Body: { "usavel_em_peca": true }
+       │                                     │
+       │                        FlagUpdateDTO (Pydantic, Optional)
+       │                                     │
+       │                        MetadataAdminService:
+       │                          1. Busca estado atual
+       │                          2. Compara: False→True
+       │                          3. UPDATE catalogo_caracteristicas SET usavel_em_peca = ?
+       │                             WHERE caracteristica_id = ?
+       │                          4. INSERT governanca_hist (acao='liberou', sistema_alvo='s3')
+       │                                     │
+       ▼                                     ▼
+Snackbar: "Saldo: S3 liberado"    S3 lê: SELECT ... WHERE usavel_em_peca = true
+```
+
+**Trilha de auditoria:** Toda alteração grava registro em `metadata.catalogo_governanca_hist` com: quem, quando, qual flag, valor anterior/novo, ação (liberou/retirou/alterou_bloco), sistema_alvo.
+
 ---
 
 ## 6. Dependências do S1
