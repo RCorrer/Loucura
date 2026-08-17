@@ -209,63 +209,62 @@ export default function BuilderSegmentacao() {
       setError('Selecione um público-base');
       return;
     }
-    // Helper: verifica se uma regra tem valor preenchido
+    // --- Helpers para limpar/preparar a árvore recursiva ---
+
     const regraTemValor = (rule) => {
       if (rule.op === 'is_null' || rule.op === 'is_not_null') return true;
-      // value pode ser 0, false, [] — só rejeita '' e null/undefined
       return rule.value !== '' && rule.value !== null && rule.value !== undefined;
     };
 
-    const temRegraValida = regrasInclusao.some(group =>
-      group.rules.some(rule => rule.campo_id && rule.op && regraTemValor(rule))
-    );
-    if (!temRegraValida) {
+    const coerceValue = (value, op) => {
+      if (op === 'is_null' || op === 'is_not_null') return null;
+      if (typeof value === 'string' && value !== '' && !isNaN(Number(value))) return Number(value);
+      if (typeof value === 'string' && (value.toLowerCase() === 'true' || value.toLowerCase() === 'false')) {
+        return value.toLowerCase() === 'true';
+      }
+      // Suporte a listas (in, not_in, between): "a,b,c" -> [a,b,c]
+      if (typeof value === 'string' && (op === 'in' || op === 'not_in' || op === 'between')) {
+        const parts = value.split(',').map(v => v.trim()).filter(Boolean);
+        return parts.map(p => (!isNaN(Number(p)) ? Number(p) : p));
+      }
+      return value;
+    };
+
+    // Limpa a árvore recursivamente: remove folhas incompletas e sub-nós vazios
+    const cleanTree = (node) => {
+      if (!node || !node.rules) return null;
+      const cleanedRules = node.rules
+        .map((item) => {
+          // Folha
+          if ('campo_id' in item) {
+            if (!item.campo_id || !item.op || !regraTemValor(item)) return null;
+            return { campo_id: item.campo_id, op: item.op, value: coerceValue(item.value, item.op) };
+          }
+          // Sub-nó recursivo
+          return cleanTree(item);
+        })
+        .filter(Boolean);
+
+      if (cleanedRules.length === 0) return null;
+      return { operator: node.operator || 'AND', rules: cleanedRules };
+    };
+
+    // Verifica se existe pelo menos 1 folha válida na árvore
+    const temFolhaValida = (node) => {
+      if (!node || !node.rules) return false;
+      return node.rules.some((item) => {
+        if ('campo_id' in item) return item.campo_id && item.op && regraTemValor(item);
+        return temFolhaValida(item);
+      });
+    };
+
+    if (!temFolhaValida(regrasInclusao)) {
       setError('Adicione pelo menos uma regra de inclusão válida');
       return;
     }
 
-    // Filtra regras incompletas e converte value para tipo correto
-    const prepararRegras = (rules) =>
-      rules
-        .filter(r => r.campo_id && r.op && regraTemValor(r))
-        .map(r => {
-          let value = r.value;
-          // Coerce: string numérica -> number (evita enviar "25" ao invés de 25)
-          if (typeof value === 'string' && value !== '' && !isNaN(Number(value))) {
-            value = Number(value);
-          }
-          // Coerce: string boolean -> boolean
-          if (typeof value === 'string' && (value.toLowerCase() === 'true' || value.toLowerCase() === 'false')) {
-            value = value.toLowerCase() === 'true';
-          }
-          // Operadores sem valor
-          if (r.op === 'is_null' || r.op === 'is_not_null') {
-            value = null;
-          }
-          return { campo_id: r.campo_id, op: r.op, value };
-        });
-
-    // Monta cada grupo como um RegraNo individual
-    const buildRegraNo = (groups, interGroupOp) => {
-      const gruposValidos = groups
-        .map(group => ({
-          operator: group.operator || 'AND',
-          rules: prepararRegras(group.rules),
-        }))
-        .filter(g => g.rules.length > 0);
-
-      if (gruposValidos.length === 0) return null;
-      // Se só 1 grupo, envia flat (compatível com legado)
-      if (gruposValidos.length === 1) return gruposValidos[0];
-      // Múltiplos grupos: wrapper RegraNo com inter-group operator
-      return {
-        operator: interGroupOp,
-        rules: gruposValidos,
-      };
-    };
-
-    const inclusaoNo = buildRegraNo(regrasInclusao, interGroupOpInclusao);
-    const exclusaoNo = buildRegraNo(regrasExclusao, interGroupOpExclusao);
+    const inclusaoNo = cleanTree(regrasInclusao);
+    const exclusaoNo = cleanTree(regrasExclusao);
 
     if (!inclusaoNo) {
       setError('Adicione pelo menos uma regra de inclusão válida');
