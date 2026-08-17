@@ -28,5 +28,5 @@ RegraNo.model_rebuild()
 class RegrasJson(BaseModel):
     """Estrutura completa da regra JSON."""
     publico_base: str
-    inclusao: RegraNo
+    inclusao: Optional[RegraNo] = None
     exclusao: Optional[RegraNo] = None

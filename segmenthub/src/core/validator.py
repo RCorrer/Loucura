@@ -64,6 +64,11 @@ class RegraValidator:
         if not self._validar_publico(regras.publico_base):
             erros.append(f"Público base '{regras.publico_base}' não encontrado ou inativo.")
 
+        # Valida que inclusão não é None/vazia
+        if not regras.inclusao:
+            erros.append("Regras de inclusão são obrigatórias. Adicione pelo menos uma condição.")
+            return erros  # Retorna cedo para evitar validações subsequentes
+
         # Valida nó de inclusão
         erros.extend(self._validar_no(regras.inclusao, catalogo, prefixo="inclusao"))
 

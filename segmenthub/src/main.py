@@ -3,7 +3,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response
 import os
 import logging
-import json
 
 from src.api import metadata, segmentacao, estimativa, comentario, saude, metadata_admin
 from src.core.config import AppConfig
@@ -19,31 +18,6 @@ app = FastAPI(
     description="API de gestão de segmentações",
     version="0.1.0",
 )
-
-# Middleware para capturar request body antes da validação
-@app.middleware("http")
-async def log_request_body(request: Request, call_next):
-    if request.method == "POST" and "/api/estimativa/preview" in str(request.url):
-        body = await request.body()
-        try:
-            body_str = body.decode('utf-8')
-            logger.info(f"🔍 RAW PREVIEW REQUEST: {body_str}")
-            # Parse para ver estrutura
-            try:
-                body_json = json.loads(body_str)
-                logger.info(f"🔍 PARSED PREVIEW: publico={body_json.get('publico_base')}, inclusao.operator={body_json.get('inclusao', {}).get('operator')}, rules_count={len(body_json.get('inclusao', {}).get('rules', []))}")
-            except:
-                pass
-        except:
-            pass
-        
-        # Recria o body para o FastAPI poder ler novamente
-        async def receive():
-            return {"type": "http.request", "body": body}
-        request._receive = receive
-    
-    response = await call_next(request)
-    return response
 
 # ============================================================
 # Health check
