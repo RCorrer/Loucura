@@ -19,7 +19,6 @@ Fluxo:
   4. Persiste resultado em seg_resultado_corrente e seg_resultado_historico
   5. Atualiza métricas de saúde individual (seg_saude)
   6. Registra execução em seg_execucao
-  7. Calcula overlap incremental (apenas este segmento vs. demais ativos)
 
 Tabelas envolvidas:
   - plataforma.segmentacao.seg_definicao (leitura)
@@ -27,7 +26,6 @@ Tabelas envolvidas:
   - plataforma.segmentacao.seg_resultado_corrente (escrita — MERGE)
   - plataforma.segmentacao.seg_resultado_historico (escrita — INSERT)
   - plataforma.segmentacao.seg_saude (escrita — MERGE)
-  - plataforma.segmentacao.seg_overlap (escrita — MERGE)
 
 Autor: SegmentHub Platform
 Versão: 2.0 (arquitetura job-per-segment)
@@ -402,74 +400,6 @@ spark.sql(f"""
 """)
 
 print(f"✓ Saúde atualizada: {health_status.upper()} (variação: {variacao_pct:+.1f}%)")
-
-# COMMAND ----------
-
-# ============================================================
-# STEP 7: Overlap incremental (este segmento vs. demais ativos)
-# ============================================================
-
-# Busca IDs dos outros segmentos ativos que já têm resultado
-df_outros = spark.sql(f"""
-  SELECT DISTINCT seg_id
-  FROM {CATALOG}.{SCHEMA_SEG}.seg_resultado_corrente
-  WHERE seg_id != '{SEG_ID}'
-""")
-
-outros_seg_ids = [row["seg_id"] for row in df_outros.collect()]
-
-if outros_seg_ids:
-    print(f"\n🔄 Calculando overlap com {len(outros_seg_ids)} segmentos...")
-
-    # Resultado do segmento atual (já temos em memória)
-    df_meu_resultado = spark.sql(f"""
-      SELECT cpf_cnpj FROM {CATALOG}.{SCHEMA_SEG}.seg_resultado_corrente
-      WHERE seg_id = '{SEG_ID}'
-    """)
-    meu_count = qtd_clientes
-
-    overlap_rows = []
-    for outro_id in outros_seg_ids:
-        df_outro = spark.sql(f"""
-          SELECT cpf_cnpj FROM {CATALOG}.{SCHEMA_SEG}.seg_resultado_corrente
-          WHERE seg_id = '{outro_id}'
-        """)
-        outro_count = df_outro.count()
-
-        # Interseção
-        em_comum = df_meu_resultado.join(df_outro, "cpf_cnpj", "inner").count()
-
-        if em_comum > 0:
-            pct_sobre_a = round((em_comum / meu_count) * 100, 2) if meu_count > 0 else 0
-            pct_sobre_b = round((em_comum / outro_count) * 100, 2) if outro_count > 0 else 0
-            overlap_rows.append((SEG_ID, outro_id, em_comum, pct_sobre_a, pct_sobre_b))
-            overlap_rows.append((outro_id, SEG_ID, em_comum, pct_sobre_b, pct_sobre_a))
-
-    # Persiste overlap (MERGE para atualizar pares existentes)
-    if overlap_rows:
-        df_overlap = spark.createDataFrame(
-            overlap_rows,
-            ["seg_id_a", "seg_id_b", "clientes_em_comum", "pct_sobre_a", "pct_sobre_b"]
-        )
-        df_overlap.createOrReplaceTempView("overlap_novo")
-
-        spark.sql(f"""
-          MERGE INTO {CATALOG}.{SCHEMA_SEG}.seg_overlap AS target
-          USING overlap_novo AS source
-          ON target.seg_id_a = source.seg_id_a AND target.seg_id_b = source.seg_id_b
-          WHEN MATCHED THEN UPDATE SET
-            clientes_em_comum = source.clientes_em_comum,
-            pct_sobre_a = source.pct_sobre_a,
-            pct_sobre_b = source.pct_sobre_b,
-            calculado_em = current_timestamp()
-          WHEN NOT MATCHED THEN INSERT *
-        """)
-
-        print(f"✓ Overlap calculado: {len(overlap_rows)//2} pares atualizados")
-    else:
-        print("✓ Nenhum overlap encontrado")
-else:
-    print("✓ Primeiro segmento — overlap não aplicável")
 
 # COMMAND ----------
 

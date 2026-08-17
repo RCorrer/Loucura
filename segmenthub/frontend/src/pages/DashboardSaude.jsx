@@ -23,7 +23,6 @@ import {
   Button,
   LinearProgress,
   Tooltip,
-  Link,
 } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
@@ -201,7 +200,7 @@ export default function DashboardSaude() {
                   </TableCell>
                   <TableCell align="right">
                     {item.taxa_sucesso_exec !== null && item.taxa_sucesso_exec !== undefined
-                      ? `${(item.taxa_sucesso_exec * 100).toFixed(0)}%`
+                      ? `${item.taxa_sucesso_exec.toFixed(0)}%`
                       : '-'}
                   </TableCell>
                   <TableCell align="right">
@@ -261,7 +260,7 @@ export default function DashboardSaude() {
                 <Grid item xs={6}>
                   <Typography variant="caption" color="text.secondary">Taxa Sucesso Exec</Typography>
                   <Typography variant="h6">
-                    {detalheData.taxa_sucesso_exec !== null ? `${(detalheData.taxa_sucesso_exec * 100).toFixed(0)}%` : '-'}
+                    {detalheData.taxa_sucesso_exec !== null ? `${detalheData.taxa_sucesso_exec.toFixed(0)}%` : '-'}
                   </Typography>
                 </Grid>
                 <Grid item xs={6}>
@@ -282,15 +281,6 @@ export default function DashboardSaude() {
                 </Box>
               )}
 
-              {/* Link Job */}
-              {detalheData.job_run_url && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2" gutterBottom>Link do Job</Typography>
-                  <Link href={detalheData.job_run_url} target="_blank" rel="noopener">
-                    Abrir última execução do Job <OpenInNewIcon fontSize="small" sx={{ verticalAlign: 'middle' }} />
-                  </Link>
-                </Box>
-              )}
 
 
             </Box>
