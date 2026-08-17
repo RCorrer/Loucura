@@ -106,7 +106,7 @@ class RegraValidator:
             )
 
         # Valida tipo do valor
-        if not self._validar_valor(folha.value, campo["tipo_dado"], campo["valores_dominio"]):
+        if not self._validar_valor(folha.value, campo["tipo_dado"], campo["valores_dominio"], op=folha.op):
             erros.append(
                 f"{prefixo}.value: valor '{folha.value}' inválido para campo '{folha.campo_id}' "
                 f"(esperado tipo {campo['tipo_dado']})"

@@ -237,6 +237,35 @@ export default function DetalheSegmentacao() {
             Validar e Aprovar
           </Button>
         )}
+        {seg.status === 'aprovada' && (
+          <>
+            <Button
+              variant="contained"
+              startIcon={<PlayArrowIcon />}
+              onClick={() => abrirConfirmacao(
+                'Ativar segmentação',
+                'A segmentação será ativada: o job será criado e passará a executar conforme agendamento.',
+                'info', 'Ativar', ativar, 'Ativação'
+              )}
+              color="success"
+              sx={{ mr: 1 }}
+            >
+              Ativar
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<DeleteOutlineIcon />}
+              color="error"
+              onClick={() => abrirConfirmacao(
+                'Arquivar segmentação',
+                'A segmentação aprovada será arquivada sem nunca ter sido ativada.',
+                'error', 'Arquivar', arquivar, 'Arquivamento'
+              )}
+            >
+              Arquivar
+            </Button>
+          </>
+        )}
         {seg.status === 'ativa' && (
           <>
             <Button
