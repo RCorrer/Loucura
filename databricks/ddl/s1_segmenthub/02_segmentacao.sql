@@ -34,7 +34,8 @@ CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_definicao (
   checklist_validacao_json STRING,
   versao_atual             INT      DEFAULT 1,
   atualizado_em            TIMESTAMP DEFAULT current_timestamp(),
-  habilitado               BOOLEAN  DEFAULT true
+  habilitado               BOOLEAN  DEFAULT true,
+  job_id_databricks        STRING   COMMENT 'ID do Databricks Job associado (arquitetura job-per-segment)'
 ) USING DELTA
 CLUSTER BY (status, objetivo, owner)
 TBLPROPERTIES (
