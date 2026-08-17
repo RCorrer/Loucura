@@ -130,6 +130,55 @@ Snackbar: "Saldo: S3 liberado"    S3 lê: SELECT ... WHERE usavel_em_peca = true
 
 **Trilha de auditoria:** Toda alteração grava registro em `metadata.catalogo_governanca_hist` com: quem, quando, qual flag, valor anterior/novo, ação (liberou/retirou/alterou_bloco), sistema_alvo.
 
+### Padrão de Consumo para S2 e S3
+
+S2 e S3 **não** usam API do S1 — leem diretamente via GRANT SELECT. Queries recomendadas:
+
+```sql
+-- S2 (ClientView): quais campos exibir na Visão 360
+SELECT caracteristica_id, campo_label, campo_fisico, tabela_fisica, bloco_visao360
+FROM plataforma.metadata.catalogo_caracteristicas
+WHERE usavel_em_visao360 = true
+  AND ativo = true
+ORDER BY bloco_visao360, campo_label
+
+-- S3 (EngagementHub): quais campos usar para personalização de peças
+SELECT caracteristica_id, campo_label, campo_fisico, tabela_fisica
+FROM plataforma.metadata.catalogo_caracteristicas
+WHERE usavel_em_peca = true
+  AND ativo = true
+ORDER BY tema, campo_label
+```
+
+> **Importante:** S2/S3 devem incluir `AND ativo = true` para respeitar campos desativados globalmente.
+
+### Semântica do `ativo` (flag global)
+
+O campo `ativo` controla a **visibilidade no S1** em 3 pontos:
+
+| Ponto de uso | Filtro | Efeito quando `ativo = false` |
+|---|---|---|
+| TemaMenu do Builder (frontend) | `GET /metadata/temas-completos` → `WHERE ativo = true` | Campo **não aparece** para seleção |
+| Estimativa (query_engine.py) | Não filtra (usa `campo_id` do JSON salvo) | Funciona se a regra já existia |
+| Job seg_exec (execução real) | `catalogo_df.filter("ativo = true")` | **`ValueError`** — campo não encontrado |
+
+### Edge Case: Campo desativado após uso em regras
+
+```
+  Admin desativa campo "saldo"      Segmentação X já usa "saldo" em regras_json
+  (ativo = false)                    │
+       │                             │
+       ▼                             ▼
+  Campo some do TemaMenu       seg_exec tenta resolver "saldo" no catálogo
+  (novas regras impossíveis)        └─▶ catalogo_df.filter("ativo = true").first() = None
+                                        └─▶ ValueError("Campo saldo não encontrado")
+                                            └─▶ Execução falha com erro_metadado
+```
+
+**Comportamento intencional** (segurança): impede que dados de campos revogados continuem sendo usados.
+
+**Mitigação recomendada:** Antes de desativar, o admin deve consultar o endpoint `GET /api/metadata/caracteristicas-em-uso` que lista quais campos estão em segmentações ativas. Se o campo está em uso, as segmentações afetadas devem ser pausadas/editadas antes da desativação.
+
 ---
 
 ## 6. Dependências do S1
