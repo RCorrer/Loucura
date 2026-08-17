@@ -21,8 +21,10 @@ import TemaMenu from '../components/TemaMenu';
 import RuleBuilder from '../components/RuleBuilder';
 import ExclusaoBuilder from '../components/ExclusaoBuilder';
 import EstimativaBadge from '../components/EstimativaBadge';
+import DestinoSelector from '../components/DestinoSelector';
+import VigenciaAgendamento from '../components/VigenciaAgendamento';
 
-const STEPS = ['Público', 'Regras de Inclusão', 'Regras de Exclusão', 'Metadados'];
+const STEPS = ['Público', 'Regras de Inclusão', 'Regras de Exclusão', 'Destino & Vigência', 'Metadados'];
 
 export default function BuilderSegmentacao() {
   const navigate = useNavigate();
@@ -128,6 +130,18 @@ export default function BuilderSegmentacao() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEdit, id]);
 
+  // State para destino e vigência
+  const [destinos, setDestinos] = useState([
+    { destino: 'sistema2', habilitado: false },
+    { destino: 'sistema3', habilitado: false },
+  ]);
+  const [vigencia, setVigencia] = useState({
+    vigencia_inicio: '',
+    vigencia_fim: '',
+    recorrencia: 'once',
+    cron_expression: '',
+  });
+
   // ✅ Reseta estado ao mudar de edição para criação
   useEffect(() => {
     if (!isEdit) {
@@ -138,12 +152,24 @@ export default function BuilderSegmentacao() {
         owner: 'admin',
         area_responsavel: '',
         email_contato: '',
+        seg_tags: [],
+        resumo: '',
+        objetivo_negocio: '',
+        publico_alvo_descricao: '',
+        observacoes: '',
+        documentacao_md: '',
+        tipo: 'direta',
       });
       setPublicoSelecionado('');
       setRegrasInclusao([{ operator: 'AND', rules: [{ campo_id: '', op: '', value: '' }] }]);
       setRegrasExclusao([{ operator: 'OR', rules: [{ campo_id: '', op: '', value: '' }] }]);
       setInterGroupOpInclusao('OR');
       setInterGroupOpExclusao('OR');
+      setDestinos([
+        { destino: 'sistema2', habilitado: false },
+        { destino: 'sistema3', habilitado: false },
+      ]);
+      setVigencia({ vigencia_inicio: '', vigencia_fim: '', recorrencia: 'once', cron_expression: '' });
       setActiveStep(0);
       setError(null);
       setCarregandoMetadata(true);
@@ -254,6 +280,8 @@ export default function BuilderSegmentacao() {
         inclusao: inclusaoNo,
         exclusao: exclusaoNo,
       },
+      destinos,
+      ...vigencia,
     };
 
     try {

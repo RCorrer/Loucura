@@ -34,8 +34,12 @@ import SendIcon from '@mui/icons-material/Send';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import PersonIcon from '@mui/icons-material/Person';
 import CampaignIcon from '@mui/icons-material/Campaign';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { useSegmentacoesApi } from '../api/segmentacoes';
+import { useSaudeApi } from '../api/saude';
 import ValidationModal from '../components/ValidationModal';
+import Comentarios from '../components/Comentarios';
 
 const STATUS_COLORS = {
   rascunho: 'default',
@@ -70,8 +74,10 @@ export default function DetalheSegmentacao() {
     encerrar,
     executar,
     enviarAprovacao,
+    arquivar,
     loading,
   } = useSegmentacoesApi();
+  const { obterDetalhe: obterSaude } = useSaudeApi();
 
   const [seg, setSeg] = useState(null);
   const [destinos, setDestinos] = useState([]);
@@ -87,16 +93,20 @@ export default function DetalheSegmentacao() {
     setCarregando(true);
     setErro(null);
     try {
-      const [segData, destData, execData, versData] = await Promise.all([
+      const [segData, destData, execData, versData, saudeData, overlapData] = await Promise.all([
         buscar(id),
         buscarDestinos(id),
         listarExecucoes(id),
         listarVersoes(id),
+        obterSaude(id).catch(() => null),
+        obterOverlap(id).catch(() => ({ overlaps: [] })),
       ]);
       setSeg(segData);
       setDestinos(destData || []);
       setExecucoes(Array.isArray(execData) ? execData : execData?.data || []);
       setVersoes(Array.isArray(versData) ? versData : versData?.data || []);
+      setSaude(saudeData);
+      setOverlaps(overlapData?.overlaps || []);
     } catch (err) {
       setErro(err?.message || 'Erro ao carregar segmentação');
     } finally {
@@ -214,6 +224,10 @@ export default function DetalheSegmentacao() {
                 <ListItemIcon><StopIcon /></ListItemIcon>
                 <ListItemText>Encerrar</ListItemText>
               </MenuItem>
+              <MenuItem onClick={() => executarAcao(arquivar, 'Arquivamento')} sx={{ color: 'error.main' }}>
+                <ListItemIcon><DeleteOutlineIcon color="error" /></ListItemIcon>
+                <ListItemText>Arquivar</ListItemText>
+              </MenuItem>
             </Menu>
           </>
         )}
@@ -237,6 +251,22 @@ export default function DetalheSegmentacao() {
               <Typography variant="caption" color="text.secondary">Status</Typography>
               <Box sx={{ mt: 1 }}>
                 <Chip label={seg.status} color={STATUS_COLORS[seg.status] || 'default'} />
+              </Box>
+            </Paper>
+          </Grid>
+          {/* Saúde */}
+          <Grid item xs={12} sm={4}>
+            <Paper sx={{ p: 2, textAlign: 'center' }}>
+              <Typography variant="caption" color="text.secondary">Saúde</Typography>
+              <Box sx={{ mt: 1 }}>
+                {saude ? (
+                  <Chip
+                    label={saude.health_status?.toUpperCase() || 'N/A'}
+                    color={saude.health_status === 'verde' ? 'success' : saude.health_status === 'amarelo' ? 'warning' : saude.health_status === 'vermelho' ? 'error' : 'default'}
+                  />
+                ) : (
+                  <Chip label="SEM DADOS" variant="outlined" />
+                )}
               </Box>
             </Paper>
           </Grid>
@@ -402,6 +432,43 @@ export default function DetalheSegmentacao() {
               </Grid>
             )}
           </Grid>
+        </Paper>
+
+        {/* Overlap */}
+        {overlaps.length > 0 && (
+          <Paper sx={{ p: 2, mb: 2 }}>
+            <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+              Sobreposições (Overlap)
+            </Typography>
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Segmento</TableCell>
+                    <TableCell>Clientes em Comum</TableCell>
+                    <TableCell>% deste seg.</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {overlaps.slice(0, 10).map((o) => (
+                    <TableRow key={o.seg_id_b || o.seg_codigo_b}>
+                      <TableCell>{o.seg_codigo_b || o.seg_id_b}</TableCell>
+                      <TableCell>{o.clientes_em_comum?.toLocaleString('pt-BR') || '-'}</TableCell>
+                      <TableCell>{o.pct_overlap ? `${(o.pct_overlap * 100).toFixed(1)}%` : '-'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        )}
+
+        {/* Comentários */}
+        <Paper sx={{ p: 2, mb: 2 }}>
+          <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+            Comentários
+          </Typography>
+          <Comentarios segId={id} />
         </Paper>
       </Box>
 

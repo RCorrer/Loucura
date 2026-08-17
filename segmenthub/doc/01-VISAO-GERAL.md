@@ -224,8 +224,7 @@ O SegmentHub opera sobre o catálogo `plataforma` com os seguintes schemas:
   │    (cron dispara)   (query completa)      │                                            │
   │                                           ├─▶ MERGE seg_resultado_corrente             │
   │                                           ├─▶ INSERT seg_resultado_historico           │
-  │                                           ├─▶ MERGE seg_saude                         │
-  │                                           └─▶ MERGE seg_overlap                       │
+  │                                           └─▶ MERGE seg_saude                         │
   │                                                                                        │
   └────────────────────────────────────────────────────────────────────────────────────────┘
 ```

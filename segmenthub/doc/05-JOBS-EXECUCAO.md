@@ -54,7 +54,7 @@ Notebook parametrizado que executa **1 segmentação**.
 | `seg_id` | STRING | ID da segmentação a executar |
 | `origem_execucao` | STRING | `agendada` / `manual` / `reativacao` |
 
-### Fluxo de Execução (7 Steps)
+### Fluxo de Execução (6 Steps)
 
 ```
   ┌──────────────────────────────────────────────────────────────────────────┐
