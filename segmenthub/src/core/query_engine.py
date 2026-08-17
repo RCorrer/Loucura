@@ -92,18 +92,18 @@ class QueryEngine:
         inclusao_sql = self._build_condition(regras.inclusao, params)
         inclusao_sql = f"({inclusao_sql})" if inclusao_sql else "1=1"
 
-        exclusao_sql = "1=1"
+        exclusao_clause = ""
         if regras.exclusao:
             exclusao_sql = self._build_condition(regras.exclusao, params)
-            exclusao_sql = f"({exclusao_sql})" if exclusao_sql else "1=1"
+            if exclusao_sql:
+                exclusao_clause = f"\n              AND NOT ({exclusao_sql})"
 
         sql = f"""
             SELECT cpf_cnpj
             FROM plataforma.publico.{regras.publico_base} p
             JOIN plataforma.caracteristicas.customer_features_wide f
                 ON p.cpf_cnpj = f.cpf_cnpj
-            WHERE {inclusao_sql}
-              AND {exclusao_sql}
+            WHERE {inclusao_sql}{exclusao_clause}
         """
 
         return sql, params

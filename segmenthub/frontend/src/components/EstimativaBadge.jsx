@@ -61,17 +61,27 @@ export default function EstimativaBadge({
       .filter((r) => r.campo_id && r.op && regraTemValor(r))
       .map((r) => {
         let value = r.value;
+        if (r.op === 'is_null' || r.op === 'is_not_null') {
+          return { campo_id: r.campo_id, op: r.op, value: null };
+        }
+        // Coerce: string numérica -> number
         if (typeof value === 'string' && value !== '' && !isNaN(Number(value))) {
           value = Number(value);
         }
+        // Coerce: boolean
         if (
           typeof value === 'string' &&
           (value.toLowerCase() === 'true' || value.toLowerCase() === 'false')
         ) {
           value = value.toLowerCase() === 'true';
         }
-        if (r.op === 'is_null' || r.op === 'is_not_null') {
-          value = null;
+        // Coerce: listas para in/not_in/between (split por vírgula)
+        if (
+          typeof value === 'string' &&
+          (r.op === 'in' || r.op === 'not_in' || r.op === 'between')
+        ) {
+          const parts = value.split(',').map((v) => v.trim()).filter(Boolean);
+          value = parts.map((p) => (!isNaN(Number(p)) ? Number(p) : p));
         }
         return { campo_id: r.campo_id, op: r.op, value };
       });
