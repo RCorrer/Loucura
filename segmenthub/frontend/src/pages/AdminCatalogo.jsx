@@ -33,8 +33,7 @@ import {
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import HistoryIcon from '@mui/icons-material/History';
 import SearchIcon from '@mui/icons-material/Search';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import BlockIcon from '@mui/icons-material/Block';
+// CheckCircleIcon e BlockIcon removidos — S2/S3 agora usam Switch inline
 import { useMetadataAdminApi } from '../api/metadataAdmin';
 
 /**
@@ -334,16 +333,20 @@ export default function AdminCatalogo() {
                             />
                           </TableCell>
                           <TableCell align="center">
-                            {campo.usavel_em_visao360
-                              ? <CheckCircleIcon fontSize="small" color="success" />
-                              : <BlockIcon fontSize="small" color="disabled" />
-                            }
+                            <Switch
+                              size="small"
+                              checked={campo.usavel_em_visao360}
+                              onChange={() => handleToggleFlag(campo, 'usavel_em_visao360')}
+                              color="info"
+                            />
                           </TableCell>
                           <TableCell align="center">
-                            {campo.usavel_em_peca
-                              ? <CheckCircleIcon fontSize="small" color="success" />
-                              : <BlockIcon fontSize="small" color="disabled" />
-                            }
+                            <Switch
+                              size="small"
+                              checked={campo.usavel_em_peca}
+                              onChange={() => handleToggleFlag(campo, 'usavel_em_peca')}
+                              color="success"
+                            />
                           </TableCell>
                           <TableCell>
                             <Typography variant="caption">{campo.bloco_visao360 || '-'}</Typography>
