@@ -31,13 +31,13 @@ export default function BuilderSegmentacao() {
   const { id } = useParams();
   const isEdit = !!id;
 
-  const { buscar, criar, atualizar, loading: apiLoading } = useSegmentacoesApi();
+  const { buscar, criar, atualizar, buscarDestinos, loading: apiLoading } = useSegmentacoesApi();
 
   const [dadosBasicos, setDadosBasicos] = useState({
     nome: '',
     descricao: '',
     objetivo: '',
-    owner: 'admin',
+    owner: '',
     area_responsavel: '',
     email_contato: '',
     seg_tags: [],
@@ -89,6 +89,23 @@ export default function BuilderSegmentacao() {
             tipo: data.tipo || 'direta',
           });
           setPublicoSelecionado(data.publico_base_id || '');
+
+          // Carregar destinos e vigência
+          try {
+            const destData = await buscarDestinos(id);
+            if (destData && Array.isArray(destData) && destData.length > 0) {
+              setDestinos(destData);
+            }
+          } catch (e) { /* sem destinos ainda */ }
+
+          // Vigência vem da própria segmentação
+          setVigencia({
+            vigencia_inicio: data.vigencia_inicio || '',
+            vigencia_fim: data.vigencia_fim || '',
+            recorrencia: data.recorrencia || 'once',
+            cron_expression: data.agendamento_cron || '',
+          });
+
           if (data.regras_json) {
             const inclusao = data.regras_json.inclusao;
             const exclusao = data.regras_json.exclusao;
@@ -388,6 +405,13 @@ export default function BuilderSegmentacao() {
                 rows={2}
               />
               <TextField
+                label="Owner (responsável)"
+                value={dadosBasicos.owner}
+                onChange={(e) => setDadosBasicos({ ...dadosBasicos, owner: e.target.value })}
+                fullWidth
+                helperText="Deixe vazio para usar seu email automaticamente"
+              />
+              <TextField
                 label="Área Responsável"
                 value={dadosBasicos.area_responsavel}
                 onChange={(e) => setDadosBasicos({ ...dadosBasicos, area_responsavel: e.target.value })}
@@ -434,6 +458,27 @@ export default function BuilderSegmentacao() {
         )}
 
         {activeStep === 3 && (
+          <Paper sx={{ p: 3, overflow: 'auto' }}>
+            <Typography variant="h6" gutterBottom>
+              Destino & Vigência
+            </Typography>
+            <Divider sx={{ mb: 3 }} />
+
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2 }}>
+              Para quem esta segmentação será entregue?
+            </Typography>
+            <DestinoSelector value={destinos} onChange={setDestinos} />
+
+            <Divider sx={{ my: 3 }} />
+
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2 }}>
+              Quando e com qual frequência?
+            </Typography>
+            <VigenciaAgendamento value={vigencia} onChange={setVigencia} />
+          </Paper>
+        )}
+
+        {activeStep === 4 && (
           <Paper sx={{ p: 3, overflow: 'auto' }}>
             <Typography variant="h6" gutterBottom>
               Metadados e Documentação

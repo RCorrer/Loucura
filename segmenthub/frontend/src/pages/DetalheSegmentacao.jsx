@@ -176,6 +176,14 @@ export default function DetalheSegmentacao() {
         >
           Documentação
         </Button>
+        <Button
+          variant="outlined"
+          startIcon={<TimelineIcon />}
+          onClick={() => navigate(`/segmentacoes/${id}/timeline`)}
+          sx={{ mr: 1 }}
+        >
+          Timeline
+        </Button>
 
         {/* Ações de ciclo */}
         {seg.status === 'rascunho' && (
