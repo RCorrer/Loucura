@@ -50,14 +50,15 @@ export default function BuilderSegmentacao() {
   });
 
   const [publicoSelecionado, setPublicoSelecionado] = useState('');
-  const [regrasInclusao, setRegrasInclusao] = useState([
+  // Árvore recursiva de regras (formato RegraNo: { operator, rules })
+  const [regrasInclusao, setRegrasInclusao] = useState(
     { operator: 'AND', rules: [{ campo_id: '', op: '', value: '' }] }
-  ]);
-  const [regrasExclusao, setRegrasExclusao] = useState([
-    { operator: 'OR', rules: [{ campo_id: '', op: '', value: '' }] }
-  ]);
+  );
+  const [regrasExclusao, setRegrasExclusao] = useState(
+    { operator: 'OR', rules: [] }
+  );
 
-  // Operadores inter-grupo: como os GRUPOS se conectam entre si
+  // Compat legado (não mais usados, mantidos para evitar breaking)
   const [interGroupOpInclusao, setInterGroupOpInclusao] = useState('OR');
   const [interGroupOpExclusao, setInterGroupOpExclusao] = useState('OR');
 
@@ -110,28 +111,17 @@ export default function BuilderSegmentacao() {
             const inclusao = data.regras_json.inclusao;
             const exclusao = data.regras_json.exclusao;
 
-            // Se inclusao é um RegraNo com sub-RegraNos (estrutura aninhada),
-            // decompor em grupos + inter-group operator
-            if (inclusao && inclusao.rules && inclusao.rules.length > 0 && inclusao.rules[0]?.rules) {
-              // Estrutura aninhada: {operator: 'OR', rules: [{operator:'AND', rules:[...]}, ...]}
-              setInterGroupOpInclusao(inclusao.operator || 'OR');
-              setRegrasInclusao(inclusao.rules);
-            } else if (inclusao) {
-              // Estrutura flat legada: {operator: 'AND', rules: [folha, folha, ...]}
-              setRegrasInclusao([inclusao]);
-              setInterGroupOpInclusao('OR');
+            // Carregar árvore diretamente (formato recursivo RegraNo)
+            if (inclusao && inclusao.operator && Array.isArray(inclusao.rules)) {
+              setRegrasInclusao(inclusao);
             } else {
-              setRegrasInclusao([{ operator: 'AND', rules: [] }]);
+              setRegrasInclusao({ operator: 'AND', rules: [{ campo_id: '', op: '', value: '' }] });
             }
 
-            if (exclusao && exclusao.rules && exclusao.rules.length > 0 && exclusao.rules[0]?.rules) {
-              setInterGroupOpExclusao(exclusao.operator || 'OR');
-              setRegrasExclusao(exclusao.rules);
-            } else if (exclusao) {
-              setRegrasExclusao([exclusao]);
-              setInterGroupOpExclusao('OR');
+            if (exclusao && exclusao.operator && Array.isArray(exclusao.rules)) {
+              setRegrasExclusao(exclusao);
             } else {
-              setRegrasExclusao([{ operator: 'OR', rules: [] }]);
+              setRegrasExclusao({ operator: 'OR', rules: [] });
             }
           }
         } catch (err) {
@@ -178,8 +168,8 @@ export default function BuilderSegmentacao() {
         tipo: 'direta',
       });
       setPublicoSelecionado('');
-      setRegrasInclusao([{ operator: 'AND', rules: [{ campo_id: '', op: '', value: '' }] }]);
-      setRegrasExclusao([{ operator: 'OR', rules: [{ campo_id: '', op: '', value: '' }] }]);
+      setRegrasInclusao({ operator: 'AND', rules: [{ campo_id: '', op: '', value: '' }] });
+      setRegrasExclusao({ operator: 'OR', rules: [] });
       setInterGroupOpInclusao('OR');
       setInterGroupOpExclusao('OR');
       setDestinos([
@@ -193,27 +183,20 @@ export default function BuilderSegmentacao() {
     }
   }, [isEdit]);
 
+  // Adiciona campo no root da árvore (catálogo → click)
   const handleSelectCampoInclusao = (campo) => {
-    const lastIndex = regrasInclusao.length - 1;
-    const novasRegras = [...regrasInclusao];
-    novasRegras[lastIndex].rules.push({
-      campo_id: campo.caracteristica_id,
-      op: campo.operadores?.[0] || '=',
-      value: '',
-    });
-    setRegrasInclusao(novasRegras);
+    setRegrasInclusao((prev) => ({
+      ...prev,
+      rules: [...prev.rules, { campo_id: campo.caracteristica_id, op: campo.operadores?.[0] || '=', value: '' }],
+    }));
     if (activeStep < 1) setActiveStep(1);
   };
 
   const handleSelectCampoExclusao = (campo) => {
-    const lastIndex = regrasExclusao.length - 1;
-    const novasRegras = [...regrasExclusao];
-    novasRegras[lastIndex].rules.push({
-      campo_id: campo.caracteristica_id,
-      op: campo.operadores?.[0] || '=',
-      value: '',
-    });
-    setRegrasExclusao(novasRegras);
+    setRegrasExclusao((prev) => ({
+      ...prev,
+      rules: [...prev.rules, { campo_id: campo.caracteristica_id, op: campo.operadores?.[0] || '=', value: '' }],
+    }));
     if (activeStep < 2) setActiveStep(2);
   };
 

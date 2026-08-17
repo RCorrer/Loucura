@@ -1,47 +1,66 @@
 import React from 'react';
-import { Box, Button, Typography, Paper } from '@mui/material';
-import RuleGroup from './RuleGroup';
+import { Box, Typography, Paper } from '@mui/material';
+import RuleNode from './RuleNode';
 
-const DEFAULT_OPERADORES = ['=', '!=', '>', '<', '>=', '<=', 'between', 'in', 'not_in', 'is_null', 'is_not_null'];
-
-export default function ExclusaoBuilder({ value, onChange, operadores = DEFAULT_OPERADORES }) {
-  const handleAddGroup = () => {
-    const newGroups = [...value, { operator: 'OR', rules: [{ campo_id: '', op: '', value: '' }] }];
-    onChange(newGroups);
+/**
+ * ExclusaoBuilder — Mesmo engine recursivo do RuleBuilder, com visual de exclusão.
+ *
+ * Props (mesmas do RuleBuilder, retrocompatível):
+ *   - value: RegraNo | array (legado)
+ *   - onChange: (RegraNo) => void
+ *   - operadores: lista de operadores
+ *   - interGroupOperator: usado apenas se value for array legado
+ *   - onInterGroupOperatorChange: mantido para compat
+ *   - catalogoCampos: array de campos do catálogo
+ */
+export default function ExclusaoBuilder({
+  value,
+  onChange,
+  operadores,
+  interGroupOperator = 'OR',
+  onInterGroupOperatorChange,
+  catalogoCampos = [],
+}) {
+  // Normalizar: se value é array legado, converter para árvore
+  const normalizeToTree = (val) => {
+    if (!val) return { operator: 'OR', rules: [] };
+    if (val.operator && Array.isArray(val.rules)) return val;
+    if (Array.isArray(val)) {
+      if (val.length === 0) return { operator: 'OR', rules: [] };
+      if (val.length === 1) return val[0];
+      return { operator: interGroupOperator || 'OR', rules: val };
+    }
+    return { operator: 'OR', rules: [] };
   };
 
-  const handleUpdateGroup = (index, updatedGroup) => {
-    const newGroups = [...value];
-    newGroups[index] = updatedGroup;
-    onChange(newGroups);
-  };
+  const tree = normalizeToTree(value);
 
-  const handleRemoveGroup = (index) => {
-    const newGroups = value.filter((_, i) => i !== index);
-    onChange(newGroups);
+  const handleChange = (updatedTree) => {
+    onChange(updatedTree);
+    if (onInterGroupOperatorChange && updatedTree.operator !== interGroupOperator) {
+      onInterGroupOperatorChange(updatedTree.operator);
+    }
   };
 
   return (
     <Paper sx={{ p: 2, mb: 3, border: '1px dashed #d32f2f' }}>
-      <Typography variant="h6" sx={{ mb: 2, color: '#d32f2f' }}>
-        Exclusão (opcional)
-      </Typography>
-      <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-        Clientes que atendem a estas regras serão removidos do segmento.
-      </Typography>
-      {value.map((group, index) => (
-        <RuleGroup
-          key={index}
-          group={group}
-          index={index}
-          onUpdate={handleUpdateGroup}
-          onRemove={handleRemoveGroup}
-          operadores={operadores}
-        />
-      ))}
-      <Button variant="outlined" color="error" onClick={handleAddGroup} size="small">
-        + Adicionar Grupo de Exclusão
-      </Button>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+        <Typography variant="h6" sx={{ color: '#d32f2f' }}>
+          Exclusão (opcional)
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          Clientes que atendem estas regras serão removidos
+        </Typography>
+      </Box>
+      <RuleNode
+        node={tree}
+        onChange={handleChange}
+        onRemove={null}
+        depth={0}
+        operadores={operadores}
+        catalogoCampos={catalogoCampos}
+        variant="exclusao"
+      />
     </Paper>
   );
 }
