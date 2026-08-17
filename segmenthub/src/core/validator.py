@@ -32,16 +32,22 @@ class RegraValidator:
         """
         results = self.client.execute_query(sql)
         catalogo = {}
+        columns = ["caracteristica_id", "tipo_dado", "operadores", "valores_dominio", "ativo"]
+        
         for row in results:
+            # Converte linha (lista) para dicionário
+            row_dict = dict(zip(columns, row))
+            
             # Converte operadores para lista (caso venha como array)
-            ops = row["operadores"]
+            ops = row_dict["operadores"]
             if hasattr(ops, "tolist"):
                 ops = ops.tolist()
-            catalogo[row["caracteristica_id"]] = {
-                "tipo_dado": row["tipo_dado"],
+            
+            catalogo[row_dict["caracteristica_id"]] = {
+                "tipo_dado": row_dict["tipo_dado"],
                 "operadores": ops,
-                "valores_dominio": row.get("valores_dominio"),
-                "ativo": row["ativo"],
+                "valores_dominio": row_dict.get("valores_dominio"),
+                "ativo": row_dict["ativo"],
             }
         self._cache_campos = catalogo
         return catalogo
