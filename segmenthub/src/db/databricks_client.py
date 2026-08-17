@@ -84,8 +84,20 @@ class DatabricksSQLClient:
 
 _default_client = None
 
-def get_client() -> DatabricksSQLClient:
+def get_client():
+    """Return the appropriate DB client based on environment.
+
+    - ENV=local  → FakeSQLiteClient (SQLite, no Databricks needed)
+    - Otherwise  → DatabricksSQLClient (production)
+    """
     global _default_client
     if _default_client is None:
-        _default_client = DatabricksSQLClient()
+        env = os.getenv("ENV", "production").lower()
+        if env == "local":
+            from src.db.fake_client import FakeSQLiteClient
+            _default_client = FakeSQLiteClient()
+            logger.info("🔧 Usando FakeSQLiteClient (modo local)")
+        else:
+            _default_client = DatabricksSQLClient()
+            logger.info("☁️ Usando DatabricksSQLClient (Databricks)")
     return _default_client
