@@ -16,7 +16,14 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 
-const DEFAULT_OPS = ['=', '!=', '>', '<', '>=', '<=', 'between', 'in', 'not_in', 'is_null', 'is_not_null'];
+const DEFAULT_OPS = [
+  '=', '!=', '>', '<', '>=', '<=',                     // Comparação numérica
+  'between', 'in', 'not_in',                          // Ranges e listas
+  'contains', 'not_contains',                         // Texto: contém
+  'starts_with', 'ends_with',                         // Texto: começa/termina com
+  'not_starts_with', 'not_ends_with',                 // Texto: negação
+  'is_null', 'is_not_null'                            // Nulidade
+];
 
 const OPERATOR_COLORS = {
   AND: { border: '#1976d2', bg: '#e3f2fd', chip: 'primary' },
