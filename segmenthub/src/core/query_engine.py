@@ -25,12 +25,12 @@ class QueryEngine:
             return
         client = get_client()
         sql = """
-            SELECT caracteristica_id, campo_fisico, tabela_fisica, join_key
+            SELECT caracteristica_id, campo_fisico, tabela_fisica, join_key, tipo_dado
             FROM plataforma.metadata.catalogo_caracteristicas
             WHERE ativo = true
         """
         rows = client.execute_query(sql)
-        columns = ["caracteristica_id", "campo_fisico", "tabela_fisica", "join_key"]
+        columns = ["caracteristica_id", "campo_fisico", "tabela_fisica", "join_key", "tipo_dado"]
         for row in rows:
             d = dict(zip(columns, row))
             self._cache_catalogo[d["caracteristica_id"]] = d
@@ -60,6 +60,13 @@ class QueryEngine:
         self._tabelas_usadas.add((info["tabela_fisica"], info["join_key"]))
         return f"{info['tabela_fisica']}.{info['campo_fisico']}"
 
+    def _is_string_field(self, campo_id: str) -> bool:
+        """Verifica se um campo é do tipo string para aplicar LOWER() nas comparações."""
+        info = self._cache_catalogo.get(campo_id)
+        if not info:
+            return False
+        return info.get("tipo_dado") == "string"
+
     def _get_param(self) -> str:
         self._param_counter += 1
         return "?"
@@ -76,12 +83,19 @@ class QueryEngine:
         campo = self._resolver_campo(folha.campo_id)
         op = folha.op
         valor = folha.value
+        is_string = self._is_string_field(folha.campo_id)
 
         if op == "=":
-            sql = f"{campo} = {self._get_param()}"
+            if is_string:
+                sql = f"LOWER({campo}) = LOWER({self._get_param()})"
+            else:
+                sql = f"{campo} = {self._get_param()}"
             params.append(valor)
         elif op == "!=":
-            sql = f"{campo} != {self._get_param()}"
+            if is_string:
+                sql = f"LOWER({campo}) != LOWER({self._get_param()})"
+            else:
+                sql = f"{campo} != {self._get_param()}"
             params.append(valor)
         elif op == ">":
             sql = f"{campo} > {self._get_param()}"
@@ -104,31 +118,41 @@ class QueryEngine:
             if not isinstance(valor, list):
                 raise ValueError(f"Operador 'in' requer lista de valores: {valor}")
             placeholders = ", ".join([self._get_param() for _ in valor])
-            sql = f"{campo} IN ({placeholders})"
+            if is_string:
+                # Para strings, aplicar LOWER() tanto no campo quanto nos valores
+                lower_placeholders = ", ".join([f"LOWER({self._get_param()})" for _ in valor])
+                sql = f"LOWER({campo}) IN ({lower_placeholders})"
+            else:
+                sql = f"{campo} IN ({placeholders})"
             params.extend(valor)
         elif op == "not_in":
             if not isinstance(valor, list):
                 raise ValueError(f"Operador 'not_in' requer lista de valores: {valor}")
             placeholders = ", ".join([self._get_param() for _ in valor])
-            sql = f"{campo} NOT IN ({placeholders})"
+            if is_string:
+                # Para strings, aplicar LOWER() tanto no campo quanto nos valores
+                lower_placeholders = ", ".join([f"LOWER({self._get_param()})" for _ in valor])
+                sql = f"LOWER({campo}) NOT IN ({lower_placeholders})"
+            else:
+                sql = f"{campo} NOT IN ({placeholders})"
             params.extend(valor)
         elif op == "contains":
-            sql = f"{campo} LIKE {self._get_param()}"
+            sql = f"LOWER({campo}) LIKE LOWER({self._get_param()})"
             params.append(f"%{valor}%")
         elif op == "starts_with":
-            sql = f"{campo} LIKE {self._get_param()}"
+            sql = f"LOWER({campo}) LIKE LOWER({self._get_param()})"
             params.append(f"{valor}%")
         elif op == "ends_with":
-            sql = f"{campo} LIKE {self._get_param()}"
+            sql = f"LOWER({campo}) LIKE LOWER({self._get_param()})"
             params.append(f"%{valor}")
         elif op == "not_contains":
-            sql = f"{campo} NOT LIKE {self._get_param()}"
+            sql = f"LOWER({campo}) NOT LIKE LOWER({self._get_param()})"
             params.append(f"%{valor}%")
         elif op == "not_starts_with":
-            sql = f"{campo} NOT LIKE {self._get_param()}"
+            sql = f"LOWER({campo}) NOT LIKE LOWER({self._get_param()})"
             params.append(f"{valor}%")
         elif op == "not_ends_with":
-            sql = f"{campo} NOT LIKE {self._get_param()}"
+            sql = f"LOWER({campo}) NOT LIKE LOWER({self._get_param()})"
             params.append(f"%{valor}")
         elif op == "is_null":
             sql = f"{campo} IS NULL"
