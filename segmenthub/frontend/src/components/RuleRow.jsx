@@ -2,7 +2,14 @@ import React from 'react';
 import { Box, TextField, Select, MenuItem, IconButton, FormControl, InputLabel } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 
-const DEFAULT_OPERADORES = ['=', '!=', '>', '<', '>=', '<=', 'between', 'in', 'not_in', 'is_null', 'is_not_null'];
+const DEFAULT_OPERADORES = [
+  '=', '!=', '>', '<', '>=', '<=',                     // Comparação numérica
+  'between', 'in', 'not_in',                          // Ranges e listas
+  'contains', 'not_contains',                         // Texto: contém
+  'starts_with', 'ends_with',                         // Texto: começa/termina com
+  'not_starts_with', 'not_ends_with',                 // Texto: negação
+  'is_null', 'is_not_null'                            // Nulidade
+];
 
 export default function RuleRow({ rule, index, onUpdate, onRemove, operadores = DEFAULT_OPERADORES }) {
   const handleChange = (field, value) => {

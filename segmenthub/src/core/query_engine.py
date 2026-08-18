@@ -118,6 +118,18 @@ class QueryEngine:
         elif op == "starts_with":
             sql = f"{campo} LIKE {self._get_param()}"
             params.append(f"{valor}%")
+        elif op == "ends_with":
+            sql = f"{campo} LIKE {self._get_param()}"
+            params.append(f"%{valor}")
+        elif op == "not_contains":
+            sql = f"{campo} NOT LIKE {self._get_param()}"
+            params.append(f"%{valor}%")
+        elif op == "not_starts_with":
+            sql = f"{campo} NOT LIKE {self._get_param()}"
+            params.append(f"{valor}%")
+        elif op == "not_ends_with":
+            sql = f"{campo} NOT LIKE {self._get_param()}"
+            params.append(f"%{valor}")
         elif op == "is_null":
             sql = f"{campo} IS NULL"
         elif op == "is_not_null":
