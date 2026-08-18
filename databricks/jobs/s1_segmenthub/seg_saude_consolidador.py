@@ -74,11 +74,13 @@ df_check = df_ativas.join(df_ultima_exec, "seg_id", "left")
 
 # COMMAND ----------
 
+# DBTITLE 1,Step 3: Detectar atrasos e falhas
 # ============================================================
 # STEP 3: Detectar atrasos e falhas
 # ============================================================
 
-agora = datetime.now(timezone.utc)
+# Usa naive datetime para compatibilidade com timestamps Spark (que retornam naive)
+agora = datetime.utcnow()
 limite_diario = agora - timedelta(hours=26)      # tolerancia: 26h para diario
 limite_semanal = agora - timedelta(days=8)        # tolerancia: 8 dias para semanal
 limite_sem_exec = agora - timedelta(days=3)       # 3 dias sem nenhuma exec = problema
@@ -149,6 +151,7 @@ print(f"✓ seg_saude atualizada para {len(saude_updates)} segmentações")
 
 # COMMAND ----------
 
+# DBTITLE 1,Step 5: Gerar notificações para owners
 # ============================================================
 # STEP 5: Gerar notificações para owners
 # ============================================================
@@ -156,7 +159,8 @@ print(f"✓ seg_saude atualizada para {len(saude_updates)} segmentações")
 for alerta in alertas_gerados:
     titulo = f"⚠️ Saúde crítica: {alerta['nome']}".replace("'", "''")
     mensagem = f"Problemas detectados: {'; '.join(alerta['problemas'])}".replace("'", "''")
-    notif_id = f"notif_saude_{alerta['seg_id']}_{datetime.now().strftime('%Y%m%d%H%M')}"
+    import uuid as _uuid
+    notif_id = f"notif_saude_{_uuid.uuid4().hex[:12]}"
     owner_safe = alerta['owner'].replace("'", "''") if alerta.get('owner') else 'system'
 
     spark.sql(f"""

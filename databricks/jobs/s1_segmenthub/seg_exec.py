@@ -60,6 +60,7 @@ SCHEMA_META = "metadata"
 
 # COMMAND ----------
 
+# DBTITLE 1,Step 1: Carregar definição da segmentação
 # ============================================================
 # STEP 1: Carregar definição da segmentação
 # ============================================================
@@ -89,8 +90,8 @@ if seg["status"] not in ("ativa", "aprovada"):
         "mensagem": f"Status '{seg['status']}' não permite execução"
     }))
 
-# Validação de vigência
-agora = datetime.now(timezone.utc)
+# Validação de vigência (usa naive datetime para compatibilidade com Spark timestamps)
+agora = datetime.utcnow()
 if seg["vigencia_fim"] and seg["vigencia_fim"] < agora:
     dbutils.notebook.exit(json.dumps({
         "status": "expirado",
@@ -107,19 +108,44 @@ print(f"✓ Regras carregadas (público base: {regras.get('publico_base')})")
 # STEP 2: Montar e executar query SQL a partir das regras
 # ============================================================
 
-def build_condition(node: dict, catalogo_df) -> str:
+# Whitelist de operadores válidos (defesa contra regras corrompidas)
+OPS_VALIDOS = {"=", "!=", ">", "<", ">=", "<=", "in", "not_in",
+               "between", "contains", "starts_with", "ends_with",
+               "not_contains", "not_starts_with", "not_ends_with",
+               "is_null", "is_not_null"}
+
+# Materializa catálogo como dict para lookup O(1) (evita N filter().first())
+catalogo_df = spark.table(f"{CATALOG}.{SCHEMA_META}.catalogo_caracteristicas").filter("ativo = true")
+_catalogo_rows = catalogo_df.collect()
+catalogo_dict = {row["caracteristica_id"]: row.asDict() for row in _catalogo_rows}
+
+
+def sql_val(v):
+    """Formata valor Python para literal SQL com escape seguro."""
+    if isinstance(v, bool):
+        return str(v).lower()  # True → true (Spark syntax)
+    if isinstance(v, str):
+        escaped = v.replace("'", "''")
+        return f"'{escaped}'"
+    if v is None:
+        return "NULL"
+    return str(v)
+
+
+def build_condition(node: dict) -> str:
     """
     Converte um nó de regra (RegraNo) em SQL WHERE condition.
     Recursivo: suporta grupos aninhados.
+    Usa catalogo_dict (closure) para lookup O(1).
     """
-    if "rules" not in node:
+    if not node.get("rules"):
         return "1=1"
 
     conditions = []
     for rule in node["rules"]:
         if "rules" in rule:
             # Grupo aninhado
-            sub = build_condition(rule, catalogo_df)
+            sub = build_condition(rule)
             conditions.append(f"({sub})")
         else:
             # Folha: {campo_id, op, value}
@@ -127,24 +153,16 @@ def build_condition(node: dict, catalogo_df) -> str:
             op = rule["op"]
             value = rule.get("value")
 
-            # Resolve campo físico via catálogo
-            campo_info = catalogo_df.filter(
-                F.col("caracteristica_id") == campo_id
-            ).first()
+            # Valida operador contra whitelist
+            if op not in OPS_VALIDOS:
+                raise ValueError(f"Operador inválido '{op}' para campo {campo_id}")
 
+            # Resolve campo físico via dict (O(1))
+            campo_info = catalogo_dict.get(campo_id)
             if not campo_info:
                 raise ValueError(f"Campo {campo_id} não encontrado no catálogo")
 
             col_fisico = f"{campo_info['tabela_fisica']}.{campo_info['campo_fisico']}"
-
-            # Helper: formata valor para SQL com escape de aspas
-            def sql_val(v):
-                if isinstance(v, bool):
-                    return str(v).lower()  # True → true (Spark syntax)
-                if isinstance(v, str):
-                    escaped = v.replace("'", "''")
-                    return f"'{escaped}'"
-                return str(v)
 
             # Monta condição SQL
             if op == "is_null":
@@ -162,9 +180,21 @@ def build_condition(node: dict, catalogo_df) -> str:
             elif op == "contains":
                 escaped = str(value).replace("'", "''")
                 conditions.append(f"{col_fisico} LIKE '%{escaped}%'")
+            elif op == "not_contains":
+                escaped = str(value).replace("'", "''")
+                conditions.append(f"{col_fisico} NOT LIKE '%{escaped}%'")
             elif op == "starts_with":
                 escaped = str(value).replace("'", "''")
                 conditions.append(f"{col_fisico} LIKE '{escaped}%'")
+            elif op == "not_starts_with":
+                escaped = str(value).replace("'", "''")
+                conditions.append(f"{col_fisico} NOT LIKE '{escaped}%'")
+            elif op == "ends_with":
+                escaped = str(value).replace("'", "''")
+                conditions.append(f"{col_fisico} LIKE '%{escaped}'")
+            elif op == "not_ends_with":
+                escaped = str(value).replace("'", "''")
+                conditions.append(f"{col_fisico} NOT LIKE '%{escaped}'")
             else:
                 # Operadores simples: =, !=, >, <, >=, <=
                 conditions.append(f"{col_fisico} {op} {sql_val(value)}")
@@ -173,19 +203,14 @@ def build_condition(node: dict, catalogo_df) -> str:
     return operator.join(conditions)
 
 
-# Carrega catálogo de características
-catalogo_df = spark.table(f"{CATALOG}.{SCHEMA_META}.catalogo_caracteristicas").filter("ativo = true")
-
-# Identifica tabelas envolvidas nas regras (para JOINs)
+# Identifica tabelas envolvidas nas regras (para JOINs) — usa dict O(1)
 def extrair_tabelas(node: dict) -> set:
     tabelas = set()
     for rule in node.get("rules", []):
         if "rules" in rule:
             tabelas.update(extrair_tabelas(rule))
         else:
-            campo_info = catalogo_df.filter(
-                F.col("caracteristica_id") == rule["campo_id"]
-            ).first()
+            campo_info = catalogo_dict.get(rule["campo_id"])
             if campo_info:
                 tabelas.add((campo_info["tabela_fisica"], campo_info["join_key"]))
     return tabelas
@@ -205,12 +230,12 @@ join_key_base = publico_info["join_key"]
 print(f"✓ Público base: {publico_info['nome']} → {tabela_base} (key: {join_key_base})")
 
 # Monta WHERE (inclusão)
-inclusao_where = build_condition(regras["inclusao"], catalogo_df)
+inclusao_where = build_condition(regras["inclusao"])
 
 # Monta WHERE (exclusão, se existir)
 exclusao_where = None
 if regras.get("exclusao"):
-    exclusao_where = build_condition(regras["exclusao"], catalogo_df)
+    exclusao_where = build_condition(regras["exclusao"])
 
 # Resolve JOINs necessários
 tabelas_inclusao = extrair_tabelas(regras["inclusao"])
@@ -291,6 +316,7 @@ print(f"✓ seg_resultado_historico inserido ({qtd_clientes} registros)")
 
 # COMMAND ----------
 
+# DBTITLE 1,Step 5: Registrar execução em seg_execucao
 # ============================================================
 # STEP 5: Registrar execução em seg_execucao
 # ============================================================
@@ -306,6 +332,8 @@ except Exception:
 
 spark.sql(f"""
   INSERT INTO {CATALOG}.{SCHEMA_SEG}.seg_execucao
+  (exec_id, seg_id, versao_usada, origem_execucao, executado_em,
+   qtd_clientes, status, job_id, run_id, job_run_url)
   VALUES (
     '{exec_id}',
     '{SEG_ID}',
@@ -314,9 +342,9 @@ spark.sql(f"""
     current_timestamp(),
     {qtd_clientes},
     'sucesso',
-    '{job_id}',
-    '{run_id}',
-    '{job_run_url}'
+    NULLIF('{job_id}', ''),
+    NULLIF('{run_id}', ''),
+    NULLIF('{job_run_url}', '')
   )
 """)
 
@@ -324,6 +352,7 @@ print(f"✓ Execução registrada: {exec_id}")
 
 # COMMAND ----------
 
+# DBTITLE 1,Step 6: Atualizar saúde individual (seg_saude)
 # ============================================================
 # STEP 6: Atualizar saúde individual (seg_saude)
 # ============================================================
@@ -360,18 +389,8 @@ df_taxa = spark.sql(f"""
 """)
 taxa_sucesso = round(df_taxa.collect()[0]["taxa"], 1) if df_taxa.count() > 0 else 100.0
 
-# Tempo médio (últimas 10)
-df_tempo = spark.sql(f"""
-  SELECT AVG(tempo_exec_seg) AS media
-  FROM (
-    SELECT TIMESTAMPDIFF(SECOND, executado_em, current_timestamp()) AS tempo_exec_seg
-    FROM {CATALOG}.{SCHEMA_SEG}.seg_execucao
-    WHERE seg_id = '{SEG_ID}' AND status = 'sucesso'
-    ORDER BY executado_em DESC
-    LIMIT 10
-  )
-""")
-tempo_medio = tempo_exec  # usa tempo atual como aproximação
+# Tempo da execução atual (já medido no Step 3)
+tempo_medio = tempo_exec
 
 # Determina health status
 alertas = []
