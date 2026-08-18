@@ -3,7 +3,14 @@ import { Box, Button, Select, MenuItem, FormControl, InputLabel, Paper } from '@
 import RuleRow from './RuleRow';
 
 export default function RuleGroup({ group, index, onUpdate, onRemove, operadores = [] }) {
-  const ops = (operadores && operadores.length > 0) ? operadores : ['=', '!=', '>', '<', '>=', '<=', 'between', 'in', 'not_in', 'is_null', 'is_not_null'];
+  const ops = (operadores && operadores.length > 0) ? operadores : [
+    '=', '!=', '>', '<', '>=', '<=',                     // Comparação numérica
+    'between', 'in', 'not_in',                          // Ranges e listas
+    'contains', 'not_contains',                         // Texto: contém
+    'starts_with', 'ends_with',                         // Texto: começa/termina com
+    'not_starts_with', 'not_ends_with',                 // Texto: negação
+    'is_null', 'is_not_null'                            // Nulidade
+  ];
 
   const handleAddRule = () => {
     const newRules = [...group.rules, { campo_id: '', op: '', value: '' }];
