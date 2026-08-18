@@ -1,5 +1,5 @@
 """
-Repository para saúde e overlap.
+Repository para saúde.
 """
 
 from typing import List, Dict, Optional
@@ -7,7 +7,7 @@ from src.db.databricks_client import get_client
 
 
 class SaudeRepository:
-    """Acesso a dados para saúde e overlap."""
+    """Acesso a dados para saúde."""
 
     def __init__(self):
         self.client = get_client()
@@ -55,21 +55,6 @@ class SaudeRepository:
             return dict(zip(columns, rows[0]))
         return None
 
-    def listar_overlaps(self, seg_id: str) -> List[Dict]:
-        """Retorna sobreposições de um segmento."""
-        sql = """
-            SELECT seg_id_a, seg_id_b, clientes_em_comum,
-                   pct_sobre_a, pct_sobre_b, calculado_em
-            FROM plataforma.segmentacao.seg_overlap
-            WHERE seg_id_a = ? OR seg_id_b = ?
-            ORDER BY clientes_em_comum DESC
-        """
-        rows = self.client.execute_query(sql, (seg_id, seg_id))
-        columns = [
-            "seg_id_a", "seg_id_b", "clientes_em_comum",
-            "pct_sobre_a", "pct_sobre_b", "calculado_em"
-        ]
-        return [dict(zip(columns, row)) for row in rows]
 
     def ultima_atualizacao(self) -> Optional[Dict]:
         """Retorna a data da última atualização da tabela de saúde."""

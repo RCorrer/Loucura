@@ -61,33 +61,63 @@ export default function EstimativaBadge({
       .filter((r) => r.campo_id && r.op && regraTemValor(r))
       .map((r) => {
         let value = r.value;
+        if (r.op === 'is_null' || r.op === 'is_not_null') {
+          return { campo_id: r.campo_id, op: r.op, value: null };
+        }
+        // Coerce: string numérica -> number
         if (typeof value === 'string' && value !== '' && !isNaN(Number(value))) {
           value = Number(value);
         }
+        // Coerce: boolean
         if (
           typeof value === 'string' &&
           (value.toLowerCase() === 'true' || value.toLowerCase() === 'false')
         ) {
           value = value.toLowerCase() === 'true';
         }
-        if (r.op === 'is_null' || r.op === 'is_not_null') {
-          value = null;
+        // Coerce: listas para in/not_in/between (split por vírgula)
+        if (
+          typeof value === 'string' &&
+          (r.op === 'in' || r.op === 'not_in' || r.op === 'between')
+        ) {
+          const parts = value.split(',').map((v) => v.trim()).filter(Boolean);
+          value = parts.map((p) => (!isNaN(Number(p)) ? Number(p) : p));
         }
         return { campo_id: r.campo_id, op: r.op, value };
       });
 
-  const buildRegraNo = useCallback((groups, interGroupOp) => {
-    const gruposValidos = groups
-      .map((group) => ({
-        operator: group.operator || 'AND',
-        rules: prepararRegras(group.rules || []),
-      }))
-      .filter((g) => g.rules.length > 0);
-
-    if (gruposValidos.length === 0) return null;
-    if (gruposValidos.length === 1) return gruposValidos[0];
-    return { operator: interGroupOp, rules: gruposValidos };
+  // Limpa árvore recursivamente (suporta tanto formato árvore quanto array legado)
+  const cleanTreeForEstimate = useCallback((node) => {
+    if (!node) return null;
+    // Array legado: converter
+    if (Array.isArray(node)) {
+      const grupos = node
+        .map((g) => cleanTreeForEstimate(g))
+        .filter(Boolean);
+      if (grupos.length === 0) return null;
+      if (grupos.length === 1) return grupos[0];
+      return { operator: 'OR', rules: grupos };
+    }
+    // Árvore: { operator, rules }
+    if (node.operator && Array.isArray(node.rules)) {
+      const cleaned = node.rules
+        .map((item) => {
+          if ('campo_id' in item) {
+            if (!item.campo_id || !item.op || !regraTemValor(item)) return null;
+            return prepararRegras([item])[0] || null;
+          }
+          return cleanTreeForEstimate(item);
+        })
+        .filter(Boolean);
+      if (cleaned.length === 0) return null;
+      return { operator: node.operator, rules: cleaned };
+    }
+    return null;
   }, []);
+
+  const buildRegraNo = useCallback((groups, interGroupOp) => {
+    return cleanTreeForEstimate(groups);
+  }, [cleanTreeForEstimate]);
 
   // =============================================
   // Verifica se temos o mínimo para disparar
@@ -95,11 +125,15 @@ export default function EstimativaBadge({
 
   const podEstimar = useCallback(() => {
     if (!publicoBase) return false;
-    // Precisa de ao menos 1 regra válida na inclusão
-    const temRegra = regrasInclusao.some((group) =>
-      (group.rules || []).some((r) => r.campo_id && r.op && regraTemValor(r))
-    );
-    return temRegra;
+    // Verifica recursivamente se há ao menos 1 regra válida
+    const temFolha = (node) => {
+      if (!node) return false;
+      if (Array.isArray(node)) return node.some(temFolha);
+      if ('campo_id' in node) return !!(node.campo_id && node.op && regraTemValor(node));
+      if (node.rules) return node.rules.some(temFolha);
+      return false;
+    };
+    return temFolha(regrasInclusao);
   }, [publicoBase, regrasInclusao]);
 
   // =============================================

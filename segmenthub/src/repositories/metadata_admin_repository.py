@@ -181,7 +181,8 @@ class MetadataAdminRepository:
             SET {set_clause}
             WHERE caracteristica_id = ?
         """
-        self.client.execute_insert(sql, tuple(params))
+        # SET params primeiro, WHERE (caracteristica_id) por último — posicional
+        self.client.execute_insert(sql, tuple(set_params + [caracteristica_id]))
 
         return {
             "alteracoes": alteracoes,

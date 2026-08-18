@@ -8,7 +8,6 @@ const BASE_URL = '/api/saude';
  *
  * GET /api/saude               -> dashboard consolidado
  * GET /api/saude/{seg_id}      -> saúde detalhada
- * GET /api/saude/{seg_id}/overlap -> sobreposições
  */
 export const useSaudeApi = () => {
   const { request, loading, error } = useApi();
@@ -17,7 +16,5 @@ export const useSaudeApi = () => {
 
   const obterDetalhe = useCallback((segId) => request(`${BASE_URL}/${segId}`), [request]);
 
-  const obterOverlap = useCallback((segId) => request(`${BASE_URL}/${segId}/overlap`), [request]);
-
-  return { obterDashboard, obterDetalhe, obterOverlap, loading, error };
+  return { obterDashboard, obterDetalhe, loading, error };
 };

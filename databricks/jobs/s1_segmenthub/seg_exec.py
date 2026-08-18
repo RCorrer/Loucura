@@ -19,7 +19,6 @@ Fluxo:
   4. Persiste resultado em seg_resultado_corrente e seg_resultado_historico
   5. Atualiza métricas de saúde individual (seg_saude)
   6. Registra execução em seg_execucao
-  7. Calcula overlap incremental (apenas este segmento vs. demais ativos)
 
 Tabelas envolvidas:
   - plataforma.segmentacao.seg_definicao (leitura)
@@ -27,7 +26,6 @@ Tabelas envolvidas:
   - plataforma.segmentacao.seg_resultado_corrente (escrita — MERGE)
   - plataforma.segmentacao.seg_resultado_historico (escrita — INSERT)
   - plataforma.segmentacao.seg_saude (escrita — MERGE)
-  - plataforma.segmentacao.seg_overlap (escrita — MERGE)
 
 Autor: SegmentHub Platform
 Versão: 2.0 (arquitetura job-per-segment)
@@ -104,6 +102,7 @@ print(f"✓ Regras carregadas (público base: {regras.get('publico_base')})")
 
 # COMMAND ----------
 
+# DBTITLE 1,Step 2: Montar query SQL a partir das regras
 # ============================================================
 # STEP 2: Montar e executar query SQL a partir das regras
 # ============================================================
@@ -138,27 +137,37 @@ def build_condition(node: dict, catalogo_df) -> str:
 
             col_fisico = f"{campo_info['tabela_fisica']}.{campo_info['campo_fisico']}"
 
+            # Helper: formata valor para SQL com escape de aspas
+            def sql_val(v):
+                if isinstance(v, bool):
+                    return str(v).lower()  # True → true (Spark syntax)
+                if isinstance(v, str):
+                    escaped = v.replace("'", "''")
+                    return f"'{escaped}'"
+                return str(v)
+
             # Monta condição SQL
             if op == "is_null":
                 conditions.append(f"{col_fisico} IS NULL")
             elif op == "is_not_null":
                 conditions.append(f"{col_fisico} IS NOT NULL")
             elif op == "in":
-                vals = ", ".join([f"'{v}'" if isinstance(v, str) else str(v) for v in value])
+                vals = ", ".join([sql_val(v) for v in value])
                 conditions.append(f"{col_fisico} IN ({vals})")
             elif op == "not_in":
-                vals = ", ".join([f"'{v}'" if isinstance(v, str) else str(v) for v in value])
+                vals = ", ".join([sql_val(v) for v in value])
                 conditions.append(f"{col_fisico} NOT IN ({vals})")
             elif op == "between":
-                conditions.append(f"{col_fisico} BETWEEN {value[0]} AND {value[1]}")
+                conditions.append(f"{col_fisico} BETWEEN {sql_val(value[0])} AND {sql_val(value[1])}")
             elif op == "contains":
-                conditions.append(f"{col_fisico} LIKE '%{value}%'")
+                escaped = str(value).replace("'", "''")
+                conditions.append(f"{col_fisico} LIKE '%{escaped}%'")
             elif op == "starts_with":
-                conditions.append(f"{col_fisico} LIKE '{value}%'")
+                escaped = str(value).replace("'", "''")
+                conditions.append(f"{col_fisico} LIKE '{escaped}%'")
             else:
                 # Operadores simples: =, !=, >, <, >=, <=
-                v = f"'{value}'" if isinstance(value, str) else str(value)
-                conditions.append(f"{col_fisico} {op} {v}")
+                conditions.append(f"{col_fisico} {op} {sql_val(value)}")
 
     operator = f" {node.get('operator', 'AND')} "
     return operator.join(conditions)
@@ -402,74 +411,6 @@ spark.sql(f"""
 """)
 
 print(f"✓ Saúde atualizada: {health_status.upper()} (variação: {variacao_pct:+.1f}%)")
-
-# COMMAND ----------
-
-# ============================================================
-# STEP 7: Overlap incremental (este segmento vs. demais ativos)
-# ============================================================
-
-# Busca IDs dos outros segmentos ativos que já têm resultado
-df_outros = spark.sql(f"""
-  SELECT DISTINCT seg_id
-  FROM {CATALOG}.{SCHEMA_SEG}.seg_resultado_corrente
-  WHERE seg_id != '{SEG_ID}'
-""")
-
-outros_seg_ids = [row["seg_id"] for row in df_outros.collect()]
-
-if outros_seg_ids:
-    print(f"\n🔄 Calculando overlap com {len(outros_seg_ids)} segmentos...")
-
-    # Resultado do segmento atual (já temos em memória)
-    df_meu_resultado = spark.sql(f"""
-      SELECT cpf_cnpj FROM {CATALOG}.{SCHEMA_SEG}.seg_resultado_corrente
-      WHERE seg_id = '{SEG_ID}'
-    """)
-    meu_count = qtd_clientes
-
-    overlap_rows = []
-    for outro_id in outros_seg_ids:
-        df_outro = spark.sql(f"""
-          SELECT cpf_cnpj FROM {CATALOG}.{SCHEMA_SEG}.seg_resultado_corrente
-          WHERE seg_id = '{outro_id}'
-        """)
-        outro_count = df_outro.count()
-
-        # Interseção
-        em_comum = df_meu_resultado.join(df_outro, "cpf_cnpj", "inner").count()
-
-        if em_comum > 0:
-            pct_sobre_a = round((em_comum / meu_count) * 100, 2) if meu_count > 0 else 0
-            pct_sobre_b = round((em_comum / outro_count) * 100, 2) if outro_count > 0 else 0
-            overlap_rows.append((SEG_ID, outro_id, em_comum, pct_sobre_a, pct_sobre_b))
-            overlap_rows.append((outro_id, SEG_ID, em_comum, pct_sobre_b, pct_sobre_a))
-
-    # Persiste overlap (MERGE para atualizar pares existentes)
-    if overlap_rows:
-        df_overlap = spark.createDataFrame(
-            overlap_rows,
-            ["seg_id_a", "seg_id_b", "clientes_em_comum", "pct_sobre_a", "pct_sobre_b"]
-        )
-        df_overlap.createOrReplaceTempView("overlap_novo")
-
-        spark.sql(f"""
-          MERGE INTO {CATALOG}.{SCHEMA_SEG}.seg_overlap AS target
-          USING overlap_novo AS source
-          ON target.seg_id_a = source.seg_id_a AND target.seg_id_b = source.seg_id_b
-          WHEN MATCHED THEN UPDATE SET
-            clientes_em_comum = source.clientes_em_comum,
-            pct_sobre_a = source.pct_sobre_a,
-            pct_sobre_b = source.pct_sobre_b,
-            calculado_em = current_timestamp()
-          WHEN NOT MATCHED THEN INSERT *
-        """)
-
-        print(f"✓ Overlap calculado: {len(overlap_rows)//2} pares atualizados")
-    else:
-        print("✓ Nenhum overlap encontrado")
-else:
-    print("✓ Primeiro segmento — overlap não aplicável")
 
 # COMMAND ----------
 

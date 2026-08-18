@@ -184,13 +184,12 @@
 
 ---
 
-## 6. Saúde e Overlap
+## 6. Saúde
 
 | Método | Rota | Descrição |
 |---|---|---|
 | GET | `/api/saude` | Dashboard consolidado (todas) |
 | GET | `/api/saude/{seg_id}` | Saúde detalhada + alertas |
-| GET | `/api/overlap/{seg_id}` | Sobreposições do segmento |
 
 ---
 

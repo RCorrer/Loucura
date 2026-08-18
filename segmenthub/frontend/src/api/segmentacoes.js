@@ -47,6 +47,8 @@ export const useSegmentacoesApi = () => {
 
   const listarVersoes = useCallback((id) => request(`${BASE_URL}/${id}/versoes`), [request]);
 
+  const obterVersao = useCallback((id, versao) => request(`${BASE_URL}/${id}/versoes/${versao}`), [request]);
+
   const listarEstados = useCallback((id) => request(`${BASE_URL}/${id}/estados`), [request]);
 
   // S1-FRONT-06: Timeline e Comentários
@@ -94,6 +96,7 @@ export const useSegmentacoesApi = () => {
     enviarAprovacao,
     listarExecucoes,
     listarVersoes,
+    obterVersao,
     listarEstados,
     obterTimeline,
     listarComentarios,

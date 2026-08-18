@@ -1,12 +1,12 @@
 """
-Service para saúde e overlap.
+Service para saúde.
 """
 
 from typing import List, Dict, Optional
 from src.repositories.saude_repository import SaudeRepository
 
 class SaudeService:
-    """Serviço para operações de saúde e overlap."""
+    """Serviço para operações de saúde."""
 
     def __init__(self):
         self.repository = SaudeRepository()
@@ -56,7 +56,3 @@ class SaudeService:
                     pass
             return dados
         return None
-
-    def listar_overlaps(self, seg_id: str) -> List[Dict]:
-        """Retorna sobreposições de um segmento."""
-        return self.repository.listar_overlaps(seg_id)

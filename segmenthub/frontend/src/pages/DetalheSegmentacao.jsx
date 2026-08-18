@@ -34,8 +34,13 @@ import SendIcon from '@mui/icons-material/Send';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import PersonIcon from '@mui/icons-material/Person';
 import CampaignIcon from '@mui/icons-material/Campaign';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { useSegmentacoesApi } from '../api/segmentacoes';
+import { useSaudeApi } from '../api/saude';
 import ValidationModal from '../components/ValidationModal';
+import ConfirmDialog from '../components/ConfirmDialog';
+import Comentarios from '../components/Comentarios';
 
 const STATUS_COLORS = {
   rascunho: 'default',
@@ -70,33 +75,54 @@ export default function DetalheSegmentacao() {
     encerrar,
     executar,
     enviarAprovacao,
+    arquivar,
     loading,
   } = useSegmentacoesApi();
+  const { obterDetalhe: obterSaude } = useSaudeApi();
 
   const [seg, setSeg] = useState(null);
   const [destinos, setDestinos] = useState([]);
   const [execucoes, setExecucoes] = useState([]);
   const [versoes, setVersoes] = useState([]);
+  const [saude, setSaude] = useState(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '' });
   const [validationOpen, setValidationOpen] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', severity: 'warning', confirmText: 'Confirmar', onConfirm: null });
+
+  const abrirConfirmacao = (title, message, severity, confirmText, acao, label) => {
+    setMenuAnchor(null);
+    setConfirmDialog({
+      open: true,
+      title,
+      message,
+      severity,
+      confirmText,
+      onConfirm: async () => {
+        setConfirmDialog((prev) => ({ ...prev, open: false }));
+        await executarAcao(acao, label);
+      },
+    });
+  };
 
   const carregar = async () => {
     setCarregando(true);
     setErro(null);
     try {
-      const [segData, destData, execData, versData] = await Promise.all([
+      const [segData, destData, execData, versData, saudeData] = await Promise.all([
         buscar(id),
         buscarDestinos(id),
         listarExecucoes(id),
         listarVersoes(id),
+        obterSaude(id).catch(() => null),
       ]);
       setSeg(segData);
       setDestinos(destData || []);
       setExecucoes(Array.isArray(execData) ? execData : execData?.data || []);
       setVersoes(Array.isArray(versData) ? versData : versData?.data || []);
+      setSaude(saudeData);
     } catch (err) {
       setErro(err?.message || 'Erro ao carregar segmentação');
     } finally {
@@ -167,16 +193,39 @@ export default function DetalheSegmentacao() {
         >
           Documentação
         </Button>
+        <Button
+          variant="outlined"
+          startIcon={<TimelineIcon />}
+          onClick={() => navigate(`/segmentacoes/${id}/timeline`)}
+          sx={{ mr: 1 }}
+        >
+          Timeline
+        </Button>
 
-        {/* Ações de ciclo */}
+        {/* Ações de ciclo — por status */}
         {seg.status === 'rascunho' && (
-          <Button
-            variant="contained"
-            startIcon={<SendIcon />}
-            onClick={() => executarAcao(enviarAprovacao, 'Envio para aprovação')}
-          >
-            Enviar p/ Aprovação
-          </Button>
+          <>
+            <Button
+              variant="contained"
+              startIcon={<SendIcon />}
+              onClick={() => executarAcao(enviarAprovacao, 'Envio para aprovação')}
+              sx={{ mr: 1 }}
+            >
+              Enviar p/ Aprovação
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<DeleteOutlineIcon />}
+              color="error"
+              onClick={() => abrirConfirmacao(
+                'Descartar rascunho',
+                'Esta segmentação será arquivada e não poderá mais ser editada. Deseja continuar?',
+                'error', 'Arquivar', arquivar, 'Arquivamento'
+              )}
+            >
+              Descartar
+            </Button>
+          </>
         )}
         {seg.status === 'em_aprovacao' && (
           <Button
@@ -187,6 +236,35 @@ export default function DetalheSegmentacao() {
           >
             Validar e Aprovar
           </Button>
+        )}
+        {seg.status === 'aprovada' && (
+          <>
+            <Button
+              variant="contained"
+              startIcon={<PlayArrowIcon />}
+              onClick={() => abrirConfirmacao(
+                'Ativar segmentação',
+                'A segmentação será ativada: o job será criado e passará a executar conforme agendamento.',
+                'info', 'Ativar', ativar, 'Ativação'
+              )}
+              color="success"
+              sx={{ mr: 1 }}
+            >
+              Ativar
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<DeleteOutlineIcon />}
+              color="error"
+              onClick={() => abrirConfirmacao(
+                'Arquivar segmentação',
+                'A segmentação aprovada será arquivada sem nunca ter sido ativada.',
+                'error', 'Arquivar', arquivar, 'Arquivamento'
+              )}
+            >
+              Arquivar
+            </Button>
+          </>
         )}
         {seg.status === 'ativa' && (
           <>
@@ -206,25 +284,97 @@ export default function DetalheSegmentacao() {
               Ações
             </Button>
             <Menu anchorEl={menuAnchor} open={!!menuAnchor} onClose={() => setMenuAnchor(null)}>
-              <MenuItem onClick={() => executarAcao(pausar, 'Pausa')}>
+              <MenuItem onClick={() => abrirConfirmacao(
+                'Pausar segmentação',
+                'A segmentação será pausada e o job desabilitado. Pode ser reativada depois.',
+                'warning', 'Pausar', pausar, 'Pausa'
+              )}>
                 <ListItemIcon><PauseIcon /></ListItemIcon>
                 <ListItemText>Pausar</ListItemText>
               </MenuItem>
-              <MenuItem onClick={() => executarAcao(encerrar, 'Encerramento')}>
+              <MenuItem onClick={() => abrirConfirmacao(
+                'Encerrar segmentação',
+                'A segmentação será encerrada definitivamente e o job removido. Esta ação não pode ser revertida facilmente.',
+                'error', 'Encerrar', encerrar, 'Encerramento'
+              )}>
                 <ListItemIcon><StopIcon /></ListItemIcon>
                 <ListItemText>Encerrar</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => abrirConfirmacao(
+                'Arquivar segmentação',
+                'A segmentação será arquivada (soft-delete). Não aparecerá mais nas listagens ativas.',
+                'error', 'Arquivar', arquivar, 'Arquivamento'
+              )} sx={{ color: 'error.main' }}>
+                <ListItemIcon><DeleteOutlineIcon color="error" /></ListItemIcon>
+                <ListItemText>Arquivar</ListItemText>
               </MenuItem>
             </Menu>
           </>
         )}
         {seg.status === 'pausada' && (
-          <Button
-            variant="contained"
-            startIcon={<RestartAltIcon />}
-            onClick={() => executarAcao(reativar, 'Reativação')}
-          >
-            Reativar
-          </Button>
+          <>
+            <Button
+              variant="contained"
+              startIcon={<RestartAltIcon />}
+              onClick={() => executarAcao(reativar, 'Reativação')}
+              sx={{ mr: 1 }}
+            >
+              Reativar
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<MoreVertIcon />}
+              onClick={(e) => setMenuAnchor(e.currentTarget)}
+            >
+              Ações
+            </Button>
+            <Menu anchorEl={menuAnchor} open={!!menuAnchor} onClose={() => setMenuAnchor(null)}>
+              <MenuItem onClick={() => abrirConfirmacao(
+                'Encerrar segmentação',
+                'A segmentação será encerrada definitivamente. Esta ação não pode ser revertida.',
+                'error', 'Encerrar', encerrar, 'Encerramento'
+              )}>
+                <ListItemIcon><StopIcon /></ListItemIcon>
+                <ListItemText>Encerrar</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => abrirConfirmacao(
+                'Arquivar segmentação',
+                'A segmentação será arquivada e removida das listagens.',
+                'error', 'Arquivar', arquivar, 'Arquivamento'
+              )} sx={{ color: 'error.main' }}>
+                <ListItemIcon><DeleteOutlineIcon color="error" /></ListItemIcon>
+                <ListItemText>Arquivar</ListItemText>
+              </MenuItem>
+            </Menu>
+          </>
+        )}
+        {seg.status === 'encerrada' && (
+          <>
+            <Button
+              variant="outlined"
+              startIcon={<RestartAltIcon />}
+              onClick={() => abrirConfirmacao(
+                'Reativar segmentação',
+                'A segmentação será reativada e voltará a executar conforme agendamento.',
+                'info', 'Reativar', reativar, 'Reativação'
+              )}
+              sx={{ mr: 1 }}
+            >
+              Reativar
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<DeleteOutlineIcon />}
+              color="error"
+              onClick={() => abrirConfirmacao(
+                'Arquivar segmentação',
+                'A segmentação será arquivada definitivamente.',
+                'error', 'Arquivar', arquivar, 'Arquivamento'
+              )}
+            >
+              Arquivar
+            </Button>
+          </>
         )}
       </PageHeader>
 
@@ -237,6 +387,22 @@ export default function DetalheSegmentacao() {
               <Typography variant="caption" color="text.secondary">Status</Typography>
               <Box sx={{ mt: 1 }}>
                 <Chip label={seg.status} color={STATUS_COLORS[seg.status] || 'default'} />
+              </Box>
+            </Paper>
+          </Grid>
+          {/* Saúde */}
+          <Grid item xs={12} sm={4}>
+            <Paper sx={{ p: 2, textAlign: 'center' }}>
+              <Typography variant="caption" color="text.secondary">Saúde</Typography>
+              <Box sx={{ mt: 1 }}>
+                {saude ? (
+                  <Chip
+                    label={saude.health_status?.toUpperCase() || 'N/A'}
+                    color={saude.health_status === 'verde' ? 'success' : saude.health_status === 'amarelo' ? 'warning' : saude.health_status === 'vermelho' ? 'error' : 'default'}
+                  />
+                ) : (
+                  <Chip label="SEM DADOS" variant="outlined" />
+                )}
               </Box>
             </Paper>
           </Grid>
@@ -403,6 +569,14 @@ export default function DetalheSegmentacao() {
             )}
           </Grid>
         </Paper>
+
+        {/* Comentários */}
+        <Paper sx={{ p: 2, mb: 2 }}>
+          <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+            Comentários
+          </Typography>
+          <Comentarios segId={id} />
+        </Paper>
       </Box>
 
       {/* Modal de Validação */}
@@ -412,6 +586,17 @@ export default function DetalheSegmentacao() {
         segId={id}
         segData={{ ...seg, destinos }}
         onAprovado={carregar}
+      />
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onClose={() => setConfirmDialog((prev) => ({ ...prev, open: false }))}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        severity={confirmDialog.severity}
+        confirmText={confirmDialog.confirmText}
       />
 
       {/* Snackbar */}

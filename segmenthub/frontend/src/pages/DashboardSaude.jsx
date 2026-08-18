@@ -23,7 +23,6 @@ import {
   Button,
   LinearProgress,
   Tooltip,
-  Link,
 } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
@@ -54,11 +53,10 @@ const STATUS_COLOR = {
  * APIs:
  *  - GET /api/saude (dashboard)
  *  - GET /api/saude/{seg_id} (detalhe)
- *  - GET /api/saude/{seg_id}/overlap
  */
 export default function DashboardSaude() {
   const navigate = useNavigate();
-  const { obterDashboard, obterDetalhe, obterOverlap } = useSaudeApi();
+  const { obterDashboard, obterDetalhe } = useSaudeApi();
 
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -67,7 +65,7 @@ export default function DashboardSaude() {
   // Dialog de detalhe
   const [detalheOpen, setDetalheOpen] = useState(false);
   const [detalheData, setDetalheData] = useState(null);
-  const [overlapData, setOverlapData] = useState([]);
+
   const [loadingDetalhe, setLoadingDetalhe] = useState(false);
 
   useEffect(() => {
@@ -91,14 +89,9 @@ export default function DashboardSaude() {
     setDetalheOpen(true);
     setLoadingDetalhe(true);
     setDetalheData(null);
-    setOverlapData([]);
     try {
-      const [det, ovlp] = await Promise.all([
-        obterDetalhe(segId),
-        obterOverlap(segId).catch(() => ({ overlaps: [] })),
-      ]);
+      const det = await obterDetalhe(segId);
       setDetalheData(det);
-      setOverlapData(ovlp?.overlaps || []);
     } catch (err) {
       setErro(err?.message || 'Erro ao carregar detalhe');
     } finally {
@@ -207,7 +200,7 @@ export default function DashboardSaude() {
                   </TableCell>
                   <TableCell align="right">
                     {item.taxa_sucesso_exec !== null && item.taxa_sucesso_exec !== undefined
-                      ? `${(item.taxa_sucesso_exec * 100).toFixed(0)}%`
+                      ? `${item.taxa_sucesso_exec.toFixed(0)}%`
                       : '-'}
                   </TableCell>
                   <TableCell align="right">
@@ -267,7 +260,7 @@ export default function DashboardSaude() {
                 <Grid item xs={6}>
                   <Typography variant="caption" color="text.secondary">Taxa Sucesso Exec</Typography>
                   <Typography variant="h6">
-                    {detalheData.taxa_sucesso_exec !== null ? `${(detalheData.taxa_sucesso_exec * 100).toFixed(0)}%` : '-'}
+                    {detalheData.taxa_sucesso_exec !== null ? `${detalheData.taxa_sucesso_exec.toFixed(0)}%` : '-'}
                   </Typography>
                 </Grid>
                 <Grid item xs={6}>
@@ -288,55 +281,8 @@ export default function DashboardSaude() {
                 </Box>
               )}
 
-              {/* Link Job */}
-              {detalheData.job_run_url && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2" gutterBottom>Link do Job</Typography>
-                  <Link href={detalheData.job_run_url} target="_blank" rel="noopener">
-                    Abrir última execução do Job <OpenInNewIcon fontSize="small" sx={{ verticalAlign: 'middle' }} />
-                  </Link>
-                </Box>
-              )}
 
-              {/* Overlap */}
-              {overlapData.length > 0 && (
-                <Box>
-                  <Typography variant="subtitle2" gutterBottom>Sobreposições (Fadiga)</Typography>
-                  <TableContainer>
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Segmento B</TableCell>
-                          <TableCell align="right">Clientes em Comum</TableCell>
-                          <TableCell align="right">% sobre A</TableCell>
-                          <TableCell align="right">% sobre B</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {overlapData.map((o, i) => (
-                          <TableRow key={i}>
-                            <TableCell>
-                              <Typography variant="caption" fontFamily="monospace">
-                                {o.seg_id_b?.slice(0, 12)}
-                              </Typography>
-                            </TableCell>
-                            <TableCell align="right">{o.clientes_em_comum?.toLocaleString('pt-BR')}</TableCell>
-                            <TableCell align="right">
-                              <Chip
-                                label={`${o.pct_sobre_a?.toFixed(1)}%`}
-                                size="small"
-                                color={o.pct_sobre_a > 80 ? 'error' : o.pct_sobre_a > 50 ? 'warning' : 'default'}
-                                variant="outlined"
-                              />
-                            </TableCell>
-                            <TableCell align="right">{o.pct_sobre_b?.toFixed(1)}%</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                </Box>
-              )}
+
             </Box>
           ) : (
             <Typography color="text.secondary">Sem dados disponíveis</Typography>

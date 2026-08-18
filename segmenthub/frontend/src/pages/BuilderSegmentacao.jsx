@@ -21,21 +21,23 @@ import TemaMenu from '../components/TemaMenu';
 import RuleBuilder from '../components/RuleBuilder';
 import ExclusaoBuilder from '../components/ExclusaoBuilder';
 import EstimativaBadge from '../components/EstimativaBadge';
+import DestinoSelector from '../components/DestinoSelector';
+import VigenciaAgendamento from '../components/VigenciaAgendamento';
 
-const STEPS = ['Público', 'Regras de Inclusão', 'Regras de Exclusão', 'Metadados'];
+const STEPS = ['Público', 'Regras de Inclusão', 'Regras de Exclusão', 'Destino & Vigência', 'Metadados'];
 
 export default function BuilderSegmentacao() {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = !!id;
 
-  const { buscar, criar, atualizar, loading: apiLoading } = useSegmentacoesApi();
+  const { buscar, criar, atualizar, buscarDestinos, loading: apiLoading } = useSegmentacoesApi();
 
   const [dadosBasicos, setDadosBasicos] = useState({
     nome: '',
     descricao: '',
     objetivo: '',
-    owner: 'admin',
+    owner: '',
     area_responsavel: '',
     email_contato: '',
     seg_tags: [],
@@ -48,14 +50,15 @@ export default function BuilderSegmentacao() {
   });
 
   const [publicoSelecionado, setPublicoSelecionado] = useState('');
-  const [regrasInclusao, setRegrasInclusao] = useState([
+  // Árvore recursiva de regras (formato RegraNo: { operator, rules })
+  const [regrasInclusao, setRegrasInclusao] = useState(
     { operator: 'AND', rules: [{ campo_id: '', op: '', value: '' }] }
-  ]);
-  const [regrasExclusao, setRegrasExclusao] = useState([
-    { operator: 'OR', rules: [{ campo_id: '', op: '', value: '' }] }
-  ]);
+  );
+  const [regrasExclusao, setRegrasExclusao] = useState(
+    { operator: 'OR', rules: [] }
+  );
 
-  // Operadores inter-grupo: como os GRUPOS se conectam entre si
+  // Compat legado (não mais usados, mantidos para evitar breaking)
   const [interGroupOpInclusao, setInterGroupOpInclusao] = useState('OR');
   const [interGroupOpExclusao, setInterGroupOpExclusao] = useState('OR');
 
@@ -87,32 +90,38 @@ export default function BuilderSegmentacao() {
             tipo: data.tipo || 'direta',
           });
           setPublicoSelecionado(data.publico_base_id || '');
+
+          // Carregar destinos e vigência
+          try {
+            const destData = await buscarDestinos(id);
+            if (destData && Array.isArray(destData) && destData.length > 0) {
+              setDestinos(destData);
+            }
+          } catch (e) { /* sem destinos ainda */ }
+
+          // Vigência vem da própria segmentação
+          setVigencia({
+            vigencia_inicio: data.vigencia_inicio || '',
+            vigencia_fim: data.vigencia_fim || '',
+            recorrencia: data.recorrencia || 'once',
+            cron_expression: data.agendamento_cron || '',
+          });
+
           if (data.regras_json) {
             const inclusao = data.regras_json.inclusao;
             const exclusao = data.regras_json.exclusao;
 
-            // Se inclusao é um RegraNo com sub-RegraNos (estrutura aninhada),
-            // decompor em grupos + inter-group operator
-            if (inclusao && inclusao.rules && inclusao.rules.length > 0 && inclusao.rules[0]?.rules) {
-              // Estrutura aninhada: {operator: 'OR', rules: [{operator:'AND', rules:[...]}, ...]}
-              setInterGroupOpInclusao(inclusao.operator || 'OR');
-              setRegrasInclusao(inclusao.rules);
-            } else if (inclusao) {
-              // Estrutura flat legada: {operator: 'AND', rules: [folha, folha, ...]}
-              setRegrasInclusao([inclusao]);
-              setInterGroupOpInclusao('OR');
+            // Carregar árvore diretamente (formato recursivo RegraNo)
+            if (inclusao && inclusao.operator && Array.isArray(inclusao.rules)) {
+              setRegrasInclusao(inclusao);
             } else {
-              setRegrasInclusao([{ operator: 'AND', rules: [] }]);
+              setRegrasInclusao({ operator: 'AND', rules: [{ campo_id: '', op: '', value: '' }] });
             }
 
-            if (exclusao && exclusao.rules && exclusao.rules.length > 0 && exclusao.rules[0]?.rules) {
-              setInterGroupOpExclusao(exclusao.operator || 'OR');
-              setRegrasExclusao(exclusao.rules);
-            } else if (exclusao) {
-              setRegrasExclusao([exclusao]);
-              setInterGroupOpExclusao('OR');
+            if (exclusao && exclusao.operator && Array.isArray(exclusao.rules)) {
+              setRegrasExclusao(exclusao);
             } else {
-              setRegrasExclusao([{ operator: 'OR', rules: [] }]);
+              setRegrasExclusao({ operator: 'OR', rules: [] });
             }
           }
         } catch (err) {
@@ -128,6 +137,18 @@ export default function BuilderSegmentacao() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEdit, id]);
 
+  // State para destino e vigência
+  const [destinos, setDestinos] = useState([
+    { destino: 'sistema2', habilitado: false },
+    { destino: 'sistema3', habilitado: false },
+  ]);
+  const [vigencia, setVigencia] = useState({
+    vigencia_inicio: '',
+    vigencia_fim: '',
+    recorrencia: 'once',
+    cron_expression: '',
+  });
+
   // ✅ Reseta estado ao mudar de edição para criação
   useEffect(() => {
     if (!isEdit) {
@@ -138,39 +159,44 @@ export default function BuilderSegmentacao() {
         owner: 'admin',
         area_responsavel: '',
         email_contato: '',
+        seg_tags: [],
+        resumo: '',
+        objetivo_negocio: '',
+        publico_alvo_descricao: '',
+        observacoes: '',
+        documentacao_md: '',
+        tipo: 'direta',
       });
       setPublicoSelecionado('');
-      setRegrasInclusao([{ operator: 'AND', rules: [{ campo_id: '', op: '', value: '' }] }]);
-      setRegrasExclusao([{ operator: 'OR', rules: [{ campo_id: '', op: '', value: '' }] }]);
+      setRegrasInclusao({ operator: 'AND', rules: [{ campo_id: '', op: '', value: '' }] });
+      setRegrasExclusao({ operator: 'OR', rules: [] });
       setInterGroupOpInclusao('OR');
       setInterGroupOpExclusao('OR');
+      setDestinos([
+        { destino: 'sistema2', habilitado: false },
+        { destino: 'sistema3', habilitado: false },
+      ]);
+      setVigencia({ vigencia_inicio: '', vigencia_fim: '', recorrencia: 'once', cron_expression: '' });
       setActiveStep(0);
       setError(null);
       setCarregandoMetadata(true);
     }
   }, [isEdit]);
 
+  // Adiciona campo no root da árvore (catálogo → click)
   const handleSelectCampoInclusao = (campo) => {
-    const lastIndex = regrasInclusao.length - 1;
-    const novasRegras = [...regrasInclusao];
-    novasRegras[lastIndex].rules.push({
-      campo_id: campo.caracteristica_id,
-      op: campo.operadores?.[0] || '=',
-      value: '',
-    });
-    setRegrasInclusao(novasRegras);
+    setRegrasInclusao((prev) => ({
+      ...prev,
+      rules: [...prev.rules, { campo_id: campo.caracteristica_id, op: campo.operadores?.[0] || '=', value: '' }],
+    }));
     if (activeStep < 1) setActiveStep(1);
   };
 
   const handleSelectCampoExclusao = (campo) => {
-    const lastIndex = regrasExclusao.length - 1;
-    const novasRegras = [...regrasExclusao];
-    novasRegras[lastIndex].rules.push({
-      campo_id: campo.caracteristica_id,
-      op: campo.operadores?.[0] || '=',
-      value: '',
-    });
-    setRegrasExclusao(novasRegras);
+    setRegrasExclusao((prev) => ({
+      ...prev,
+      rules: [...prev.rules, { campo_id: campo.caracteristica_id, op: campo.operadores?.[0] || '=', value: '' }],
+    }));
     if (activeStep < 2) setActiveStep(2);
   };
 
@@ -183,63 +209,62 @@ export default function BuilderSegmentacao() {
       setError('Selecione um público-base');
       return;
     }
-    // Helper: verifica se uma regra tem valor preenchido
+    // --- Helpers para limpar/preparar a árvore recursiva ---
+
     const regraTemValor = (rule) => {
       if (rule.op === 'is_null' || rule.op === 'is_not_null') return true;
-      // value pode ser 0, false, [] — só rejeita '' e null/undefined
       return rule.value !== '' && rule.value !== null && rule.value !== undefined;
     };
 
-    const temRegraValida = regrasInclusao.some(group =>
-      group.rules.some(rule => rule.campo_id && rule.op && regraTemValor(rule))
-    );
-    if (!temRegraValida) {
+    const coerceValue = (value, op) => {
+      if (op === 'is_null' || op === 'is_not_null') return null;
+      if (typeof value === 'string' && value !== '' && !isNaN(Number(value))) return Number(value);
+      if (typeof value === 'string' && (value.toLowerCase() === 'true' || value.toLowerCase() === 'false')) {
+        return value.toLowerCase() === 'true';
+      }
+      // Suporte a listas (in, not_in, between): "a,b,c" -> [a,b,c]
+      if (typeof value === 'string' && (op === 'in' || op === 'not_in' || op === 'between')) {
+        const parts = value.split(',').map(v => v.trim()).filter(Boolean);
+        return parts.map(p => (!isNaN(Number(p)) ? Number(p) : p));
+      }
+      return value;
+    };
+
+    // Limpa a árvore recursivamente: remove folhas incompletas e sub-nós vazios
+    const cleanTree = (node) => {
+      if (!node || !node.rules) return null;
+      const cleanedRules = node.rules
+        .map((item) => {
+          // Folha
+          if ('campo_id' in item) {
+            if (!item.campo_id || !item.op || !regraTemValor(item)) return null;
+            return { campo_id: item.campo_id, op: item.op, value: coerceValue(item.value, item.op) };
+          }
+          // Sub-nó recursivo
+          return cleanTree(item);
+        })
+        .filter(Boolean);
+
+      if (cleanedRules.length === 0) return null;
+      return { operator: node.operator || 'AND', rules: cleanedRules };
+    };
+
+    // Verifica se existe pelo menos 1 folha válida na árvore
+    const temFolhaValida = (node) => {
+      if (!node || !node.rules) return false;
+      return node.rules.some((item) => {
+        if ('campo_id' in item) return item.campo_id && item.op && regraTemValor(item);
+        return temFolhaValida(item);
+      });
+    };
+
+    if (!temFolhaValida(regrasInclusao)) {
       setError('Adicione pelo menos uma regra de inclusão válida');
       return;
     }
 
-    // Filtra regras incompletas e converte value para tipo correto
-    const prepararRegras = (rules) =>
-      rules
-        .filter(r => r.campo_id && r.op && regraTemValor(r))
-        .map(r => {
-          let value = r.value;
-          // Coerce: string numérica -> number (evita enviar "25" ao invés de 25)
-          if (typeof value === 'string' && value !== '' && !isNaN(Number(value))) {
-            value = Number(value);
-          }
-          // Coerce: string boolean -> boolean
-          if (typeof value === 'string' && (value.toLowerCase() === 'true' || value.toLowerCase() === 'false')) {
-            value = value.toLowerCase() === 'true';
-          }
-          // Operadores sem valor
-          if (r.op === 'is_null' || r.op === 'is_not_null') {
-            value = null;
-          }
-          return { campo_id: r.campo_id, op: r.op, value };
-        });
-
-    // Monta cada grupo como um RegraNo individual
-    const buildRegraNo = (groups, interGroupOp) => {
-      const gruposValidos = groups
-        .map(group => ({
-          operator: group.operator || 'AND',
-          rules: prepararRegras(group.rules),
-        }))
-        .filter(g => g.rules.length > 0);
-
-      if (gruposValidos.length === 0) return null;
-      // Se só 1 grupo, envia flat (compatível com legado)
-      if (gruposValidos.length === 1) return gruposValidos[0];
-      // Múltiplos grupos: wrapper RegraNo com inter-group operator
-      return {
-        operator: interGroupOp,
-        rules: gruposValidos,
-      };
-    };
-
-    const inclusaoNo = buildRegraNo(regrasInclusao, interGroupOpInclusao);
-    const exclusaoNo = buildRegraNo(regrasExclusao, interGroupOpExclusao);
+    const inclusaoNo = cleanTree(regrasInclusao);
+    const exclusaoNo = cleanTree(regrasExclusao);
 
     if (!inclusaoNo) {
       setError('Adicione pelo menos uma regra de inclusão válida');
@@ -254,6 +279,8 @@ export default function BuilderSegmentacao() {
         inclusao: inclusaoNo,
         exclusao: exclusaoNo,
       },
+      destinos,
+      ...vigencia,
     };
 
     try {
@@ -360,6 +387,13 @@ export default function BuilderSegmentacao() {
                 rows={2}
               />
               <TextField
+                label="Owner (responsável)"
+                value={dadosBasicos.owner}
+                onChange={(e) => setDadosBasicos({ ...dadosBasicos, owner: e.target.value })}
+                fullWidth
+                helperText="Deixe vazio para usar seu email automaticamente"
+              />
+              <TextField
                 label="Área Responsável"
                 value={dadosBasicos.area_responsavel}
                 onChange={(e) => setDadosBasicos({ ...dadosBasicos, area_responsavel: e.target.value })}
@@ -406,6 +440,27 @@ export default function BuilderSegmentacao() {
         )}
 
         {activeStep === 3 && (
+          <Paper sx={{ p: 3, overflow: 'auto' }}>
+            <Typography variant="h6" gutterBottom>
+              Destino & Vigência
+            </Typography>
+            <Divider sx={{ mb: 3 }} />
+
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2 }}>
+              Para quem esta segmentação será entregue?
+            </Typography>
+            <DestinoSelector value={destinos} onChange={setDestinos} />
+
+            <Divider sx={{ my: 3 }} />
+
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2 }}>
+              Quando e com qual frequência?
+            </Typography>
+            <VigenciaAgendamento value={vigencia} onChange={setVigencia} />
+          </Paper>
+        )}
+
+        {activeStep === 4 && (
           <Paper sx={{ p: 3, overflow: 'auto' }}>
             <Typography variant="h6" gutterBottom>
               Metadados e Documentação

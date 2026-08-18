@@ -289,7 +289,7 @@ class SegmentacaoService:
             "em_aprovacao": ["aprovada", "rascunho", "arquivada"],
             "aprovada": ["ativa", "arquivada"],
             "ativa": ["pausada", "encerrada", "arquivada"],
-            "pausada": ["ativa", "encerrada"],
+            "pausada": ["ativa", "encerrada", "arquivada"],
             "encerrada": ["ativa", "arquivada"],  # reativar via endpoint específico
         }
         if novo_status not in transicoes.get(status_atual, []):
@@ -309,7 +309,7 @@ class SegmentacaoService:
 
         # ===== Integração com JobManager (pós-transição) =====
         try:
-            if novo_status == "ativa" and status_atual in ("aprovada", "encerrada"):
+            if novo_status == "ativa" and status_atual in ("aprovada", "pausada", "encerrada"):
                 # Ativar: cria job OU reativa job existente
                 job_id_existente = atual.get("job_id_databricks")
                 if job_id_existente:
