@@ -149,22 +149,22 @@ class MetadataAdminRepository:
 
         alteracoes = {}
         updates = []
-        params = [caracteristica_id]  # primeiro parâmetro: WHERE
+        set_params = []  # params para SET (ordem posicional antes do WHERE)
 
         if usavel_em_visao360 is not None and atual["usavel_em_visao360"] != usavel_em_visao360:
             alteracoes["usavel_em_visao360"] = {"de": atual["usavel_em_visao360"], "para": usavel_em_visao360}
             updates.append("usavel_em_visao360 = ?")
-            params.append(usavel_em_visao360)
+            set_params.append(usavel_em_visao360)
 
         if usavel_em_peca is not None and atual["usavel_em_peca"] != usavel_em_peca:
             alteracoes["usavel_em_peca"] = {"de": atual["usavel_em_peca"], "para": usavel_em_peca}
             updates.append("usavel_em_peca = ?")
-            params.append(usavel_em_peca)
+            set_params.append(usavel_em_peca)
 
         if bloco_visao360 is not None and atual["bloco_visao360"] != bloco_visao360:
             alteracoes["bloco_visao360"] = {"de": atual["bloco_visao360"], "para": bloco_visao360}
             updates.append("bloco_visao360 = ?")
-            params.append(bloco_visao360)
+            set_params.append(bloco_visao360)
 
         if not alteracoes:
             return {"alteracoes": {}}
