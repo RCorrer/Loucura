@@ -418,8 +418,11 @@ class SegmentacaoService:
 
     def atualizar_vigencia(self, seg_id: str, dados: Dict, usuario: str = "system") -> bool:
         """Atualiza vigência e agendamento. Se o cron mudar, atualiza o job."""
-        # Validar cron se fornecido
-        novo_cron = dados.get("agendamento_cron")
+        # Normaliza chave: front envia 'cron_expression', banco usa 'agendamento_cron'
+        novo_cron = dados.get("agendamento_cron") or dados.get("cron_expression")
+        if novo_cron and "cron_expression" in dados:
+            dados["agendamento_cron"] = novo_cron
+            dados.pop("cron_expression", None)
 
         # Persiste no banco
         resultado = self.repository.atualizar_vigencia(seg_id, dados)
