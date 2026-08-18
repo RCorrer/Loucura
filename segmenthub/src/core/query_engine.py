@@ -117,23 +117,23 @@ class QueryEngine:
         elif op == "in":
             if not isinstance(valor, list):
                 raise ValueError(f"Operador 'in' requer lista de valores: {valor}")
-            placeholders = ", ".join([self._get_param() for _ in valor])
             if is_string:
                 # Para strings, aplicar LOWER() tanto no campo quanto nos valores
                 lower_placeholders = ", ".join([f"LOWER({self._get_param()})" for _ in valor])
                 sql = f"LOWER({campo}) IN ({lower_placeholders})"
             else:
+                placeholders = ", ".join([self._get_param() for _ in valor])
                 sql = f"{campo} IN ({placeholders})"
             params.extend(valor)
         elif op == "not_in":
             if not isinstance(valor, list):
                 raise ValueError(f"Operador 'not_in' requer lista de valores: {valor}")
-            placeholders = ", ".join([self._get_param() for _ in valor])
             if is_string:
                 # Para strings, aplicar LOWER() tanto no campo quanto nos valores
                 lower_placeholders = ", ".join([f"LOWER({self._get_param()})" for _ in valor])
                 sql = f"LOWER({campo}) NOT IN ({lower_placeholders})"
             else:
+                placeholders = ", ".join([self._get_param() for _ in valor])
                 sql = f"{campo} NOT IN ({placeholders})"
             params.extend(valor)
         elif op == "contains":
