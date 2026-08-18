@@ -16,6 +16,7 @@ import {
   Divider,
 } from '@mui/material';
 import { useSegmentacoesApi } from '../api/segmentacoes';
+import { tokens } from '../shared-ui/theme/tokens';
 import PublicoSelector from '../components/PublicoSelector';
 import TemaMenu from '../components/TemaMenu';
 import RuleBuilder from '../components/RuleBuilder';
@@ -31,7 +32,7 @@ export default function BuilderSegmentacao() {
   const { id } = useParams();
   const isEdit = !!id;
 
-  const { buscar, criar, atualizar, buscarDestinos, loading: apiLoading } = useSegmentacoesApi();
+  const { buscar, criar, atualizar, buscarDestinos, atualizarDestinos, atualizarVigencia, loading: apiLoading } = useSegmentacoesApi();
 
   const [dadosBasicos, setDadosBasicos] = useState({
     nome: '',
@@ -205,6 +206,10 @@ export default function BuilderSegmentacao() {
       setError('O nome é obrigatório');
       return;
     }
+    if (!dadosBasicos.objetivo) {
+      setError('Selecione um objetivo');
+      return;
+    }
     if (!publicoSelecionado) {
       setError('Selecione um público-base');
       return;
@@ -271,26 +276,51 @@ export default function BuilderSegmentacao() {
       return;
     }
 
+    // Payload alinhado ao SegmentacaoCreateDTO/UpdateDTO do backend
+    // (destinos e vigência são enviados via endpoints separados)
     const payload = {
       ...dadosBasicos,
+      // Se owner vazio, backend auto-preenche com o usuário OBO
+      owner: dadosBasicos.owner || '',
       publico_base_id: publicoSelecionado,
       regras_json: {
         publico_base: publicoSelecionado,
         inclusao: inclusaoNo,
         exclusao: exclusaoNo,
       },
-      destinos,
-      ...vigencia,
     };
 
     try {
-      let response;
+      let segId;
       if (isEdit) {
-        response = await atualizar(id, payload);
+        await atualizar(id, payload);
+        segId = id;
       } else {
-        response = await criar(payload);
+        const response = await criar(payload);
+        segId = response.seg_id;
       }
-      navigate(`/segmentacoes/${response.seg_id || id}`);
+
+      // Persiste destinos e vigência via endpoints dedicados
+      // (SegmentacaoCreateDTO não tem esses campos — precisam de chamadas separadas)
+      try {
+        await atualizarDestinos(segId, destinos);
+      } catch (e) {
+        console.warn('Aviso: falha ao salvar destinos', e);
+      }
+
+      const vigenciaDados = {
+        vigencia_inicio: vigencia.vigencia_inicio || null,
+        vigencia_fim: vigencia.vigencia_fim || null,
+        recorrencia: vigencia.recorrencia || 'once',
+        cron_expression: vigencia.cron_expression || null,
+      };
+      try {
+        await atualizarVigencia(segId, vigenciaDados);
+      } catch (e) {
+        console.warn('Aviso: falha ao salvar vigência', e);
+      }
+
+      navigate(`/segmentacoes/${segId}`);
     } catch (err) {
       setError('Erro ao salvar segmentação: ' + (err.message || ''));
       console.error(err);
@@ -563,7 +593,7 @@ export default function BuilderSegmentacao() {
         )}
       </Box>
 
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2, pt: 2, borderTop: '1px solid #e0e0e0' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2, pt: 2, borderTop: `1px solid ${tokens.neutral.gray10}` }}>
         <Button
           variant="outlined"
           onClick={() => setActiveStep((prev) => Math.max(prev - 1, 0))}

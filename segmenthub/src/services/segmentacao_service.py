@@ -108,7 +108,8 @@ class SegmentacaoService:
                 "publico_alvo_descricao": dados.publico_alvo_descricao,
                 "observacoes": dados.observacoes,
                 "documentacao_md": dados.documentacao_md,
-                "owner": dados.owner,
+                # Auto-fill: se owner vazio, usa o usuário que está criando (OBO)
+                "owner": dados.owner if dados.owner else usuario,
                 "area_responsavel": dados.area_responsavel,
                 "email_contato": dados.email_contato,
                 "criado_por": usuario,

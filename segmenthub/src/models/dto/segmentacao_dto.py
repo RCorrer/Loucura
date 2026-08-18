@@ -2,16 +2,27 @@
 DTOs para o módulo de segmentação.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 
+OBJETIVOS_VALIDOS = ['AQUISICAO', 'RENTABILIZACAO', 'RETENCAO', 'ENGAJAMENTO', 'COBRANCA']
+
+
 class SegmentacaoCreateDTO(BaseModel):
     """DTO para criar uma nova segmentação."""
-    nome: str
+    nome: str = Field(..., min_length=1)
     descricao: Optional[str] = None
-    objetivo: str  # AQUISICAO/RENTABILIZACAO/RETENCAO/ENGAJAMENTO/COBRANCA
+    objetivo: str = Field(..., min_length=1)  # AQUISICAO/RENTABILIZACAO/RETENCAO/ENGAJAMENTO/COBRANCA
+
+    @field_validator('objetivo')
+    @classmethod
+    def validar_objetivo(cls, v: str) -> str:
+        v_upper = v.upper()
+        if v_upper not in OBJETIVOS_VALIDOS:
+            raise ValueError(f'objetivo deve ser um de: {OBJETIVOS_VALIDOS}')
+        return v_upper
     seg_tags: Optional[List[str]] = None
     resumo: Optional[str] = None
     objetivo_negocio: Optional[str] = None
