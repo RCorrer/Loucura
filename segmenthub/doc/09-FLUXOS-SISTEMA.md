@@ -14,6 +14,8 @@ O analista monta regras no Builder e salva. O sistema persiste a definição com
 │    │                                                                          │
 │    ├─ TemaMenu: seleciona campo → `{ campo_id: caracteristica_id, op, value }` │
 │    ├─ RuleNode.jsx renderiza árvore recursiva (AND/OR aninhado)                │
+│    ├─ Conector interativo entre pares: ao clicar chip entre regras,             │
+│    │    splitAtConnector() reestrutura árvore + flattenTree() normaliza        │
 │    ├─ handleSalvar:                                                            │
 │    │     1. cleanTree(regrasInclusao) — remove folhas inválidas recursivamente  │
 │    │     2. coerceValue() — "18"→number, "SP,RJ"→["SP","RJ"], "true"→bool    │

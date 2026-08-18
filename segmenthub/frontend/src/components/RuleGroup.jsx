@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Button, Select, MenuItem, FormControl, InputLabel, Paper } from '@mui/material';
 import RuleRow from './RuleRow';
+import { tokens } from '../shared-ui/theme/tokens';
 
 export default function RuleGroup({ group, index, onUpdate, onRemove, operadores = [] }) {
   const ops = (operadores && operadores.length > 0) ? operadores : [
@@ -29,7 +30,7 @@ export default function RuleGroup({ group, index, onUpdate, onRemove, operadores
   };
 
   return (
-    <Paper sx={{ p: 2, mb: 2, border: '1px solid #e0e0e0' }}>
+    <Paper sx={{ p: 2, mb: 2, border: `1px solid ${tokens.neutral.gray10}` }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
         <FormControl size="small" sx={{ minWidth: 100 }}>
           <InputLabel>Operador</InputLabel>

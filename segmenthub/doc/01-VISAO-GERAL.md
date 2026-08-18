@@ -233,16 +233,28 @@ O SegmentHub opera sobre o catálogo `plataforma` com os seguintes schemas:
 
 ## 8. Índice da Documentação
 
+### S1 — Técnico (fonte de verdade para implementação)
+
 | # | Documento | Conteúdo |
 |---|---|---|
-| 01 | **Este arquivo** | Visão geral, arquitetura, stack, estrutura |
+| 01 | **Este arquivo** | Visão geral, arquitetura, stack |
 | 02 | [Schemas e Tabelas](02-SCHEMAS-TABELAS.md) | DDLs, colunas, índices, relacionamentos |
 | 03 | [Arquitetura Backend](03-ARQUITETURA-BACKEND.md) | Camadas, padrões, módulos core |
 | 04 | [Ciclo de Vida e Estados](04-CICLO-VIDA-ESTADOS.md) | State machine, transições, versionamento |
 | 05 | [Jobs e Execução](05-JOBS-EXECUCAO.md) | Arquitetura job-per-segment, notebooks, fluxos |
 | 06 | [API REST](06-API-ENDPOINTS.md) | Endpoints completos, request/response |
-| 07 | [Integração e Contratos](07-INTEGRACAO-CONTRATOS.md) | Eventos, GRANT SELECT, dependências |
+| 07 | [Integração — Impl. S1](07-INTEGRACAO-CONTRATOS.md) | Governança de campos, resolução campo_id, edge cases |
 | 08 | [Segurança e RBAC](08-SEGURANCA-RBAC.md) | Autenticação, autorização, anti-injection |
+| 09 | [Fluxos do Sistema](09-FLUXOS-SISTEMA.md) | Fluxos end-to-end (criação, estimativa, execução) |
+| 10 | [Operadores](10-OPERADORES-SISTEMA.md) | 17 operadores, case-insensitive, validação |
+
+### Plataforma CDP (visão cross-system)
+
+| # | Documento | Conteúdo |
+|---|---|---|
+| 11 | [Contratos e Eventos](11-CONTRATOS-DADOS-EVENTOS.md) | 7 decisões, contratos GRANT SELECT, barramento de eventos |
+| 12 | [Estrutura do Projeto](12-ESTRUTURA-PROJETO.md) | 4 apps + shared-ui + DDLs + Jobs (full) |
+| 13 | [Roadmap Plataforma](13-ROADMAP-PLATAFORMA.md) | Fases A-E, cartões S1, pendentes S2/S3/S4 |
 
 ---
 

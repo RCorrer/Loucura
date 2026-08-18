@@ -16,6 +16,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import { splitAtConnector, flattenTree } from '../utils/splitAtConnector';
+import { tokens } from '../shared-ui/theme/tokens';
 
 const DEFAULT_OPS = [
   '=', '!=', '>', '<', '>=', '<=',                     // Comparação numérica
@@ -27,8 +28,8 @@ const DEFAULT_OPS = [
 ];
 
 const OPERATOR_COLORS = {
-  AND: { border: '#1976d2', bg: '#e3f2fd', chip: 'primary' },
-  OR: { border: '#ed6c02', bg: '#fff3e0', chip: 'warning' },
+  AND: { border: tokens.feedback.info, bg: '#EDF4FB', chip: 'info' },
+  OR: { border: tokens.feedback.warning, bg: tokens.surface.warm1, chip: 'warning' },
 };
 
 /**
@@ -176,7 +177,7 @@ export default function RuleNode({
     <Box
       sx={{
         borderLeft: `3px solid ${colors.border}`,
-        backgroundColor: depth % 2 === 0 ? colors.bg : '#fafafa',
+        backgroundColor: depth % 2 === 0 ? colors.bg : tokens.surface.canvas,
         borderRadius: 1,
         p: 1.5,
         mb: 1,
@@ -237,7 +238,7 @@ export default function RuleNode({
               <Chip
                 label={node.operator}
                 size="small"
-                color={node.operator === 'AND' ? 'primary' : 'warning'}
+                color={colors.chip}
                 onClick={() => handleConnectorClick(index)}
                 sx={{
                   cursor: 'pointer',

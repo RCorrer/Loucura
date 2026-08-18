@@ -1,73 +1,12 @@
-# Integração e Contratos — SegmentHub
+# Integração — Implementação no S1 (SegmentHub)
 
-> Contratos de dados, eventos e dependências com outros sistemas da plataforma.
-
----
-
-## 1. Posição na Plataforma CDP
-
-```
-  ╔═══════════════════╗         ┌───────────────────┐         ┌───────────────────┐
-  ║ S1 — SEGMENTHUB  ║───────▶│ S3 — ENGAGEMENT │───────▶│ S2 — CLIENTVIEW │
-  ║ (produz base)     ║         │ (consome S1,   │         │ (consome S1     │
-  ╚═══════════════════╝         │  produz track.)│         │  e S3)          │
-         │                       └───────────────────┘         └───────────────────┘
-         │                              │                        │
-         │        ┌───────────────────┤                        │
-         └───────▶│ S4 — COMPASSHUB │◀───────────────────────┘
-                  │ (consome todos)  │
-                  └───────────────────┘
-```
-
-**Ordem de deploy:** S1 → S3 → S2 → S4 (topológica pelo fluxo de dados)
+> Detalhes de implementação específicos de como o S1 participa da integração.  
+> Para a visão completa de todos os contratos da plataforma (4 sistemas),  
+> ver [11-CONTRATOS-DADOS-EVENTOS.md](./11-CONTRATOS-DADOS-EVENTOS.md).
 
 ---
 
-## 2. Contratos de Dados Produzidos pelo S1 (GRANT SELECT)
-
-Tabelas/views que o S1 expõe para outros sistemas lerem.
-
-| Tabela/View | Consumidores | Colunas-chave | Uso |
-|---|---|---|---|
-| `segmentacao.seg_resultado_corrente` | S2, S3 | seg_id, cpf_cnpj | Público atual do segmento |
-| `segmentacao.seg_definicao` | S2, S3, S4 | seg_id, seg_codigo, nome, objetivo, status, owner, area | Contexto e metadados |
-| `segmentacao.seg_destino` | S2, S3, S4 | seg_id, destino, habilitado | Natureza (humano/digital) |
-| `metadata.catalogo_caracteristicas` | S2, S3 | caracteristica_id, campo_label, usavel_em_*, bloco_visao360 | S2: Visão 360; S3: peças |
-| `caracteristicas.customer_features_wide` | S2, S3 | cpf_cnpj + colunas | S2: Visão 360; S3: personalização |
-| `segmentacao.seg_execucao`, `seg_saude` | S4 | — | Métricas de segmentação |
-
----
-
-## 3. Eventos Produzidos (`eventos.seg_eventos`)
-
-```
-  S1 (produz) ─▶ INSERT ─▶ eventos.seg_eventos ─┬─▶ S3 (sabe que há público novo)
-                                                └─▶ S4 (acompanhamento)
-```
-
-| tipo_evento | Consumidor | Ação |
-|---|---|---|
-| `publicada` | S3 | Sabe que há público novo |
-| `executada` | S3 | Público atualizado |
-| `aprovada` | S4 | Acompanhamento |
-| `pausada` | S4 | Acompanhamento |
-| `encerrada` | S4 | Acompanhamento |
-| `reativada` | S4 | Acompanhamento |
-
-**Payload JSON:**
-```json
-{
-  "seg_id": "seg_abc123",
-  "seg_codigo": "SEG-ALTA-RENDA-3F2A",
-  "versao_usada": 2,
-  "qtd_clientes": 15000,
-  "destino": "sistema2"
-}
-```
-
----
-
-## 4. Dados Consumidos pelo S1
+## 1. Dados Consumidos pelo S1
 
 | Schema.Tabela | Produção | Uso no S1 |
 |---|---|---|
@@ -79,25 +18,13 @@ Tabelas/views que o S1 expõe para outros sistemas lerem.
 
 ---
 
-## 5. Regras de Desacoplamento
+## 2. Governança de Campos — Implementação
 
-```
-  ┌───────────────────────────────────────────────────────────────────────────┐
-  │  REGRAS DE DESACOPLAMENTO                                                 │
-  │                                                                           │
-  │  1️⃣  Nenhum sistema lê tabela INTERNA de outro                            │
-  │       └─▶ Só GRANT SELECT no Unity Catalog                                │
-  │  2️⃣  Produtor não conhece consumidores                                    │
-  │  3️⃣  Comunicação via eventos (processado=false → true)                    │
-  │  4️⃣  S1 é guardião/editor das flags S2/S3, mas NÃO as consome            │
-  │       └─▶ Admin edita flags; S2/S3 leem via GRANT SELECT                  │
-  │  5️⃣  Contratos publicados por quem cria a relação                          │
-  └───────────────────────────────────────────────────────────────────────────┘
-```
+> Regras de desacoplamento completas: ver [11-CONTRATOS §3](./11-CONTRATOS-DADOS-EVENTOS.md).
 
-**Regra #4 detalhada:** O S1 hospeda as flags `usavel_em_peca`, `usavel_em_visao360`, `bloco_visao360` e o admin as edita via `/api/metadata/admin/campos/{id}/flags`. Porém, a lógica de segmentação do S1 **nunca** consulta essas flags. S2 e S3 as acessam diretamente via GRANT SELECT na tabela.
+**Como o S1 implementa a Regra #4:** O admin edita flags via `/api/metadata/admin/campos/{id}/flags`. A lógica de segmentação do S1 **nunca** consulta essas flags. S2 e S3 as acessam diretamente via GRANT SELECT.
 
-### Governança de Campos — Fluxo Completo
+### 3 Controles Independentes por Campo
 
 O Admin Catálogo (`/admin/catalogo`) expõe **3 controles independentes** por campo, editáveis inline na tabela:
 
@@ -213,7 +140,7 @@ Frontend state:           { campo_id: "caract_idade", op: ">", value: 18 }
 
 ---
 
-## 6. Dependências do S1
+## 3. Dependências do S1
 
 ```
   ┌────────────────────────────────────┐   ┌───────────────────────────────────┐
@@ -230,7 +157,7 @@ Frontend state:           { campo_id: "caract_idade", op: ">", value: 18 }
 
 ---
 
-## 7. Fluxo de Integração (S1 → S3)
+## 4. Fluxo de Integração (S1 → S3)
 
 ```
   S1 (SegmentHub)              Delta Lake                  S3 (EngagementHub)
@@ -249,7 +176,7 @@ Frontend state:           { campo_id: "caract_idade", op: ">", value: 18 }
 
 ---
 
-## 8. Fluxo de Integração (S1 → S2)
+## 5. Fluxo de Integração (S1 → S2)
 
 ```
   S2 (ClientView 360)             Delta Lake (tabelas S1)
@@ -265,7 +192,7 @@ Frontend state:           { campo_id: "caract_idade", op: ">", value: 18 }
 
 ---
 
-## 9. Decisões de Integração Relevantes ao S1
+## 6. Decisões de Integração Relevantes ao S1
 
 | # | Decisão | Impacto no S1 |
 |---|---|---|
