@@ -330,27 +330,20 @@ class JobManagerService:
                        usuario: str = "system", detalhes: str = None):
         """
         Registra operação no log de auditoria (seg_job_log).
+        Usa queries parametrizadas para evitar SQL injection.
         """
         try:
             log_id = f"jlog_{uuid.uuid4().hex[:12]}"
-            detalhes_escaped = detalhes.replace("'", "''") if detalhes else None
 
-            from databricks.sdk.runtime import spark
-            spark.sql(f"""
+            from src.db.databricks_client import get_client
+            client = get_client()
+            sql = """
                 INSERT INTO plataforma.segmentacao.seg_job_log
                 (log_id, seg_id, acao, job_id, run_id, status, detalhes, executado_por, criado_em)
-                VALUES (
-                    '{log_id}',
-                    '{seg_id}',
-                    '{acao}',
-                    {f"'{job_id}'" if job_id else "NULL"},
-                    {f"'{run_id}'" if run_id else "NULL"},
-                    '{status}',
-                    {f"'{detalhes_escaped}'" if detalhes_escaped else "NULL"},
-                    '{usuario}',
-                    current_timestamp()
-                )
-            """)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, current_timestamp())
+            """
+            params = (log_id, seg_id, acao, job_id, run_id, status, detalhes, usuario)
+            client.execute_insert(sql, params)
         except Exception as e:
             # Não falha se o log der erro (operação principal já foi executada)
             logger.warning(f"Falha ao registrar log de auditoria: {e}")
