@@ -15,6 +15,7 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
+import { splitAtConnector, flattenTree } from '../utils/splitAtConnector';
 
 const DEFAULT_OPS = [
   '=', '!=', '>', '<', '>=', '<=',                     // Comparação numérica
@@ -161,6 +162,14 @@ export default function RuleNode({
     onChange({ ...node, operator: node.operator === 'AND' ? 'OR' : 'AND' });
   };
 
+  const handleConnectorClick = (index) => {
+    const newOp = node.operator === 'AND' ? 'OR' : 'AND';
+    const restructured = splitAtConnector(node, index, newOp);
+    // Flatten para remover nós redundantes (1 filho, ou mesmo operator pai/filho)
+    const normalized = flattenTree(restructured);
+    onChange(normalized);
+  };
+
   // --- Render ---
 
   return (
@@ -222,12 +231,24 @@ export default function RuleNode({
               variant={variant}
             />
           )}
-          {/* Conector visual entre siblings */}
+          {/* Conector interativo entre siblings — clicável para mudar operator */}
           {index < node.rules.length - 1 && (
             <Box sx={{ display: 'flex', justifyContent: 'center', my: 0.5 }}>
-              <Typography variant="caption" sx={{ color: colors.border, fontWeight: 'bold', fontSize: '0.7rem' }}>
-                {node.operator}
-              </Typography>
+              <Chip
+                label={node.operator}
+                size="small"
+                color={node.operator === 'AND' ? 'primary' : 'warning'}
+                onClick={() => handleConnectorClick(index)}
+                sx={{
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '0.65rem',
+                  height: 20,
+                  '&:hover': { opacity: 0.8, transform: 'scale(1.05)' },
+                  transition: 'all 0.15s ease',
+                }}
+                title="Clique para alternar AND/OR entre estas regras"
+              />
             </Box>
           )}
         </React.Fragment>
