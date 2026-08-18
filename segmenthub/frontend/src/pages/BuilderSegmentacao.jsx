@@ -157,7 +157,7 @@ export default function BuilderSegmentacao() {
         nome: '',
         descricao: '',
         objetivo: '',
-        owner: 'admin',
+        owner: '',  // vazio → backend auto-fill com OBO user
         area_responsavel: '',
         email_contato: '',
         seg_tags: [],
