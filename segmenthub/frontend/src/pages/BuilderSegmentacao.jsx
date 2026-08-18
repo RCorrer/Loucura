@@ -79,7 +79,7 @@ export default function BuilderSegmentacao() {
             nome: data.nome || '',
             descricao: data.descricao || '',
             objetivo: data.objetivo || '',
-            owner: data.owner || 'admin',
+            owner: data.owner || '',  // vazio → backend auto-fill com OBO user
             area_responsavel: data.area_responsavel || '',
             email_contato: data.email_contato || '',
             seg_tags: data.seg_tags || [],
@@ -105,7 +105,7 @@ export default function BuilderSegmentacao() {
             vigencia_inicio: data.vigencia_inicio || '',
             vigencia_fim: data.vigencia_fim || '',
             recorrencia: data.recorrencia || 'once',
-            cron_expression: data.agendamento_cron || '',
+            agendamento_cron: data.agendamento_cron || '',
           });
 
           if (data.regras_json) {
@@ -147,7 +147,7 @@ export default function BuilderSegmentacao() {
     vigencia_inicio: '',
     vigencia_fim: '',
     recorrencia: 'once',
-    cron_expression: '',
+    agendamento_cron: '',
   });
 
   // ✅ Reseta estado ao mudar de edição para criação
@@ -177,7 +177,7 @@ export default function BuilderSegmentacao() {
         { destino: 'sistema2', habilitado: false },
         { destino: 'sistema3', habilitado: false },
       ]);
-      setVigencia({ vigencia_inicio: '', vigencia_fim: '', recorrencia: 'once', cron_expression: '' });
+      setVigencia({ vigencia_inicio: '', vigencia_fim: '', recorrencia: 'once', agendamento_cron: '' });
       setActiveStep(0);
       setError(null);
       setCarregandoMetadata(true);
@@ -312,7 +312,7 @@ export default function BuilderSegmentacao() {
         vigencia_inicio: vigencia.vigencia_inicio || null,
         vigencia_fim: vigencia.vigencia_fim || null,
         recorrencia: vigencia.recorrencia || 'once',
-        cron_expression: vigencia.cron_expression || null,
+        agendamento_cron: vigencia.agendamento_cron || null,
       };
       try {
         await atualizarVigencia(segId, vigenciaDados);
