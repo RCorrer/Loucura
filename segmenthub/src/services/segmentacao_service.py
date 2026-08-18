@@ -465,7 +465,8 @@ class SegmentacaoService:
             create_dto = SegmentacaoCreateDTO(
                 nome=nome_clone,
                 descricao=dados.descricao or original.get("descricao"),
-                objetivo=original["objetivo"],
+                # Fallback para segs legadas com objetivo vazio (pré-validator)
+                objetivo=original.get("objetivo") or "AQUISICAO",
                 seg_tags=original.get("seg_tags"),
                 resumo=original.get("resumo"),
                 objetivo_negocio=original.get("objetivo_negocio"),
