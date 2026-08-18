@@ -543,6 +543,6 @@ class SegmentacaoService:
             })
 
         # Ordena por data (mais recente primeiro)
-        # Usa datetime.min como fallback para execuções em andamento (executado_em=None)
-        timeline.sort(key=lambda x: x["data"] or datetime.min, reverse=True)
+        # Execuções em andamento (data=None) aparecem no topo (datetime.max)
+        timeline.sort(key=lambda x: x["data"] or datetime.max, reverse=True)
         return timeline

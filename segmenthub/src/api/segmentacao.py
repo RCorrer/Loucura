@@ -148,7 +148,7 @@ async def validar_segmentacao(
             "valido": True,
             "mensagem": "Segmentação válida",
             "resumo": {
-                "regras": regras.dict(),
+                "regras": regras.model_dump(),
                 "estimativa": "Consulta pode ser executada",
             }
         }

@@ -42,6 +42,16 @@ class SegmentacaoUpdateDTO(BaseModel):
     nome: Optional[str] = None
     descricao: Optional[str] = None
     objetivo: Optional[str] = None
+
+    @field_validator('objetivo')
+    @classmethod
+    def validar_objetivo(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        v_upper = v.upper()
+        if v_upper not in OBJETIVOS_VALIDOS:
+            raise ValueError(f'objetivo deve ser um de: {OBJETIVOS_VALIDOS}')
+        return v_upper
     seg_tags: Optional[List[str]] = None
     resumo: Optional[str] = None
     objetivo_negocio: Optional[str] = None
