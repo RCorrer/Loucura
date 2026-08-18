@@ -120,7 +120,7 @@ export default function AdminCatalogo() {
     carregarCampos();
   };
 
-  // Toggle status
+  // Toggle status (ativa/desativa campo geral)
   const handleToggleStatus = async (campo) => {
     try {
       await atualizarStatus(campo.caracteristica_id, !campo.ativo);
@@ -128,6 +128,24 @@ export default function AdminCatalogo() {
       carregarCampos();
     } catch (err) {
       setSnackbar({ open: true, message: err?.message || 'Erro ao alterar status' });
+    }
+  };
+
+  // Toggle flag inline na tabela (S2/S3)
+  const handleToggleFlag = async (campo, flagName) => {
+    try {
+      const newFlags = {
+        usavel_em_visao360: !!campo.usavel_em_visao360,
+        usavel_em_peca: !!campo.usavel_em_peca,
+        bloco_visao360: campo.bloco_visao360 || '',
+        [flagName]: !campo[flagName],
+      };
+      await atualizarFlags(campo.caracteristica_id, newFlags);
+      const label = flagName === 'usavel_em_visao360' ? 'S2 (Visão 360)' : 'S3 (Peça)';
+      setSnackbar({ open: true, message: `${label} ${!campo[flagName] ? 'ativado' : 'desativado'}` });
+      carregarCampos();
+    } catch (err) {
+      setSnackbar({ open: true, message: err?.message || 'Erro ao alterar flag' });
     }
   };
 
@@ -335,7 +353,7 @@ export default function AdminCatalogo() {
                           <TableCell align="center">
                             <Switch
                               size="small"
-                              checked={campo.usavel_em_visao360}
+                              checked={!!campo.usavel_em_visao360}
                               onChange={() => handleToggleFlag(campo, 'usavel_em_visao360')}
                               color="info"
                             />
@@ -343,7 +361,7 @@ export default function AdminCatalogo() {
                           <TableCell align="center">
                             <Switch
                               size="small"
-                              checked={campo.usavel_em_peca}
+                              checked={!!campo.usavel_em_peca}
                               onChange={() => handleToggleFlag(campo, 'usavel_em_peca')}
                               color="success"
                             />
