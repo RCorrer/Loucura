@@ -298,7 +298,7 @@ Não são bugs de crash, mas afetam consistência e escalabilidade.
 
 ---
 
-### RF-01: exec_id duplicado (Service ↔ Job criam registros independentes)
+### RF-01: exec_id duplicado (Service ↔ Job criam registros independentes) — ✅ IMPLEMENTADO
 
 **Problema:**
 
@@ -327,33 +327,20 @@ O fluxo de execução manual gera DOIS registros em `seg_execucao` para a mesma 
 | **B** | Service NÃO cria registro prévio; job é dono de todo o ciclo | Simples, sem duplicata | Frontend não tem exec_id imediato (precisa polling) |
 | **C** | Service cria com status `disparado`, job atualiza (UPDATE) em vez de INSERT | Ambos participam do mesmo registro | Job precisa receber exec_id (volta ao problema de A) |
 
-**Recomendação: Opção A** — passar `exec_id` como terceiro widget param:
+**Implementação aplicada (Opção A+B combinada):**
 
-```python
-# job_manager_service.py → criar execução:
-def executar_agora(self, seg_id, usuario):
-    exec_id = f"exec_{uuid.uuid4().hex[:12]}"
-    # registra com status 'em_execucao'
-    self.repository.registrar_execucao(seg_id, exec_id, "em_execucao")
-    # dispara job com exec_id como param
-    run = self.client.jobs.run_now(job_id, notebook_params={
-        "seg_id": seg_id,
-        "origem_execucao": "manual",
-        "exec_id": exec_id  # ← NOVO
-    })
-    return exec_id, run.run_id
+1. `segmentacao_service.executar()` gera `exec_id` com UUID e registra `em_execucao` ANTES de disparar
+2. `job_manager_service.executar_agora()` propaga `exec_id` como notebook_param
+3. `seg_exec.py` tem widget `exec_id`:
+   - Se recebido (`IS_PREREGISTERED=True`): faz UPDATE no registro existente
+   - Se vazio (execução agendada): gera próprio exec_id e faz INSERT
+4. Se job crashar, registro fica como `em_execucao` → consolidador detecta como travada (>2h)
 
-# seg_exec.py → usar exec_id do widget se fornecido:
-EXEC_ID_PARAM = dbutils.widgets.get("exec_id") or None
-exec_id = EXEC_ID_PARAM or f"exec_{SEG_ID}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-# Se exec_id veio do service → UPDATE em vez de INSERT no Step 5
-```
-
-**Impacto:** Baixa complexidade, alto valor de consistência.
+**Resultado:** Zero registros órfãos, timeline consistente, falhas visíveis.
 
 ---
 
-### RF-02: Execução fantasma (crash entre Step 3 e Step 5)
+### RF-02: Execução fantasma (crash entre Step 3 e Step 5) — ✅ IMPLEMENTADO
 
 **Problema:**
 
@@ -379,7 +366,13 @@ Se o notebook falha APÓS executar a query (Step 3) mas ANTES de registrar em
 | **B** | Registrar status `em_execucao` no INÍCIO (Step 1), atualizar para `sucesso`/`falha` no fim | Sempre existe registro; consolidador detecta `em_execucao` velhos | Requer lógica de rollback no Step 4 |
 | **C** | Usar Databricks Job events API no consolidador para detectar runs que falharam | Não muda o notebook; consolidador reconcilia | Consolidador fica mais complexo |
 
-**Recomendação: Opção B** combinada com RF-01 — o service cria registro `em_execucao` no início, job atualiza status no final. Se nunca atualizar, o consolidador já pega como "travada" (>2h em `em_execucao` → `falha_timeout`).
+**Implementação aplicada (Opção B combinada com RF-01):**
+
+O service cria registro `em_execucao` ANTES do disparo. O job atualiza para `sucesso` no final.
+Se o job crashar em qualquer step, o registro permanece como `em_execucao`.
+O consolidador (a cada 6h) detecta registros >2h em `em_execucao` e marca como `falha_timeout`.
+
+**Resultado:** Toda execução tem registro desde o início. Falhas são detectáveis.
 
 ---
 
@@ -593,8 +586,8 @@ spark.sql(f"... alertas_json = '{alertas_safe}' ...")
 
 | Prioridade | ID | Issue | Esforço | Risco se não corrigir |
 |---|---|---|---|---|
-| 🔴 Alta | RF-01 | exec_id duplicado | 2h | Dados inconsistentes, timeline poluída |
-| 🔴 Alta | RF-02 | Execução fantasma | 1h | Perda de visibilidade em falhas |
+| ✅ Feito | RF-01 | exec_id duplicado | 2h | ~~Dados inconsistentes, timeline poluída~~ |
+| ✅ Feito | RF-02 | Execução fantasma | 1h | ~~Perda de visibilidade em falhas~~ |
 | 🟡 Média | RF-03 | MERGE em loop | 1h | Performance ruim com muitas segs atrasadas |
 | 🟡 Média | RF-04 | Travadas sem seg_saude | 30min | Delay de até 6h na detecção |
 | 🟡 Média | RF-07 | alertas_json escape | 10min | Crash se alerta tiver aspas |
@@ -607,6 +600,7 @@ spark.sql(f"... alertas_json = '{alertas_safe}' ...")
 
 | Data | Versão | Descrição |
 |---|---|---|
+| 2026-08-19 | 2.2 | RF-01 + RF-02 implementados: exec_id unificado + execução fantasma resolvida |
 | 2026-08-18 | 2.1 | Auditoria completa: 9 bugs corrigidos, 7 pontos de revisão futura documentados |
 | 2026-08-18 | 2.0 | Arquitetura job-per-segment implementada (seg_exec + consolidador + job_manager_service) |
 | 2026-08-01 | 1.0 | Manifest inicial |

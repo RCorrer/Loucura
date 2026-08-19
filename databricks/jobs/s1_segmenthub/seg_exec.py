@@ -34,6 +34,7 @@ Versão: 2.0 (arquitetura job-per-segment)
 
 # COMMAND ----------
 
+# DBTITLE 1,Setup: Parâmetros e imports
 # ============================================================
 # SETUP: Parâmetros e imports
 # ============================================================
@@ -46,12 +47,22 @@ from pyspark.sql import functions as F
 # Parâmetros do Job
 dbutils.widgets.text("seg_id", "", "ID da Segmentação")
 dbutils.widgets.text("origem_execucao", "agendada", "Origem (agendada/manual/reativacao)")
+dbutils.widgets.text("exec_id", "", "ID da Execução (propagado pelo service, vazio se agendada)")
 
 SEG_ID = dbutils.widgets.get("seg_id")
 ORIGEM = dbutils.widgets.get("origem_execucao")
 
+# RF-01/RF-02: Se exec_id foi propagado pelo service, reutiliza (UPDATE no final).
+# Se vazio (execução agendada), gera novo exec_id (INSERT no final).
+EXEC_ID_PARAM = dbutils.widgets.get("exec_id").strip() or None
+IS_PREREGISTERED = EXEC_ID_PARAM is not None
+
 assert SEG_ID, "Parâmetro seg_id é obrigatório"
 print(f"▶ Executando segmentação: {SEG_ID} | Origem: {ORIGEM}")
+if IS_PREREGISTERED:
+    print(f"  exec_id propagado: {EXEC_ID_PARAM} (será UPDATE no final)")
+else:
+    print(f"  exec_id será gerado pelo job (INSERT no final)")
 
 # Schemas
 CATALOG = "plataforma"
@@ -275,12 +286,14 @@ print(f"\n✓ Resultado: {qtd_clientes:,} clientes em {tempo_exec}s")
 
 # COMMAND ----------
 
+# DBTITLE 1,Step 4: Persistir resultado
 # ============================================================
 # STEP 4: Persistir resultado
 # ============================================================
 
-exec_id = f"exec_{SEG_ID}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-exec_timestamp = datetime.now(timezone.utc)
+# RF-01: Reutiliza exec_id do service (se propagado) ou gera novo (execução agendada)
+exec_id = EXEC_ID_PARAM or f"exec_{SEG_ID}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+exec_timestamp = datetime.utcnow()
 
 # 4a. MERGE em seg_resultado_corrente (snapshot atual)
 df_resultado.createOrReplaceTempView("resultado_novo")
@@ -320,6 +333,10 @@ print(f"✓ seg_resultado_historico inserido ({qtd_clientes} registros)")
 # ============================================================
 # STEP 5: Registrar execução em seg_execucao
 # ============================================================
+# RF-01/RF-02: Se exec_id veio do service (IS_PREREGISTERED), o registro
+# já existe com status 'em_execucao' → UPDATE para 'sucesso'.
+# Se exec_id foi gerado aqui (agendada) → INSERT novo registro.
+# ============================================================
 
 # Obtem job_id e run_id do contexto Databricks
 try:
@@ -330,25 +347,40 @@ try:
 except Exception:
     job_id, run_id, job_run_url = "", "", ""
 
-spark.sql(f"""
-  INSERT INTO {CATALOG}.{SCHEMA_SEG}.seg_execucao
-  (exec_id, seg_id, versao_usada, origem_execucao, executado_em,
-   qtd_clientes, status, job_id, run_id, job_run_url)
-  VALUES (
-    '{exec_id}',
-    '{SEG_ID}',
-    {seg['versao_atual']},
-    '{ORIGEM}',
-    current_timestamp(),
-    {qtd_clientes},
-    'sucesso',
-    NULLIF('{job_id}', ''),
-    NULLIF('{run_id}', ''),
-    NULLIF('{job_run_url}', '')
-  )
-""")
-
-print(f"✓ Execução registrada: {exec_id}")
+if IS_PREREGISTERED:
+    # UPDATE: registro já existe (criado pelo service antes do disparo)
+    spark.sql(f"""
+      UPDATE {CATALOG}.{SCHEMA_SEG}.seg_execucao
+      SET status = 'sucesso',
+          versao_usada = {seg['versao_atual']},
+          executado_em = current_timestamp(),
+          qtd_clientes = {qtd_clientes},
+          job_id = NULLIF('{job_id}', ''),
+          run_id = NULLIF('{run_id}', ''),
+          job_run_url = NULLIF('{job_run_url}', '')
+      WHERE exec_id = '{exec_id}'
+    """)
+    print(f"✓ Execução atualizada (UPDATE): {exec_id}")
+else:
+    # INSERT: execução agendada (sem registro prévio)
+    spark.sql(f"""
+      INSERT INTO {CATALOG}.{SCHEMA_SEG}.seg_execucao
+      (exec_id, seg_id, versao_usada, origem_execucao, executado_em,
+       qtd_clientes, status, job_id, run_id, job_run_url)
+      VALUES (
+        '{exec_id}',
+        '{SEG_ID}',
+        {seg['versao_atual']},
+        '{ORIGEM}',
+        current_timestamp(),
+        {qtd_clientes},
+        'sucesso',
+        NULLIF('{job_id}', ''),
+        NULLIF('{run_id}', ''),
+        NULLIF('{job_run_url}', '')
+      )
+    """)
+    print(f"✓ Execução registrada (INSERT): {exec_id}")
 
 # COMMAND ----------
 

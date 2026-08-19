@@ -393,12 +393,21 @@ class SegmentacaoService:
         if not job_id:
             raise ValueError(f"Segmentação '{seg_id}' não possui job configurado. Ative-a primeiro.")
 
-        # Dispara run_now no Databricks
-        run_id = self.job_manager.executar_agora(seg_id, job_id, origem, usuario)
-
-        # Registra execução localmente (status será atualizado pelo notebook ao finalizar)
-        exec_id = f"exec_{seg_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        # RF-01/RF-02: Gera exec_id ANTES de disparar o job.
+        # Registra com status 'em_execucao' no banco.
+        # Passa exec_id ao job via widget param — job fará UPDATE (não INSERT).
+        # Se job falhar sem atualizar, consolidador detecta como travada (>2h em em_execucao).
+        exec_id = f"exec_{uuid.uuid4().hex[:12]}"
         self.repository.executar_segmentacao(seg_id, exec_id)
+
+        # Dispara run_now no Databricks com exec_id propagado
+        run_id = self.job_manager.executar_agora(
+            seg_id=seg_id,
+            job_id=job_id,
+            origem=origem,
+            usuario=usuario,
+            exec_id=exec_id,
+        )
 
         return {"exec_id": exec_id, "run_id": run_id, "job_id": job_id}
 
