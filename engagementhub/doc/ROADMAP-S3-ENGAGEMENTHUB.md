@@ -1,7 +1,7 @@
 # ROADMAP-S3-ENGAGEMENTHUB.md
 
 > **29 cartões** (13 BACK + 7 JOBS + 9 FRONT) | Plataforma CDP Bradesco
-> Status: Roadmap completo — implementação pendente
+> Status: **3/29 completos (10%)** — BACK-01 ✅ BACK-02 ✅ BACK-03 ✅ | DDL auditado ✅
 
 ---
 
@@ -20,10 +20,10 @@
 
 ```
 BACK (13):
-[ ] S3-BACK-01  Fundação (db + security + main)
-[ ] S3-BACK-02  Campanha (CRUD + ciclo de vida)
-[ ] S3-BACK-03  Peças (CRUD + aprovação + variáveis + assets)
-[ ] S3-BACK-04  Canais + Providers (Email + WhatsApp reais)
+[x] S3-BACK-01  Fundação (db + security + main)                    ← Commit #26
+[x] S3-BACK-02  Campanha (CRUD + ciclo de vida + guards)           ← Commits #27-28
+[x] S3-BACK-03  Peças (CRUD + aprovação + variáveis + preview)    ← Commits #31-32
+[ ] S3-BACK-04  Canais + Providers (Email + WhatsApp reais)        ← Parcial (scaffolds prontos)
 [ ] S3-BACK-05  Jornada (CRUD + grafo + validações + preview)
 [ ] S3-BACK-06  Orquestrador (Waterfall + Capping + Consentimento)
 [ ] S3-BACK-07  Motor de Jornada (lógica core)
@@ -184,14 +184,78 @@ Ver seção completa no roadmap original (shell, campanha, peça email/whatsapp,
 
 ---
 
-## Validação DDL
+## Validação DDL (Commit #30 — Audit)
 
 | Status | Observação |
 |---|---|
-| ✅ | 10 DDLs com 33 tabelas + 3 views: 100% alinhados com os 29 cartões |
-| ✅ | Naming: `supressao_log` (renomeado de `supressao_optout`) |
+| ✅ | **11 DDLs** com 34 tabelas + 3 views + 1 volume: 100% alinhados |
+| ✅ | `00_schema.sql` criado: CREATE SCHEMA engagement + eventos + disparo_eventos |
+| ✅ | `04_pecas.sql`: CREATE VOLUME plataforma.engagement.assets |
+| ✅ | CLUSTER BY adicionado: fila_disparo, jornada_estado_cliente, supressao_log |
+| ✅ | `10_contratos.sql`: GRANT SELECT para sp_clientview_s2 |
 | ✅ | Dependências S1/S0 corretamente referenciadas |
 | ✅ | Contratos de saída (views) com lógica validada |
+
+---
+
+## Changelog de Implementação
+
+| Commit | Card | Descrição |
+|---|---|---|
+| #26 | BACK-01 | Fundação: app.yaml, main.py, security.py, config.py, fake_client.py |
+| #27 | BACK-02 | Campanha CRUD: 9 endpoints + ciclo de vida + versionamento |
+| #28 | BACK-02 fix | Colunas explícitas, json.loads tags, validação peças via grafo |
+| #29 | seed | seed.py: 37 tabelas SQLite, dados cruzados, fluxo completo validado |
+| #30 | DDL audit | 5 gaps corrigidos: volume, barramento, grants, cluster by, schema |
+| #31 | BACK-03 | Peças: 10 endpoints + render_engine Jinja2 + aprovação multi-etapa |
+| #32 | BACK-03 fix | Rota /variaveis movida (conflito), guard empty update, SafeUndefined |
+
+### Arquivos implementados
+
+```
+engagementhub/
+  src/
+    main.py                     ← 3 routers ativos (campanhas, peças, canais*)
+    core/
+      config.py                 ← Todas as TABLE_* definidas
+      security.py               ← OBO + RBAC (sistema=engagement)
+      render_engine.py          ← Jinja2: extrair_variaveis + render_preview
+    db/
+      databricks_client.py      ← Abstraction layer (Databricks SQL / SQLite)
+      fake_client.py            ← SQLite para ENV=local
+      seed.py                   ← 37 tabelas, dados cruzados
+    api/
+      campanha.py               ← 9 endpoints (CRUD + ciclo completo)
+      peca.py                   ← 10 endpoints (CRUD + aprovação + preview)
+      canal.py*                 ← Em andamento (BACK-04)
+    models/
+      campanha.py               ← StatusCampanha, TRANSICOES_VALIDAS, schemas
+      peca.py                   ← StatusAprovacao, CanalPeca, 6 schemas
+      canal.py*                 ← Em andamento
+    providers/
+      __init__.py               ← Exports
+      base.py                   ← ChannelProvider ABC (6 methods + 2 props)
+      email_provider.py*        ← Em andamento (SMTP)
+      whatsapp_provider.py*     ← Em andamento (Meta Cloud API)
+      registry.py*              ← Em andamento (factory)
+  app.yaml
+  requirements.txt              ← fastapi, pydantic, jinja2, httpx
+
+databricks/ddl/s3_engagement/
+  00_schema.sql                 ← CREATE SCHEMA + disparo_eventos
+  01_campanha.sql               ← 4 tabelas
+  02_waterfall_capping.sql      ← 4 tabelas (supressao + CLUSTER BY)
+  03_canais.sql                 ← 1 tabela
+  04_pecas.sql                  ← 5 tabelas + 1 volume + 1 view
+  05_jornadas.sql               ← 7 tabelas (estado_cliente + CLUSTER BY)
+  06_disparo.sql                ← 5 tabelas (fila + CLUSTER BY)
+  07_tracking.sql               ← 1 tabela (CLUSTER BY cpf_cnpj)
+  08_otimizacao.sql             ← 4 tabelas
+  09_operacao.sql               ← 2 tabelas
+  10_contratos_saida.sql        ← 2 views + 3 GRANTs
+```
+
+* = não commitados ainda (BACK-04 em andamento, interrompido)
 
 ---
 
