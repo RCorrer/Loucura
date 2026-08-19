@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS plataforma.engagement.fila_disparo (
   criado_em TIMESTAMP DEFAULT current_timestamp(),
   atualizado_em TIMESTAMP DEFAULT current_timestamp()
 ) USING DELTA
+CLUSTER BY (status, agendado_para)
 COMMENT 'Fila única de disparo (jornada + avulso). Processada pelo motor_disparo';
 
 CREATE TABLE IF NOT EXISTS plataforma.engagement.disparo_tentativa (

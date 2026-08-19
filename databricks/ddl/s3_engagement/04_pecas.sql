@@ -75,6 +75,10 @@ CREATE TABLE IF NOT EXISTS plataforma.engagement.asset (
 ) USING DELTA
 COMMENT 'Asset manager (imagens) em Unity Catalog Volumes';
 
+-- Volume para assets (imagens, logos, banners)
+CREATE VOLUME IF NOT EXISTS plataforma.engagement.assets
+COMMENT 'Imagens, logos e mídias das peças de comunicação. Ref: asset.caminho_volume';
+
 -- Variáveis disponíveis p/ personalização: só normal + usavel_em_peca (contrato com S1)
 CREATE OR REPLACE VIEW plataforma.engagement.variaveis_disponiveis AS
 SELECT caracteristica_id AS campo_id, campo_label, tipo_dado, descricao

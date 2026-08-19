@@ -44,4 +44,5 @@ CREATE TABLE IF NOT EXISTS plataforma.engagement.supressao_log (
   detalhe STRING,
   data_execucao TIMESTAMP DEFAULT current_timestamp()
 ) USING DELTA
+CLUSTER BY (cpf_cnpj, data_execucao)
 COMMENT 'Registra CADA não-envio e o porquê (transparência). Consultável via admin';
