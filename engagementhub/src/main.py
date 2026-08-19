@@ -40,7 +40,7 @@ def health():
 
 # --- API Routers ---
 from src.api.campanha import router as campanha_router
-# from src.api.peca import router as peca_router
+from src.api.peca import router as peca_router
 # from src.api.jornada import router as jornada_router
 # from src.api.disparo import router as disparo_router
 # from src.api.avulso import router as avulso_router
@@ -48,7 +48,7 @@ from src.api.campanha import router as campanha_router
 # from src.api.admin import router as admin_router
 #
 app.include_router(campanha_router, prefix="/api/campanhas", tags=["Campanhas"])
-# app.include_router(peca_router, prefix="/api/pecas", tags=["Peças"])
+app.include_router(peca_router, prefix="/api/pecas", tags=["Peças"])
 # app.include_router(jornada_router, prefix="/api/jornadas", tags=["Jornadas"])
 # app.include_router(disparo_router, prefix="/api/disparo", tags=["Disparo"])
 # app.include_router(avulso_router, prefix="/api/avulso", tags=["Avulso"])
