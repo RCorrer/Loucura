@@ -115,18 +115,15 @@
 | evento_conversao | STRING | abriu/clicou/converteu |
 | janela_dias | INT | Janela de atribuição |
 
-### `supressao_optout`
+### `supressao_log`
 | Coluna | Tipo | Descrição |
 |---|---|---|
 | supressao_id | STRING PK | |
 | cpf_cnpj | STRING | Cliente suprimido |
 | campanha_id | STRING | Campanha relacionada |
 | canal | STRING | Canal |
-| motivo | STRING | opt_out/capping/blacklisted |
+| motivo | STRING | opt_out/capping/waterfall/blacklisted/janela |
 | detalhe | STRING | Explicação legível |
-
-> **Nota:** O roadmap referencia como `supressao_log`. Considerar renomear para consistência
-> (a tabela registra TODOS os tipos de supressão, não apenas opt-out).
 
 ---
 
@@ -323,7 +320,7 @@ FROM jornada_estado_cliente e JOIN jornada j ...
 | Status | Observação |
 |---|---|
 | ✅ Alinhado | Todas as tabelas referenciadas nos 29 cartões existem nos DDLs |
-| ⚠️ Naming | `supressao_optout` no DDL vs `supressao_log` no roadmap (recomendar renomear) |
+| ✅ Naming | `supressao_log` (renomeado de `supressao_optout` para consistência) |
 | ✅ Views | 3 views com lógica correta (contratos S2 + variáveis S1) |
 | ✅ Dependências | S1 (seg_resultado_corrente), S0 (consentimento, golden_record) referenciados |
 

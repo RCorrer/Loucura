@@ -189,7 +189,7 @@ Ver seção completa no roadmap original (shell, campanha, peça email/whatsapp,
 | Status | Observação |
 |---|---|
 | ✅ | 10 DDLs com 33 tabelas + 3 views: 100% alinhados com os 29 cartões |
-| ⚠️ | Naming: `supressao_optout` → recomendar renomear para `supressao_log` |
+| ✅ | Naming: `supressao_log` (renomeado de `supressao_optout`) |
 | ✅ | Dependências S1/S0 corretamente referenciadas |
 | ✅ | Contratos de saída (views) com lógica validada |
 

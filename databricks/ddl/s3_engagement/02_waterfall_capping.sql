@@ -35,13 +35,13 @@ CREATE TABLE IF NOT EXISTS plataforma.engagement.config_conversao (
 ) USING DELTA
 COMMENT 'Critério de conversão da cascata (configurável)';
 
-CREATE TABLE IF NOT EXISTS plataforma.engagement.supressao_optout (
+CREATE TABLE IF NOT EXISTS plataforma.engagement.supressao_log (
   supressao_id STRING NOT NULL,
   cpf_cnpj STRING,
   campanha_id STRING,
   canal STRING,
-  motivo STRING COMMENT 'opt_out/capping/blacklisted',
+  motivo STRING COMMENT 'opt_out/capping/waterfall/blacklisted/janela',
   detalhe STRING,
   data_execucao TIMESTAMP DEFAULT current_timestamp()
 ) USING DELTA
-COMMENT 'Registra CADA não-envio e o porquê (transparência)';
+COMMENT 'Registra CADA não-envio e o porquê (transparência). Consultável via admin';
