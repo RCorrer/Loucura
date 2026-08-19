@@ -3,13 +3,12 @@
 import uuid
 import json
 import logging
-from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from src.db.databricks_client import get_client
 from src.core.security import get_user_or_raise, require_perfil
-from src.core.config import CATALOG, SCHEMA_ENG, SCHEMA_META, TABLE_PECA
+from src.core.config import CATALOG, SCHEMA_ENG, TABLE_PECA
 from src.core.render_engine import extrair_variaveis, render_preview
 from src.models.peca import (
     PecaCreate, PecaUpdate, AprovarPayload, ReprovarPayload, PreviewPayload,
@@ -23,6 +22,21 @@ router = APIRouter()
 def _gerar_codigo(canal: str) -> str:
     hex6 = uuid.uuid4().hex[:6].upper()
     return f"PEC-{canal.upper()}-{hex6}"
+
+
+# --- GET /api/pecas/variaveis (ANTES de /{peca_id} para evitar conflito) ---
+@router.get("/variaveis")
+async def listar_variaveis(user: dict = Depends(get_user_or_raise)):
+    """Catálogo de variáveis disponíveis para personalização (contrato S1)."""
+    client = get_client()
+    rows = client.fetch_all(
+        f"SELECT campo_id, campo_label, tipo_dado, descricao "
+        f"FROM {CATALOG}.{SCHEMA_ENG}.variaveis_disponiveis"
+    )
+    variaveis = [{
+        "campo_id": r[0], "campo_label": r[1], "tipo_dado": r[2], "descricao": r[3]
+    } for r in rows]
+    return {"data": variaveis}
 
 
 # --- GET /api/pecas ---
@@ -166,6 +180,8 @@ async def editar_peca(peca_id: str, payload: PecaUpdate, user: dict = Depends(ge
 
     nova_versao = row[1] + 1
     dados = payload.model_dump(exclude_none=True, exclude={"motivo"})
+    if not dados:
+        raise HTTPException(status_code=422, detail="Nenhum campo para atualizar")
     updates, params = [], []
 
     for campo, valor in dados.items():
@@ -291,19 +307,6 @@ async def preview_peca(peca_id: str, payload: PreviewPayload, user: dict = Depen
     return {"data": resultado}
 
 
-# --- GET /api/variaveis ---
-@router.get("/variaveis")
-async def listar_variaveis(user: dict = Depends(get_user_or_raise)):
-    """Catálogo de variáveis disponíveis para personalização (contrato S1)."""
-    client = get_client()
-    rows = client.fetch_all(
-        f"SELECT campo_id, campo_label, tipo_dado, descricao "
-        f"FROM {CATALOG}.{SCHEMA_ENG}.variaveis_disponiveis"
-    )
-    variaveis = [{
-        "campo_id": r[0], "campo_label": r[1], "tipo_dado": r[2], "descricao": r[3]
-    } for r in rows]
-    return {"data": variaveis}
 
 
 # --- POST /api/pecas/assets ---

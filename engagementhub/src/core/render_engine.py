@@ -8,7 +8,7 @@ import re
 import json
 import logging
 from typing import Optional
-from jinja2 import Environment, BaseLoader
+from jinja2 import Environment, BaseLoader, Undefined
 
 logger = logging.getLogger(__name__)
 
@@ -157,11 +157,11 @@ def _render_str(text: str, ctx: dict, env: Environment) -> str:
         return text
 
 
-class _SafeUndefined:
-    """Retorna placeholder ao invés de erro."""
-    def __init__(self, *args, **kwargs):
-        self._name = kwargs.get('name', '?')
-    def __str__(self): return f"[{self._name}]"
-    def __repr__(self): return f"[{self._name}]"
+class _SafeUndefined(Undefined):
+    """Retorna placeholder ao invés de erro (herda de jinja2.Undefined)."""
+    def __str__(self): return f"[{self._undefined_name}]"
+    def __repr__(self): return f"[{self._undefined_name}]"
     def __bool__(self): return False
     def __iter__(self): return iter([])
+    def __getattr__(self, name): return self
+    def __call__(self, *args, **kwargs): return self
