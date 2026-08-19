@@ -74,7 +74,7 @@ df_check = df_ativas.join(df_ultima_exec, "seg_id", "left")
 
 # COMMAND ----------
 
-# DBTITLE 1,Step 3: Detectar atrasos e falhas
+# DBTITLE 1,Step 3: Detectar atrasos, falhas e execuções travadas
 # ============================================================
 # STEP 3: Detectar atrasos e falhas
 # ============================================================
@@ -123,31 +123,90 @@ for row in df_check.collect():
             "alertas_json": json.dumps(problemas),
         })
 
-print(f"✓ Alertas gerados: {len(alertas_gerados)}")
+# RF-04: Detectar execuções travadas (>2h em 'rodando' ou 'em_execucao') ANTES do MERGE
+# Integrado aqui para que o Step 4 (MERGE bulk) já inclua essas segs.
+df_travadas = spark.sql(f"""
+  SELECT seg_id, exec_id, executado_em
+  FROM {CATALOG}.{SCHEMA_SEG}.seg_execucao
+  WHERE status IN ('rodando', 'em_execucao')
+    AND executado_em < current_timestamp() - INTERVAL 2 HOURS
+""")
+
+travadas_count = df_travadas.count()
+if travadas_count > 0:
+    print(f"\n⚠️ {travadas_count} execuções travadas detectadas")
+    travadas_rows = df_travadas.collect()
+    # Marca como 'falha_timeout'
+    for row in travadas_rows:
+        spark.sql(f"""
+          UPDATE {CATALOG}.{SCHEMA_SEG}.seg_execucao
+          SET status = 'falha_timeout'
+          WHERE exec_id = '{row["exec_id"]}'
+        """)
+    # Inclui segs travadas no saude_updates para MERGE imediato
+    segs_travadas = set(row["seg_id"] for row in travadas_rows)
+    segs_ja_alertadas = set(u["seg_id"] for u in saude_updates)
+    for seg_trav in segs_travadas - segs_ja_alertadas:
+        problema_trav = ["Execução travada (timeout > 2h)"]
+        saude_updates.append({
+            "seg_id": seg_trav,
+            "health_status": "vermelho",
+            "alertas_json": json.dumps(problema_trav),
+        })
+        alertas_gerados.append({
+            "seg_id": seg_trav,
+            "nome": "(timeout detectado)",
+            "owner": "",
+            "email_contato": "",
+            "problemas": problema_trav,
+        })
+    print(f"✓ Marcadas como 'falha_timeout' + incluídas no saude_updates")
+else:
+    print("✓ Nenhuma execução travada")
+
+print(f"✓ Total alertas: {len(alertas_gerados)} | Saude updates: {len(saude_updates)}")
 
 # COMMAND ----------
 
+# DBTITLE 1,Step 4: Atualizar seg_saude (MERGE bulk)
 # ============================================================
-# STEP 4: Atualizar seg_saude para os problemáticos
+# STEP 4: Atualizar seg_saude (MERGE bulk — RF-03)
+# ============================================================
+# Substitui loop de N MERGEs por 1 único MERGE via DataFrame.
+# Performance: N queries → 1 query, N commits Delta → 1 commit.
 # ============================================================
 
-for update in saude_updates:
+if saude_updates:
+    from pyspark.sql.types import StructType, StructField, StringType
+
+    # RF-07: escape aspas simples no alertas_json antes de persistir
+    for u in saude_updates:
+        u["alertas_json"] = u["alertas_json"].replace("'", "''")
+
+    schema = StructType([
+        StructField("seg_id", StringType(), False),
+        StructField("health_status", StringType(), False),
+        StructField("alertas_json", StringType(), True),
+    ])
+    df_saude_batch = spark.createDataFrame(saude_updates, schema=schema)
+    df_saude_batch.createOrReplaceTempView("saude_batch")
+
     spark.sql(f"""
       MERGE INTO {CATALOG}.{SCHEMA_SEG}.seg_saude AS target
-      USING (SELECT '{update['seg_id']}' AS seg_id) AS source
+      USING saude_batch AS source
       ON target.seg_id = source.seg_id
       WHEN MATCHED THEN UPDATE SET
-        health_status = '{update['health_status']}',
+        health_status = source.health_status,
         ultima_verificacao = current_timestamp(),
-        alertas_json = '{update['alertas_json']}'
+        alertas_json = source.alertas_json
       WHEN NOT MATCHED THEN INSERT
         (seg_id, health_status, ultima_verificacao, alertas_json, publico_atual)
       VALUES
-        ('{update['seg_id']}', '{update['health_status']}', current_timestamp(),
-         '{update['alertas_json']}', 0)
+        (source.seg_id, source.health_status, current_timestamp(),
+         source.alertas_json, 0)
     """)
 
-print(f"✓ seg_saude atualizada para {len(saude_updates)} segmentações")
+print(f"✓ seg_saude atualizada para {len(saude_updates)} segmentações (1 MERGE bulk)")
 
 # COMMAND ----------
 
@@ -182,33 +241,19 @@ print(f"✓ {len(alertas_gerados)} notificações geradas")
 
 # COMMAND ----------
 
+# DBTITLE 1,Step 6: (movido para Step 3)
 # ============================================================
-# STEP 6: Detectar execuções 'travadas' (status 'rodando' > 2h)
+# STEP 6: (RF-04) Detecção de travadas movida para Step 3
 # ============================================================
-
-df_travadas = spark.sql(f"""
-  SELECT seg_id, exec_id, executado_em
-  FROM {CATALOG}.{SCHEMA_SEG}.seg_execucao
-  WHERE status = 'rodando'
-    AND executado_em < current_timestamp() - INTERVAL 2 HOURS
-""")
-
-if df_travadas.count() > 0:
-    print(f"\n⚠️ {df_travadas.count()} execuções travadas detectadas")
-    # Marca como 'falha_timeout'
-    travadas_ids = [row["exec_id"] for row in df_travadas.collect()]
-    for eid in travadas_ids:
-        spark.sql(f"""
-          UPDATE {CATALOG}.{SCHEMA_SEG}.seg_execucao
-          SET status = 'falha_timeout'
-          WHERE exec_id = '{eid}'
-        """)
-    print(f"✓ Marcadas como 'falha_timeout'")
-else:
-    print("✓ Nenhuma execução travada")
+# A detecção de execuções travadas agora roda ANTES do MERGE bulk
+# (Step 3) para que seg_saude seja atualizado imediatamente.
+# Este cell é mantido apenas como referência.
+# Contagem já disponível na variável `travadas_count`.
+print(f"✓ Travadas processadas no Step 3: {travadas_count}")
 
 # COMMAND ----------
 
+# DBTITLE 1,Resumo
 # ============================================================
 # RESUMO
 # ============================================================
@@ -218,7 +263,7 @@ result = {
     "segmentacoes_verificadas": df_ativas.count(),
     "alertas_gerados": len(alertas_gerados),
     "saude_atualizada": len(saude_updates),
-    "execucoes_travadas": df_travadas.count() if df_travadas else 0,
+    "execucoes_travadas": travadas_count,
 }
 
 print(f"\n{'='*60}")

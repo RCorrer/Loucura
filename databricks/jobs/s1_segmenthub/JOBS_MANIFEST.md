@@ -376,7 +376,7 @@ O consolidador (a cada 6h) detecta registros >2h em `em_execucao` e marca como `
 
 ---
 
-### RF-03: MERGE em loop no consolidador (N queries sequenciais)
+### RF-03: MERGE em loop no consolidador (N queries sequenciais) — ✅ IMPLEMENTADO
 
 **Problema:**
 
@@ -419,7 +419,7 @@ if saude_updates:
 
 ---
 
-### RF-04: Execuções travadas NÃO atualizam seg_saude imediatamente
+### RF-04: Execuções travadas NÃO atualizam seg_saude imediatamente — ✅ IMPLEMENTADO
 
 **Problema:**
 
@@ -554,7 +554,7 @@ HAVING problema IS NOT NULL
 
 ---
 
-### RF-07: alertas_json com json.dumps interpolado em SQL
+### RF-07: alertas_json com json.dumps interpolado em SQL — ✅ IMPLEMENTADO
 
 **Problema:**
 
@@ -588,9 +588,9 @@ spark.sql(f"... alertas_json = '{alertas_safe}' ...")
 |---|---|---|---|---|
 | ✅ Feito | RF-01 | exec_id duplicado | 2h | ~~Dados inconsistentes, timeline poluída~~ |
 | ✅ Feito | RF-02 | Execução fantasma | 1h | ~~Perda de visibilidade em falhas~~ |
-| 🟡 Média | RF-03 | MERGE em loop | 1h | Performance ruim com muitas segs atrasadas |
-| 🟡 Média | RF-04 | Travadas sem seg_saude | 30min | Delay de até 6h na detecção |
-| 🟡 Média | RF-07 | alertas_json escape | 10min | Crash se alerta tiver aspas |
+| ✅ Feito | RF-03 | MERGE em loop | 1h | ~~Performance ruim com muitas segs atrasadas~~ |
+| ✅ Feito | RF-04 | Travadas sem seg_saude | 30min | ~~Delay de até 6h na detecção~~ |
+| ✅ Feito | RF-07 | alertas_json escape | 10min | ~~Crash se alerta tiver aspas~~ |
 | 🟢 Baixa | RF-05 | f-string SQL | 4-8h | Baixo (inputs controlados hoje) |
 | 🟢 Baixa | RF-06 | collect() escalabilidade | 2h | OK até 5K segs |
 
@@ -600,6 +600,7 @@ spark.sql(f"... alertas_json = '{alertas_safe}' ...")
 
 | Data | Versão | Descrição |
 |---|---|---|
+| 2026-08-19 | 2.3 | RF-03 + RF-04 + RF-07 implementados: MERGE bulk, travadas imediatas, escape seguro |
 | 2026-08-19 | 2.2 | RF-01 + RF-02 implementados: exec_id unificado + execução fantasma resolvida |
 | 2026-08-18 | 2.1 | Auditoria completa: 9 bugs corrigidos, 7 pontos de revisão futura documentados |
 | 2026-08-18 | 2.0 | Arquitetura job-per-segment implementada (seg_exec + consolidador + job_manager_service) |
