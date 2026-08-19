@@ -15,7 +15,7 @@ Endpoints:
 import uuid
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -54,7 +54,7 @@ def _transitar_estado(
         )
 
     client = get_client()
-    hist_id = f"hist_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:4]}"
+    hist_id = f"hist_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:4]}"
 
     # Update status
     client.execute_insert(
@@ -316,9 +316,7 @@ async def ativar_campanha(campanha_id: str, user: dict = Depends(require_perfil(
     if not row:
         raise HTTPException(status_code=404, detail="Campanha não encontrada")
 
-    # Valida peças aprovadas
-    # Busca peças referenciadas no grafo das jornadas (não depende de fila_disparo)
-    # Primeiro pega jornadas da campanha, depois busca peças pelo peca_id
+    # Valida que há pelo menos 1 jornada vinculada
     jornadas = client.fetch_all(
         f"SELECT j.jornada_id, j.grafo_json "
         f"FROM {CATALOG}.{SCHEMA_ENG}.campanha_jornada cj "
@@ -327,7 +325,13 @@ async def ativar_campanha(campanha_id: str, user: dict = Depends(require_perfil(
         (campanha_id,)
     )
 
-    # Extrai peca_ids dos grafos
+    if not jornadas:
+        raise HTTPException(
+            status_code=422,
+            detail="Campanha não possui jornadas ativas vinculadas. Vincule ao menos 1 jornada antes de ativar."
+        )
+
+    # Extrai peca_ids dos grafos das jornadas
     peca_ids = set()
     for jor in jornadas:
         try:
@@ -339,14 +343,19 @@ async def ativar_campanha(campanha_id: str, user: dict = Depends(require_perfil(
         except (json.JSONDecodeError, TypeError):
             pass
 
-    pecas_nao_aprovadas = []
-    if peca_ids:
-        placeholders = ', '.join(['?' for _ in peca_ids])
-        pecas_nao_aprovadas = client.fetch_all(
-            f"SELECT peca_id, nome, status_aprovacao FROM {CATALOG}.{SCHEMA_ENG}.peca "
-            f"WHERE peca_id IN ({placeholders}) AND status_aprovacao != 'aprovada'",
-            tuple(peca_ids)
+    if not peca_ids:
+        raise HTTPException(
+            status_code=422,
+            detail="Nenhuma peça encontrada nos grafos das jornadas. Adicione nós de envio antes de ativar."
         )
+
+    # Valida que todas peças referenciadas estão aprovadas
+    placeholders = ', '.join(['?' for _ in peca_ids])
+    pecas_nao_aprovadas = client.fetch_all(
+        f"SELECT peca_id, nome, status_aprovacao FROM {CATALOG}.{SCHEMA_ENG}.peca "
+        f"WHERE peca_id IN ({placeholders}) AND status_aprovacao != 'aprovada'",
+        tuple(peca_ids)
+    )
 
     if pecas_nao_aprovadas:
         nomes = [r[1] for r in pecas_nao_aprovadas]

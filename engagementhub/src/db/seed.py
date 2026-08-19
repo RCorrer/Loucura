@@ -449,7 +449,7 @@ def _seed_jornadas(c):
         ]
     })
     c.execute(
-        "INSERT INTO jornada VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'),?,?,datetime('now'))",
+        "INSERT INTO jornada VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'),?,?,datetime('now'))",
         (JORNADA_1, "JOR-CROSSSELL-001-01", CAMPANHA_1,
          "Jornada Email Platinum", "Régua de email para oferta platinum",
          grafo_1, SEG_ID_1, None, None, None,
@@ -471,7 +471,7 @@ def _seed_jornadas(c):
         ]
     })
     c.execute(
-        "INSERT INTO jornada VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'),?,?,datetime('now'))",
+        "INSERT INTO jornada VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'),?,?,datetime('now'))",
         (JORNADA_2, "JOR-CROSSSELL-001-02", CAMPANHA_1,
          "Jornada A/B Platinum", "Teste A/B de assunto",
          grafo_2, SEG_ID_1, None, None, None,
