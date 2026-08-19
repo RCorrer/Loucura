@@ -76,13 +76,14 @@ SCHEMA_META = "metadata"
 # STEP 1: Carregar definição da segmentação
 # ============================================================
 
-df_definicao = spark.sql(f"""
-  SELECT seg_id, nome, regras_json, versao_atual, status, publico_base_id,
-         vigencia_inicio, vigencia_fim, agendamento_cron
-  FROM {CATALOG}.{SCHEMA_SEG}.seg_definicao
-  WHERE seg_id = '{SEG_ID}'
-    AND habilitado = true
-""")
+df_definicao = spark.sql(
+    f"""SELECT seg_id, nome, regras_json, versao_atual, status, publico_base_id,
+           vigencia_inicio, vigencia_fim, agendamento_cron
+    FROM {CATALOG}.{SCHEMA_SEG}.seg_definicao
+    WHERE seg_id = :seg_id
+      AND habilitado = true""",
+    args={"seg_id": SEG_ID}
+)
 
 if df_definicao.count() == 0:
     dbutils.notebook.exit(json.dumps({
@@ -118,6 +119,10 @@ print(f"✓ Regras carregadas (público base: {regras.get('publico_base')})")
 # ============================================================
 # STEP 2: Montar e executar query SQL a partir das regras
 # ============================================================
+# RF-05: Queries parametrizadas (Spark 3.4+).
+# - Nomes de tabela/coluna (do catálogo confiável) → identifiers (f-string)
+# - VALORES das regras (input do usuário) → named params (:p0, :p1...)
+# ============================================================
 
 # Whitelist de operadores válidos (defesa contra regras corrompidas)
 OPS_VALIDOS = {"=", "!=", ">", "<", ">=", "<=", "in", "not_in",
@@ -130,34 +135,34 @@ catalogo_df = spark.table(f"{CATALOG}.{SCHEMA_META}.catalogo_caracteristicas").f
 _catalogo_rows = catalogo_df.collect()
 catalogo_dict = {row["caracteristica_id"]: row.asDict() for row in _catalogo_rows}
 
+# Contador global de parâmetros (para nomes únicos entre inclusão + exclusão)
+_param_counter = [0]
 
-def sql_val(v):
-    """Formata valor Python para literal SQL com escape seguro."""
-    if isinstance(v, bool):
-        return str(v).lower()  # True → true (Spark syntax)
-    if isinstance(v, str):
-        escaped = v.replace("'", "''")
-        return f"'{escaped}'"
-    if v is None:
-        return "NULL"
-    return str(v)
+def _next_param() -> str:
+    """Gera nome de parâmetro único sequencial: p0, p1, p2..."""
+    name = f"p{_param_counter[0]}"
+    _param_counter[0] += 1
+    return name
 
 
-def build_condition(node: dict) -> str:
+def build_condition(node: dict) -> tuple:
     """
-    Converte um nó de regra (RegraNo) em SQL WHERE condition.
+    Converte nó de regra em (sql_where_string, params_dict).
+    Valores são parametrizados com :pN; identifiers (tabela.coluna) ficam inline.
     Recursivo: suporta grupos aninhados.
-    Usa catalogo_dict (closure) para lookup O(1).
     """
     if not node.get("rules"):
-        return "1=1"
+        return "1=1", {}
 
     conditions = []
+    params = {}
+
     for rule in node["rules"]:
         if "rules" in rule:
             # Grupo aninhado
-            sub = build_condition(rule)
-            conditions.append(f"({sub})")
+            sub_sql, sub_params = build_condition(rule)
+            conditions.append(f"({sub_sql})")
+            params.update(sub_params)
         else:
             # Folha: {campo_id, op, value}
             campo_id = rule["campo_id"]
@@ -175,43 +180,62 @@ def build_condition(node: dict) -> str:
 
             col_fisico = f"{campo_info['tabela_fisica']}.{campo_info['campo_fisico']}"
 
-            # Monta condição SQL
+            # Monta condição SQL com parâmetros nomeados
             if op == "is_null":
                 conditions.append(f"{col_fisico} IS NULL")
             elif op == "is_not_null":
                 conditions.append(f"{col_fisico} IS NOT NULL")
             elif op == "in":
-                vals = ", ".join([sql_val(v) for v in value])
-                conditions.append(f"{col_fisico} IN ({vals})")
+                pnames = []
+                for v in value:
+                    pn = _next_param()
+                    params[pn] = v
+                    pnames.append(f":{pn}")
+                conditions.append(f"{col_fisico} IN ({', '.join(pnames)})")
             elif op == "not_in":
-                vals = ", ".join([sql_val(v) for v in value])
-                conditions.append(f"{col_fisico} NOT IN ({vals})")
+                pnames = []
+                for v in value:
+                    pn = _next_param()
+                    params[pn] = v
+                    pnames.append(f":{pn}")
+                conditions.append(f"{col_fisico} NOT IN ({', '.join(pnames)})")
             elif op == "between":
-                conditions.append(f"{col_fisico} BETWEEN {sql_val(value[0])} AND {sql_val(value[1])}")
+                p_lo, p_hi = _next_param(), _next_param()
+                params[p_lo] = value[0]
+                params[p_hi] = value[1]
+                conditions.append(f"{col_fisico} BETWEEN :{p_lo} AND :{p_hi}")
             elif op == "contains":
-                escaped = str(value).replace("'", "''")
-                conditions.append(f"{col_fisico} LIKE '%{escaped}%'")
+                pn = _next_param()
+                params[pn] = f"%{value}%"
+                conditions.append(f"{col_fisico} LIKE :{pn}")
             elif op == "not_contains":
-                escaped = str(value).replace("'", "''")
-                conditions.append(f"{col_fisico} NOT LIKE '%{escaped}%'")
+                pn = _next_param()
+                params[pn] = f"%{value}%"
+                conditions.append(f"{col_fisico} NOT LIKE :{pn}")
             elif op == "starts_with":
-                escaped = str(value).replace("'", "''")
-                conditions.append(f"{col_fisico} LIKE '{escaped}%'")
+                pn = _next_param()
+                params[pn] = f"{value}%"
+                conditions.append(f"{col_fisico} LIKE :{pn}")
             elif op == "not_starts_with":
-                escaped = str(value).replace("'", "''")
-                conditions.append(f"{col_fisico} NOT LIKE '{escaped}%'")
+                pn = _next_param()
+                params[pn] = f"{value}%"
+                conditions.append(f"{col_fisico} NOT LIKE :{pn}")
             elif op == "ends_with":
-                escaped = str(value).replace("'", "''")
-                conditions.append(f"{col_fisico} LIKE '%{escaped}'")
+                pn = _next_param()
+                params[pn] = f"%{value}"
+                conditions.append(f"{col_fisico} LIKE :{pn}")
             elif op == "not_ends_with":
-                escaped = str(value).replace("'", "''")
-                conditions.append(f"{col_fisico} NOT LIKE '%{escaped}'")
+                pn = _next_param()
+                params[pn] = f"%{value}"
+                conditions.append(f"{col_fisico} NOT LIKE :{pn}")
             else:
                 # Operadores simples: =, !=, >, <, >=, <=
-                conditions.append(f"{col_fisico} {op} {sql_val(value)}")
+                pn = _next_param()
+                params[pn] = value
+                conditions.append(f"{col_fisico} {op} :{pn}")
 
     operator = f" {node.get('operator', 'AND')} "
-    return operator.join(conditions)
+    return operator.join(conditions), params
 
 
 # Identifica tabelas envolvidas nas regras (para JOINs) — usa dict O(1)
@@ -240,20 +264,23 @@ join_key_base = publico_info["join_key"]
 
 print(f"✓ Público base: {publico_info['nome']} → {tabela_base} (key: {join_key_base})")
 
-# Monta WHERE (inclusão)
-inclusao_where = build_condition(regras["inclusao"])
+# Monta WHERE parametrizado (inclusão)
+inclusao_where, inclusao_params = build_condition(regras["inclusao"])
 
-# Monta WHERE (exclusão, se existir)
-exclusao_where = None
+# Monta WHERE parametrizado (exclusão, se existir)
+exclusao_where, exclusao_params = None, {}
 if regras.get("exclusao"):
-    exclusao_where = build_condition(regras["exclusao"])
+    exclusao_where, exclusao_params = build_condition(regras["exclusao"])
+
+# Combina todos os params
+query_params = {**inclusao_params, **exclusao_params}
 
 # Resolve JOINs necessários
 tabelas_inclusao = extrair_tabelas(regras["inclusao"])
 tabelas_exclusao = extrair_tabelas(regras.get("exclusao", {})) if regras.get("exclusao") else set()
 tabelas_todas = tabelas_inclusao | tabelas_exclusao
 
-# Monta JOINs
+# Monta JOINs (identifiers confiáveis do catálogo)
 joins_sql = ""
 for tabela, join_key in tabelas_todas:
     if tabela != tabela_base:
@@ -270,15 +297,17 @@ if exclusao_where:
     query_sql += f"  AND NOT ({exclusao_where})\n"
 
 print(f"\n📋 Query gerada:\n{query_sql}")
+print(f"🔒 Parâmetros ({len(query_params)}): {list(query_params.keys())}")
 
 # COMMAND ----------
 
+# DBTITLE 1,Step 3: Executar query e medir resultado
 # ============================================================
 # STEP 3: Executar query e medir resultado
 # ============================================================
 
 t0 = time.time()
-df_resultado = spark.sql(query_sql)
+df_resultado = spark.sql(query_sql, args=query_params)
 qtd_clientes = df_resultado.count()
 tempo_exec = round(time.time() - t0, 2)
 
@@ -298,32 +327,29 @@ exec_timestamp = datetime.utcnow()
 # 4a. MERGE em seg_resultado_corrente (snapshot atual)
 df_resultado.createOrReplaceTempView("resultado_novo")
 
-spark.sql(f"""
-  MERGE INTO {CATALOG}.{SCHEMA_SEG}.seg_resultado_corrente AS target
-  USING (
-    SELECT '{SEG_ID}' AS seg_id, cpf_cnpj
-    FROM resultado_novo
-  ) AS source
-  ON target.seg_id = source.seg_id AND target.cpf_cnpj = source.cpf_cnpj
-  WHEN NOT MATCHED THEN INSERT (seg_id, cpf_cnpj, exec_id, entrou_em)
-    VALUES (source.seg_id, source.cpf_cnpj, '{exec_id}', current_timestamp())
-  WHEN NOT MATCHED BY SOURCE AND target.seg_id = '{SEG_ID}' THEN DELETE
-""")
+spark.sql(
+    f"""MERGE INTO {CATALOG}.{SCHEMA_SEG}.seg_resultado_corrente AS target
+    USING (
+      SELECT :seg_id AS seg_id, cpf_cnpj
+      FROM resultado_novo
+    ) AS source
+    ON target.seg_id = source.seg_id AND target.cpf_cnpj = source.cpf_cnpj
+    WHEN NOT MATCHED THEN INSERT (seg_id, cpf_cnpj, exec_id, entrou_em)
+      VALUES (source.seg_id, source.cpf_cnpj, :exec_id, current_timestamp())
+    WHEN NOT MATCHED BY SOURCE AND target.seg_id = :seg_id THEN DELETE""",
+    args={"seg_id": SEG_ID, "exec_id": exec_id}
+)
 
 print(f"✓ seg_resultado_corrente atualizado (MERGE)")
 
 # 4b. INSERT em seg_resultado_historico (auditoria)
-# DDL order: exec_id, seg_id, versao_usada, cpf_cnpj, snapshot_em
-spark.sql(f"""
-  INSERT INTO {CATALOG}.{SCHEMA_SEG}.seg_resultado_historico
-  (exec_id, seg_id, versao_usada, cpf_cnpj, snapshot_em)
-  SELECT '{exec_id}',
-         '{SEG_ID}',
-         {seg['versao_atual']},
-         cpf_cnpj,
-         current_timestamp()
-  FROM resultado_novo
-""")
+spark.sql(
+    f"""INSERT INTO {CATALOG}.{SCHEMA_SEG}.seg_resultado_historico
+    (exec_id, seg_id, versao_usada, cpf_cnpj, snapshot_em)
+    SELECT :exec_id, :seg_id, :versao, cpf_cnpj, current_timestamp()
+    FROM resultado_novo""",
+    args={"exec_id": exec_id, "seg_id": SEG_ID, "versao": seg["versao_atual"]}
+)
 
 print(f"✓ seg_resultado_historico inserido ({qtd_clientes} registros)")
 
@@ -347,39 +373,43 @@ try:
 except Exception:
     job_id, run_id, job_run_url = "", "", ""
 
+# Params comuns para UPDATE e INSERT
+_exec_params = {
+    "exec_id": exec_id,
+    "seg_id": SEG_ID,
+    "versao": seg["versao_atual"],
+    "origem": ORIGEM,
+    "qtd": qtd_clientes,
+    "p_job_id": job_id or None,
+    "p_run_id": run_id or None,
+    "p_job_run_url": job_run_url or None,
+}
+
 if IS_PREREGISTERED:
     # UPDATE: registro já existe (criado pelo service antes do disparo)
-    spark.sql(f"""
-      UPDATE {CATALOG}.{SCHEMA_SEG}.seg_execucao
-      SET status = 'sucesso',
-          versao_usada = {seg['versao_atual']},
-          executado_em = current_timestamp(),
-          qtd_clientes = {qtd_clientes},
-          job_id = NULLIF('{job_id}', ''),
-          run_id = NULLIF('{run_id}', ''),
-          job_run_url = NULLIF('{job_run_url}', '')
-      WHERE exec_id = '{exec_id}'
-    """)
+    spark.sql(
+        f"""UPDATE {CATALOG}.{SCHEMA_SEG}.seg_execucao
+        SET status = 'sucesso',
+            versao_usada = :versao,
+            executado_em = current_timestamp(),
+            qtd_clientes = :qtd,
+            job_id = :p_job_id,
+            run_id = :p_run_id,
+            job_run_url = :p_job_run_url
+        WHERE exec_id = :exec_id""",
+        args=_exec_params
+    )
     print(f"✓ Execução atualizada (UPDATE): {exec_id}")
 else:
     # INSERT: execução agendada (sem registro prévio)
-    spark.sql(f"""
-      INSERT INTO {CATALOG}.{SCHEMA_SEG}.seg_execucao
-      (exec_id, seg_id, versao_usada, origem_execucao, executado_em,
-       qtd_clientes, status, job_id, run_id, job_run_url)
-      VALUES (
-        '{exec_id}',
-        '{SEG_ID}',
-        {seg['versao_atual']},
-        '{ORIGEM}',
-        current_timestamp(),
-        {qtd_clientes},
-        'sucesso',
-        NULLIF('{job_id}', ''),
-        NULLIF('{run_id}', ''),
-        NULLIF('{job_run_url}', '')
-      )
-    """)
+    spark.sql(
+        f"""INSERT INTO {CATALOG}.{SCHEMA_SEG}.seg_execucao
+        (exec_id, seg_id, versao_usada, origem_execucao, executado_em,
+         qtd_clientes, status, job_id, run_id, job_run_url)
+        VALUES (:exec_id, :seg_id, :versao, :origem, current_timestamp(),
+                :qtd, 'sucesso', :p_job_id, :p_run_id, :p_job_run_url)""",
+        args=_exec_params
+    )
     print(f"✓ Execução registrada (INSERT): {exec_id}")
 
 # COMMAND ----------
@@ -390,15 +420,13 @@ else:
 # ============================================================
 
 # Busca execução anterior para calcular variação
-df_exec_anterior = spark.sql(f"""
-  SELECT qtd_clientes
-  FROM {CATALOG}.{SCHEMA_SEG}.seg_execucao
-  WHERE seg_id = '{SEG_ID}'
-    AND status = 'sucesso'
-    AND exec_id != '{exec_id}'
-  ORDER BY executado_em DESC
-  LIMIT 1
-""")
+df_exec_anterior = spark.sql(
+    f"""SELECT qtd_clientes
+    FROM {CATALOG}.{SCHEMA_SEG}.seg_execucao
+    WHERE seg_id = :seg_id AND status = 'sucesso' AND exec_id != :exec_id
+    ORDER BY executado_em DESC LIMIT 1""",
+    args={"seg_id": SEG_ID, "exec_id": exec_id}
+)
 
 publico_anterior = None
 if df_exec_anterior.count() > 0:
@@ -409,16 +437,16 @@ if publico_anterior and publico_anterior > 0:
     variacao_pct = round(((qtd_clientes - publico_anterior) / publico_anterior) * 100, 2)
 
 # Taxa de sucesso (últimas 10 execuções)
-df_taxa = spark.sql(f"""
-  SELECT
-    COUNT(CASE WHEN status = 'sucesso' THEN 1 END) * 100.0 / COUNT(*) AS taxa
-  FROM (
-    SELECT status FROM {CATALOG}.{SCHEMA_SEG}.seg_execucao
-    WHERE seg_id = '{SEG_ID}'
-    ORDER BY executado_em DESC
-    LIMIT 10
-  )
-""")
+df_taxa = spark.sql(
+    f"""SELECT
+      COUNT(CASE WHEN status = 'sucesso' THEN 1 END) * 100.0 / COUNT(*) AS taxa
+    FROM (
+      SELECT status FROM {CATALOG}.{SCHEMA_SEG}.seg_execucao
+      WHERE seg_id = :seg_id
+      ORDER BY executado_em DESC LIMIT 10
+    )""",
+    args={"seg_id": SEG_ID}
+)
 taxa_sucesso = round(df_taxa.collect()[0]["taxa"], 1) if df_taxa.count() > 0 else 100.0
 
 # Tempo da execução atual (já medido no Step 3)
@@ -440,26 +468,37 @@ elif alertas:
 else:
     health_status = "verde"
 
-# MERGE em seg_saude
-spark.sql(f"""
-  MERGE INTO {CATALOG}.{SCHEMA_SEG}.seg_saude AS target
-  USING (SELECT '{SEG_ID}' AS seg_id) AS source
-  ON target.seg_id = source.seg_id
-  WHEN MATCHED THEN UPDATE SET
-    health_status = '{health_status}',
-    ultima_verificacao = current_timestamp(),
-    variacao_publico_pct = {variacao_pct},
-    taxa_sucesso_exec = {taxa_sucesso},
-    tempo_medio_exec_seg = CAST({tempo_exec} AS INT),
-    alertas_json = '{json.dumps(alertas)}',
-    publico_atual = {qtd_clientes}
-  WHEN NOT MATCHED THEN INSERT
-    (seg_id, health_status, ultima_verificacao, variacao_publico_pct,
-     taxa_sucesso_exec, tempo_medio_exec_seg, alertas_json, publico_atual)
-  VALUES
-    ('{SEG_ID}', '{health_status}', current_timestamp(), {variacao_pct},
-     {taxa_sucesso}, CAST({tempo_exec} AS INT), '{json.dumps(alertas)}', {qtd_clientes})
-""")
+# MERGE em seg_saude (parametrizado)
+_saude_params = {
+    "seg_id": SEG_ID,
+    "health": health_status,
+    "variacao": variacao_pct,
+    "taxa": taxa_sucesso,
+    "tempo": int(tempo_exec),
+    "alertas": json.dumps(alertas),
+    "publico": qtd_clientes,
+}
+
+spark.sql(
+    f"""MERGE INTO {CATALOG}.{SCHEMA_SEG}.seg_saude AS target
+    USING (SELECT :seg_id AS seg_id) AS source
+    ON target.seg_id = source.seg_id
+    WHEN MATCHED THEN UPDATE SET
+      health_status = :health,
+      ultima_verificacao = current_timestamp(),
+      variacao_publico_pct = :variacao,
+      taxa_sucesso_exec = :taxa,
+      tempo_medio_exec_seg = :tempo,
+      alertas_json = :alertas,
+      publico_atual = :publico
+    WHEN NOT MATCHED THEN INSERT
+      (seg_id, health_status, ultima_verificacao, variacao_publico_pct,
+       taxa_sucesso_exec, tempo_medio_exec_seg, alertas_json, publico_atual)
+    VALUES
+      (:seg_id, :health, current_timestamp(), :variacao,
+       :taxa, :tempo, :alertas, :publico)""",
+    args=_saude_params
+)
 
 print(f"✓ Saúde atualizada: {health_status.upper()} (variação: {variacao_pct:+.1f}%)")
 
