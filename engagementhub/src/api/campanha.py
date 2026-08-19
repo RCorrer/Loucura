@@ -21,7 +21,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from src.db.databricks_client import get_client
 from src.core.security import get_user_or_raise, require_perfil
-from src.core.config import TABLE_CAMPANHA, CATALOG, SCHEMA_ENG
+from src.core.config import TABLE_CAMPANHA, CATALOG, SCHEMA_ENG, SCHEMA_EVENTOS
 from src.models.campanha import (
     CampanhaCreate, CampanhaUpdate, LimiteUpdate,
     CampanhaResponse, CampanhaDetalhe,
@@ -130,8 +130,17 @@ async def listar_campanhas(
 async def detalhe_campanha(campanha_id: str, user: dict = Depends(get_user_or_raise)):
     """Detalhe da campanha + jornadas vinculadas."""
     client = get_client()
+
+    # Colunas explícitas (evita fragilidade de SELECT * + índice posicional)
+    COLS = (
+        "campanha_id, campanha_codigo, nome, descricao, objetivo, tags, "
+        "resumo, objetivo_negocio, observacoes, owner, area_responsavel, "
+        "email_contato, criado_por, criado_em, status, vigencia_inicio, "
+        "vigencia_fim, aprovado_por, aprovado_em, limite_envios, "
+        "alerta_pct_limite, envios_realizados, versao_atual, atualizado_em"
+    )
     row = client.fetch_one(
-        f"SELECT * FROM {TABLE_CAMPANHA} WHERE campanha_id = ?", (campanha_id,)
+        f"SELECT {COLS} FROM {TABLE_CAMPANHA} WHERE campanha_id = ?", (campanha_id,)
     )
     if not row:
         raise HTTPException(status_code=404, detail="Campanha não encontrada")
@@ -145,12 +154,19 @@ async def detalhe_campanha(campanha_id: str, user: dict = Depends(get_user_or_ra
         (campanha_id,)
     )
 
-    # Monta response (row é lista posicional — mapear por índice ou usar dict)
-    # Para simplificar, retorna dict genérico
+    # Parse tags JSON
+    tags_raw = row[5]
+    tags = None
+    if tags_raw:
+        try:
+            tags = json.loads(tags_raw) if isinstance(tags_raw, str) else tags_raw
+        except (json.JSONDecodeError, TypeError):
+            tags = tags_raw
+
     return {
         "data": {
             "campanha_id": row[0], "campanha_codigo": row[1], "nome": row[2],
-            "descricao": row[3], "objetivo": row[4], "tags": row[5],
+            "descricao": row[3], "objetivo": row[4], "tags": tags,
             "resumo": row[6], "objetivo_negocio": row[7], "observacoes": row[8],
             "owner": row[9], "area_responsavel": row[10], "email_contato": row[11],
             "criado_por": row[12], "criado_em": row[13], "status": row[14],
@@ -241,9 +257,11 @@ async def editar_campanha(
         updates.append("versao_atual = ?")
         params.append(nova_versao)
         updates.append("atualizado_em = current_timestamp()")
+        # campanha_id para o WHERE (não precisa de ? para current_timestamp)
         params.append(campanha_id)
+        set_clause = ', '.join(updates)
         client.execute_insert(
-            f"UPDATE {TABLE_CAMPANHA} SET {', '.join(updates)} WHERE campanha_id = ?",
+            f"UPDATE {TABLE_CAMPANHA} SET {set_clause} WHERE campanha_id = ?",
             tuple(params)
         )
 
@@ -298,19 +316,37 @@ async def ativar_campanha(campanha_id: str, user: dict = Depends(require_perfil(
     if not row:
         raise HTTPException(status_code=404, detail="Campanha não encontrada")
 
-    # Valida peças aprovadas (via jornadas vinculadas)
-    pecas_nao_aprovadas = client.fetch_all(
-        f"SELECT p.peca_id, p.nome, p.status_aprovacao "
+    # Valida peças aprovadas
+    # Busca peças referenciadas no grafo das jornadas (não depende de fila_disparo)
+    # Primeiro pega jornadas da campanha, depois busca peças pelo peca_id
+    jornadas = client.fetch_all(
+        f"SELECT j.jornada_id, j.grafo_json "
         f"FROM {CATALOG}.{SCHEMA_ENG}.campanha_jornada cj "
         f"JOIN {CATALOG}.{SCHEMA_ENG}.jornada j ON j.jornada_id = cj.jornada_id "
-        f"JOIN {CATALOG}.{SCHEMA_ENG}.peca p ON p.peca_id IN ("
-        f"  SELECT DISTINCT peca_id FROM {CATALOG}.{SCHEMA_ENG}.fila_disparo "
-        f"  WHERE jornada_id = j.jornada_id"
-        f") "
-        f"WHERE cj.campanha_id = ? AND cj.ativo = true "
-        f"AND p.status_aprovacao != 'aprovada'",
+        f"WHERE cj.campanha_id = ? AND cj.ativo = true",
         (campanha_id,)
     )
+
+    # Extrai peca_ids dos grafos
+    peca_ids = set()
+    for jor in jornadas:
+        try:
+            grafo = json.loads(jor[1]) if jor[1] else {}
+            for node in grafo.get("nodes", []):
+                pid = node.get("data", {}).get("peca_id")
+                if pid:
+                    peca_ids.add(pid)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    pecas_nao_aprovadas = []
+    if peca_ids:
+        placeholders = ', '.join(['?' for _ in peca_ids])
+        pecas_nao_aprovadas = client.fetch_all(
+            f"SELECT peca_id, nome, status_aprovacao FROM {CATALOG}.{SCHEMA_ENG}.peca "
+            f"WHERE peca_id IN ({placeholders}) AND status_aprovacao != 'aprovada'",
+            tuple(peca_ids)
+        )
 
     if pecas_nao_aprovadas:
         nomes = [r[1] for r in pecas_nao_aprovadas]
@@ -385,7 +421,7 @@ def _emitir_evento(client, campanha_id: str, tipo_evento: str, usuario: str):
     evento_id = f"evt_{uuid.uuid4().hex[:12]}"
     try:
         client.execute_insert(
-            f"INSERT INTO {CATALOG}.eventos.disparo_eventos "
+            f"INSERT INTO {CATALOG}.{SCHEMA_EVENTOS}.disparo_eventos "
             f"(evento_id, tipo_evento, entidade_tipo, entidade_id, "
             f"payload_json, emitido_por, emitido_em, processado) "
             f"VALUES (?, ?, 'campanha', ?, ?, ?, current_timestamp(), false)",
