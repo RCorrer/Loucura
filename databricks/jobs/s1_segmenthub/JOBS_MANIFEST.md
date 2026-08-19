@@ -508,7 +508,7 @@ df_resultado.write.format("delta").mode("append").saveAsTable("seg_resultado_his
 
 ---
 
-### RF-06: .collect() no consolidador com 1000+ segmentações
+### RF-06: .collect() no consolidador com 1000+ segmentações — ✅ IMPLEMENTADO
 
 **Problema:**
 
@@ -592,7 +592,7 @@ spark.sql(f"... alertas_json = '{alertas_safe}' ...")
 | ✅ Feito | RF-04 | Travadas sem seg_saude | 30min | ~~Delay de até 6h na detecção~~ |
 | ✅ Feito | RF-07 | alertas_json escape | 10min | ~~Crash se alerta tiver aspas~~ |
 | ✅ Feito | RF-05 | f-string SQL | 4-8h | ~~Baixo (inputs controlados hoje)~~ |
-| 🟢 Baixa | RF-06 | collect() escalabilidade | 2h | OK até 5K segs |
+| ✅ Feito | RF-06 | collect() escalabilidade | 2h | ~~OK até 5K segs~~ |
 
 ---
 
@@ -600,6 +600,7 @@ spark.sql(f"... alertas_json = '{alertas_safe}' ...")
 
 | Data | Versão | Descrição |
 |---|---|---|
+| 2026-08-19 | 2.5 | RF-06 implementado: detecção de atrasos 100% Spark SQL (zero collect loop) |
 | 2026-08-19 | 2.4 | RF-05 implementado: todas queries parametrizadas (Spark 3.4+ args={}) |
 | 2026-08-19 | 2.3 | RF-03 + RF-04 + RF-07 implementados: MERGE bulk, travadas imediatas, escape seguro |
 | 2026-08-19 | 2.2 | RF-01 + RF-02 implementados: exec_id unificado + execução fantasma resolvida |
