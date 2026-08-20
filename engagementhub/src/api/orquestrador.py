@@ -85,9 +85,9 @@ async def listar_supressoes(
             FROM {TABLE_SUPRESSAO}
             WHERE motivo = ?
             ORDER BY data_execucao DESC
-            LIMIT ?
+            LIMIT {int(limit)}
             """,
-            (motivo, limit),
+            (motivo,),
         )
     else:
         rows = client.fetch_all(
@@ -95,9 +95,8 @@ async def listar_supressoes(
             SELECT supressao_id, cpf_cnpj, campanha_id, canal, motivo, detalhe, data_execucao
             FROM {TABLE_SUPRESSAO}
             ORDER BY data_execucao DESC
-            LIMIT ?
-            """,
-            (limit,),
+            LIMIT {int(limit)}
+            """
         )
 
     return {

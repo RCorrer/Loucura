@@ -89,7 +89,7 @@ async def dashboard_operacional(
 
     # Alertas não lidos
     alertas_pendentes = client.fetch_one(
-        f"SELECT COUNT(*) FROM {TABLE_NOTIFICACAO} WHERE lida = 0"
+        f"SELECT COUNT(*) FROM {TABLE_NOTIFICACAO} WHERE lida = false"
     )
 
     # Taxas de funil

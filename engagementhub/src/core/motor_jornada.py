@@ -176,7 +176,7 @@ def carregar_politica_global(client=None) -> dict[str, Any]:
     """Carrega política global de jornada (se existir)."""
     client = client or get_client()
     row = client.fetch_one(
-        f"SELECT loop_max_iteracoes_teto, loop_max_dias_teto FROM {TABLE_POLITICA_JORNADA} WHERE escopo = 'global' AND ativo = 1"
+        f"SELECT loop_max_iteracoes_teto, loop_max_dias_teto FROM {TABLE_POLITICA_JORNADA} WHERE escopo = 'global' AND ativo = true"
     )
     if not row:
         return {"loop_max_iteracoes_teto": 50, "loop_max_dias_teto": 90}

@@ -21,7 +21,7 @@ O S3 expoe **5 contratos** para sistemas downstream:
 
 ## 2. Contrato: `segmento_campanha_map`
 
-**Propósito:** Permite que S2 saiba quais campanhas digitais estão rodando para cada segmento, evitando conflitos de abordagem.
+**Propósito:** Permite que S2 saiba quais campanhas digitais estão vinculadas a cada segmento.
 
 | Coluna | Tipo | Descrição |
 |---|---|---|
@@ -29,15 +29,13 @@ O S3 expoe **5 contratos** para sistemas downstream:
 | campanha_id | STRING | ID da campanha |
 | campanha_codigo | STRING | Código legível (CAM-2025-...) |
 | campanha_nome | STRING | Nome de exibição |
-| campanha_status | STRING | ativa \| pausada |
+| campanha_objetivo | STRING | Objetivo de negócio |
+| campanha_status | STRING | rascunho/ativa/pausada/encerrada |
 | jornada_id | STRING | ID da jornada vinculada |
+| jornada_codigo | STRING | Código hierárquico (JOR-2025-...) |
 | jornada_nome | STRING | Nome da jornada |
-| jornada_status | STRING | ativa \| pausada |
-| canal | STRING | Canal principal (email/whatsapp) |
-| vigencia_inicio | STRING | ISO 8601 início vigência |
-| vigencia_fim | STRING | ISO 8601 fim vigência (NULL = sem fim) |
 
-**JOINs source:** `campanha_jornada` → `campanha` + `jornada`
+**JOINs source:** `jornada.campanha_id` → `campanha` (FK direta)
 
 ---
 

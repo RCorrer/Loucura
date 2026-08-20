@@ -154,7 +154,11 @@ def carregar_canais_jornada(jornada_id: str, client=None) -> set[str]:
 
 
 def cliente_tem_consentimento(cpf_cnpj: str, canal: str, client=None) -> bool:
-    """Retorna True se o cliente NÃO possui opt-out ativo para o canal."""
+    """Retorna True se o cliente NÃO possui opt-out para o canal.
+
+    DDL governanca.consentimento: cpf_cnpj, canal, status (opt_in/opt_out),
+    base_legal, origem, atualizado_em.
+    """
     client = client or get_client()
     row = client.fetch_one(
         f"""
@@ -162,13 +166,11 @@ def cliente_tem_consentimento(cpf_cnpj: str, canal: str, client=None) -> bool:
         FROM {TABLE_CONSENTIMENTO}
         WHERE cpf_cnpj = ?
           AND canal = ?
-          AND ativo = true
-          AND COALESCE(opt_out, false) = true
-        LIMIT 1
+          AND status = 'opt_out'
         """,
         (cpf_cnpj, canal),
     )
-    # Se encontrou registro de opt_out ativo, não tem consentimento
+    # Se encontrou registro de opt_out, não tem consentimento
     return row is None
 
 
