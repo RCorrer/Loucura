@@ -293,8 +293,46 @@ def _create_tables(c):
 
     -- View variaveis_disponiveis (mock local do contrato S1/metadata)
     CREATE TABLE IF NOT EXISTS variaveis_disponiveis (
-        campo_id TEXT, campo_label TEXT, tipo_dado TEXT, descricao TEXT
+        campo_id TEXT, campo_label TEXT, tipo_dado TEXT, descricao TEXT,
+        tabela_origem TEXT, coluna_origem TEXT
     );
+
+    -- Contratos de saída (BACK-13): views simuladas como tabelas no SQLite
+    CREATE VIEW IF NOT EXISTS segmento_campanha_map AS
+    SELECT
+        j.seg_entrada_id AS seg_id,
+        cj.campanha_id,
+        c.campanha_codigo,
+        c.nome AS campanha_nome,
+        c.status AS campanha_status,
+        j.jornada_id,
+        j.nome AS jornada_nome,
+        j.status AS jornada_status,
+        j.canal_principal AS canal,
+        c.vigencia_inicio,
+        c.vigencia_fim
+    FROM campanha_jornada cj
+    INNER JOIN campanha c ON c.campanha_id = cj.campanha_id
+    INNER JOIN jornada j ON j.jornada_id = cj.jornada_id
+    WHERE c.status IN ('ativa', 'pausada')
+      AND j.seg_entrada_id IS NOT NULL;
+
+    CREATE VIEW IF NOT EXISTS cliente_jornada_status AS
+    SELECT
+        ec.cpf_cnpj,
+        ec.jornada_id,
+        j.nome AS jornada_nome,
+        ec.no_atual_id,
+        ec.status AS status_participacao,
+        ec.entrou_em,
+        ec.atualizado_em,
+        jp.concluiu_em,
+        jp.resultado
+    FROM jornada_estado_cliente ec
+    INNER JOIN jornada j ON j.jornada_id = ec.jornada_id
+    LEFT JOIN jornada_participacao jp
+        ON jp.jornada_id = ec.jornada_id AND jp.cpf_cnpj = ec.cpf_cnpj
+    WHERE ec.status IN ('ativo', 'pausado', 'concluido');
     """)
 
 
