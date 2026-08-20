@@ -18,9 +18,17 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, Request, HTTPException, Query
+from fastapi.responses import PlainTextResponse
 
 from src.core.config import TABLE_TRACKING, TABLE_DISPARO_EVENTOS
 from src.db.databricks_client import get_client
+
+# Ordem do funil — só avançar, nunca regredir
+_FUNIL_ORDEM = {
+    "pendente": 0, "processando": 1, "enviado": 2,
+    "entregue": 3, "aberto": 4, "clicou": 5, "converteu": 6,
+    "falha": -1,
+}
 
 logger = logging.getLogger(__name__)
 

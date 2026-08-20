@@ -12,7 +12,6 @@ import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Response
-from fastapi.responses import Response as FastAPIResponse
 
 from src.core.config import TABLE_TRACKING, TABLE_DISPARO_EVENTOS
 from src.db.databricks_client import get_client

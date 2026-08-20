@@ -76,10 +76,14 @@ def _emitir_evento(
         f"SELECT cpf_cnpj, campanha_id, jornada_id, canal FROM {TABLE_TRACKING} WHERE envio_id = ?",
         (envio_id,),
     )
-    cpf_cnpj = row[0] if row else None
-    campanha_id = row[1] if row else None
-    jornada_id = row[2] if row else None
-    canal = row[3] if row else None
+    if not row:
+        # envio_id não existe no tracking — não criar evento órfão
+        return
+
+    cpf_cnpj = row[0]
+    campanha_id = row[1]
+    jornada_id = row[2]
+    canal = row[3]
 
     metadata_json = json.dumps(metadata) if metadata else None
 
