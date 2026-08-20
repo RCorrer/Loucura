@@ -3,7 +3,7 @@
 import json
 import logging
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 
 from src.db.databricks_client import get_client
 from src.core.security import get_user_or_raise, require_perfil

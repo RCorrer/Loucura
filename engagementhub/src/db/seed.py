@@ -269,6 +269,21 @@ def _create_tables(c):
         evento_id TEXT, tipo_evento TEXT, entidade_tipo TEXT, entidade_id TEXT,
         payload_json TEXT, emitido_por TEXT, emitido_em TEXT, processado INTEGER DEFAULT 0
     );
+
+    -- Jornada: versões + testes (usados pelo BACK-05)
+    CREATE TABLE IF NOT EXISTS jornada_versao (
+        jornada_id TEXT, versao INTEGER, grafo_json TEXT,
+        alterado_por TEXT, alterado_em TEXT, motivo TEXT
+    );
+    CREATE TABLE IF NOT EXISTS jornada_teste (
+        teste_id TEXT, jornada_id TEXT, tipo TEXT, lista_teste TEXT,
+        resultado_json TEXT, executado_por TEXT, executado_em TEXT
+    );
+
+    -- View variaveis_disponiveis (mock local do contrato S1/metadata)
+    CREATE TABLE IF NOT EXISTS variaveis_disponiveis (
+        campo_id TEXT, campo_label TEXT, tipo_dado TEXT, descricao TEXT
+    );
     """)
 
 
@@ -325,6 +340,24 @@ def _seed_contratos_s1(c):
             (SEG_ID_2, "11111111111", "exec_002"),
             (SEG_ID_2, "33333333333", "exec_002"),
             (SEG_ID_2, "55555555555", "exec_002"),
+        ]
+    )
+    # Variáveis disponíveis para personalização (mock do contrato S1/metadata)
+    c.executemany(
+        "INSERT INTO variaveis_disponiveis VALUES (?, ?, ?, ?)",
+        [
+            ("nome", "Nome completo", "string", "Nome completo do cliente"),
+            ("primeiro_nome", "Primeiro nome", "string", "Primeiro nome do cliente"),
+            ("email", "Email", "string", "Email principal do cliente"),
+            ("telefone", "Telefone", "string", "Telefone celular com DDD"),
+            ("limite_aprovado", "Limite aprovado", "currency", "Limite de crédito aprovado"),
+            ("produto", "Produto", "string", "Nome do produto ofertado"),
+            ("agencia", "Agência", "string", "Código da agência"),
+            ("conta", "Conta", "string", "Número da conta"),
+            ("data_vencimento", "Data vencimento", "date", "Data de vencimento da fatura"),
+            ("valor_fatura", "Valor fatura", "currency", "Valor da última fatura"),
+            ("link_ativacao", "Link ativação", "url", "Link de ativação do produto"),
+            ("codigo", "Código", "string", "Código de verificação/ativação"),
         ]
     )
 
