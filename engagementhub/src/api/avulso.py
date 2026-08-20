@@ -32,6 +32,7 @@ from src.core.config import (
     TABLE_SUPRESSAO,
     TABLE_CAPPING,
 )
+from src.core.orquestrador import validar_segmento_ativo
 from src.core.security import require_perfil
 from src.db.databricks_client import get_client
 
@@ -248,6 +249,17 @@ async def executar_dav(
     )
 
     try:
+        # 0. Validar segmento ativo em S1 e publicado para S3
+        if not validar_segmento_ativo(dav["seg_id"], client):
+            client.execute_insert(
+                f"UPDATE {TABLE_DISPARO_AVULSO} SET status = 'aprovado' WHERE disparo_id = ?",
+                (disparo_id,),
+            )
+            raise HTTPException(
+                status_code=409,
+                detail=f"Segmento {dav['seg_id']} não está ativo em S1 ou não publicado para S3",
+            )
+
         # 1. Carregar membros do segmento
         membros = client.fetch_all(
             f"SELECT cpf_cnpj FROM {TABLE_SEG_RESULTADO} WHERE seg_id = ?",
