@@ -33,6 +33,10 @@ TABLE_CANAIS = f"{CATALOG}.{SCHEMA_ENG}.catalogo_canais"
 TABLE_ESTADO_CLIENTE = f"{CATALOG}.{SCHEMA_ENG}.jornada_estado_cliente"
 TABLE_SAUDE_OP = f"{CATALOG}.{SCHEMA_ENG}.saude_operacional"
 TABLE_NOTIFICACAO = f"{CATALOG}.{SCHEMA_ENG}.notificacao"
+TABLE_CAMPANHA_JORNADA = f"{CATALOG}.{SCHEMA_ENG}.campanha_jornada"
+TABLE_JORNADA_PARTICIPACAO = f"{CATALOG}.{SCHEMA_ENG}.jornada_participacao"
+TABLE_CONFIG_JANELA = f"{CATALOG}.{SCHEMA_ENG}.config_janela_envio"
+TABLE_EXECUCAO_ORQUESTRADOR = f"{CATALOG}.{SCHEMA_ENG}.execucao_orquestrador"
 
 # App
 APP_NAME = "EngagementHub"

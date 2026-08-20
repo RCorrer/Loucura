@@ -43,6 +43,7 @@ from src.api.campanha import router as campanha_router
 from src.api.peca import router as peca_router
 from src.api.canal import router as canal_router
 from src.api.jornada import router as jornada_router
+from src.api.orquestrador import router as orquestrador_router
 # from src.api.disparo import router as disparo_router
 # from src.api.avulso import router as avulso_router
 # from src.api.operacao import router as operacao_router
@@ -52,6 +53,7 @@ app.include_router(campanha_router, prefix="/api/campanhas", tags=["Campanhas"])
 app.include_router(peca_router, prefix="/api/pecas", tags=["Peças"])
 app.include_router(canal_router, prefix="/api/canais", tags=["Canais"])
 app.include_router(jornada_router, prefix="/api/jornadas", tags=["Jornadas"])
+app.include_router(orquestrador_router, prefix="/api/admin/orquestrador", tags=["Orquestrador"])
 # app.include_router(disparo_router, prefix="/api/disparo", tags=["Disparo"])
 # app.include_router(avulso_router, prefix="/api/avulso", tags=["Avulso"])
 # app.include_router(operacao_router, prefix="/api/operacao", tags=["Operação"])
