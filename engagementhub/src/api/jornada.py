@@ -285,11 +285,16 @@ async def ativar_jornada(jornada_id: str, user: dict = Depends(require_perfil(["
 
     # Guard: só ativa a partir de APROVADA
     if status_atual != StatusJornada.APROVADA.value:
-        permitidos = TRANSICOES_JORNADA.get(StatusJornada(status_atual), [])
+        try:
+            estado_enum = StatusJornada(status_atual)
+            permitidos = TRANSICOES_JORNADA.get(estado_enum, [])
+            msg_permitidos = [e.value for e in permitidos]
+        except ValueError:
+            msg_permitidos = ["(status inválido no BD)"]
         raise HTTPException(
             status_code=422,
             detail=f"Não é possível ativar no status '{status_atual}'. "
-                   f"Transições permitidas: {[e.value for e in permitidos]}"
+                   f"Transições permitidas: {msg_permitidos}"
         )
 
     # Busca peças existentes

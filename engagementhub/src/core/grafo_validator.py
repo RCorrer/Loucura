@@ -190,11 +190,11 @@ def validar_grafo(grafo_json: Optional[str], peca_ids_existentes: Optional[Set[s
     ciclos = _detectar_ciclos(node_ids, adjacencia)
     if ciclos:
         for ciclo in ciclos:
-            # Verifica se algum nó do ciclo tem max_iteracoes
+            # Verifica se algum nó do ciclo tem max_iteracoes definido
             tem_limite = False
             for nid in ciclo:
                 data = node_data.get(nid, {})
-                if data.get("max_iteracoes"):
+                if "max_iteracoes" in data and data["max_iteracoes"] is not None:
                     tem_limite = True
                     break
             if not tem_limite:
@@ -240,13 +240,16 @@ def validar_grafo(grafo_json: Optional[str], peca_ids_existentes: Optional[Set[s
 
         elif tipo == "ab_split":
             variantes = data.get("variantes", [])
-            if isinstance(variantes, list) and len(variantes) < 2:
+            if not isinstance(variantes, list):
+                result.erro(f"Nó '{nid}' (ab_split): 'variantes' deve ser uma lista, recebido: {type(variantes).__name__}")
+            elif len(variantes) < 2:
                 result.erro(f"Nó '{nid}' (ab_split): 'variantes' deve ter pelo menos 2 itens")
-            out_count = len(adjacencia.get(nid, []))
-            if isinstance(variantes, list) and out_count < len(variantes):
-                result.aviso(
-                    f"Nó '{nid}' (ab_split): {len(variantes)} variantes mas só {out_count} arestas de saída"
-                )
+            else:
+                out_count = len(adjacencia.get(nid, []))
+                if out_count < len(variantes):
+                    result.aviso(
+                        f"Nó '{nid}' (ab_split): {len(variantes)} variantes mas só {out_count} arestas de saída"
+                    )
 
     # --- 8. Validação cruzada de peças (se fornecido) ---
     if peca_ids_existentes is not None and peca_ids_referenciados:
