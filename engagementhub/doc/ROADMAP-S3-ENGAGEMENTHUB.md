@@ -1,7 +1,7 @@
 # ROADMAP-S3-ENGAGEMENTHUB.md
 
 > **29 cartões** (13 BACK + 7 JOBS + 9 FRONT) | Plataforma CDP Bradesco
-> Status: **4/29 completos (14%)** — BACK-01 ✅ BACK-02 ✅ BACK-03 ✅ BACK-04 ✅ | DDL auditado ✅
+> Status: **5/29 completos (17%)** — BACK-01 ✅ BACK-02 ✅ BACK-03 ✅ BACK-04 ✅ BACK-05 ✅ | DDL auditado ✅
 
 ---
 
@@ -24,7 +24,7 @@ BACK (13):
 [x] S3-BACK-02  Campanha (CRUD + ciclo de vida + guards)           ← Commits #27-28
 [x] S3-BACK-03  Peças (CRUD + aprovação + variáveis + preview)    ← Commits #31-32
 [x] S3-BACK-04  Canais + Providers (Email + WhatsApp reais)        ← Commitado
-[ ] S3-BACK-05  Jornada (CRUD + grafo + validações + preview)
+[x] S3-BACK-05  Jornada (CRUD + grafo + validações + preview)     ← Commits #36-41
 [ ] S3-BACK-06  Orquestrador (Waterfall + Capping + Consentimento)
 [ ] S3-BACK-07  Motor de Jornada (lógica core)
 [ ] S3-BACK-08  Motor de Disparo + Fila + Render Engine
@@ -209,35 +209,47 @@ Ver seção completa no roadmap original (shell, campanha, peça email/whatsapp,
 | #30 | DDL audit | 5 gaps corrigidos: volume, barramento, grants, cluster by, schema |
 | #31 | BACK-03 | Peças: 10 endpoints + render_engine Jinja2 + aprovação multi-etapa |
 | #32 | BACK-03 fix | Rota /variaveis movida (conflito), guard empty update, SafeUndefined |
+| #33 | BACK-04 | Canais: 6 endpoints + providers Email SMTP + WhatsApp Meta Cloud API |
+| #34 | docs | Roadmap: BACK-04 marcado completo |
+| #35 | pre-05 audit | seed: +3 tabelas (jornada_versao, jornada_teste, variaveis_disponiveis) |
+| #36 | BACK-05-A | Jornada CRUD: 4 endpoints (listar, detalhe, criar+vincular, editar+versionar) |
+| #37 | BACK-05-A fix | Versão sempre snapshot grafo vigente (fallback row[2]) |
+| #38 | BACK-05-B | grafo_validator.py: 8 etapas + /validar + /ativar |
+| #39 | BACK-05-B fix | max_iteracoes=0 falsy, variantes string, StatusJornada try/except |
+| #40 | BACK-05-C | Preview engine + /aprovar + /pausar + /encerrar |
+| #41 | BACK-05-C fix | KeyError node sem id, loop counter (max_iter_global) |
 
 ### Arquivos implementados
 
 ```
 engagementhub/
   src/
-    main.py                     ← 3 routers ativos (campanhas, peças, canais*)
+    main.py                     ← 4 routers ativos (campanhas, peças, canais, jornadas)
     core/
       config.py                 ← Todas as TABLE_* definidas
       security.py               ← OBO + RBAC (sistema=engagement)
       render_engine.py          ← Jinja2: extrair_variaveis + render_preview
+      grafo_validator.py        ← Validação completa de grafo (8 etapas, BFS, DFS)
     db/
       databricks_client.py      ← Abstraction layer (Databricks SQL / SQLite)
       fake_client.py            ← SQLite para ENV=local
-      seed.py                   ← 37 tabelas, dados cruzados
+      seed.py                   ← 40 tabelas, dados cruzados
     api/
       campanha.py               ← 9 endpoints (CRUD + ciclo completo)
       peca.py                   ← 10 endpoints (CRUD + aprovação + preview)
-      canal.py*                 ← Em andamento (BACK-04)
+      canal.py                  ← 6 endpoints (CRUD + health check + providers)
+      jornada.py                ← 10 endpoints (CRUD + grafo + preview + ciclo)
     models/
       campanha.py               ← StatusCampanha, TRANSICOES_VALIDAS, schemas
       peca.py                   ← StatusAprovacao, CanalPeca, 6 schemas
-      canal.py*                 ← Em andamento
+      canal.py                  ← CanalCreate, CanalUpdate, CanalResponse
+      jornada.py                ← StatusJornada, TipoNo, TRANSICOES_JORNADA
     providers/
       __init__.py               ← Exports
       base.py                   ← ChannelProvider ABC (6 methods + 2 props)
-      email_provider.py*        ← Em andamento (SMTP)
-      whatsapp_provider.py*     ← Em andamento (Meta Cloud API)
-      registry.py*              ← Em andamento (factory)
+      email_provider.py         ← SMTP TLS (Bradesco relay)
+      whatsapp_provider.py      ← Meta Cloud API (templates HSM)
+      registry.py               ← Factory singleton + register_provider
   app.yaml
   requirements.txt              ← fastapi, pydantic, jinja2, httpx
 
@@ -255,7 +267,7 @@ databricks/ddl/s3_engagement/
   10_contratos_saida.sql        ← 2 views + 3 GRANTs
 ```
 
-* BACK-04 commitado: providers/, api/canal.py, models/canal.py
+**Total endpoints implementados: 35** (campanha 9 + peça 10 + canal 6 + jornada 10)
 
 ---
 

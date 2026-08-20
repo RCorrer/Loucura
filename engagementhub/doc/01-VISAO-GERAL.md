@@ -265,4 +265,43 @@ engagementhub/
 
 ---
 
+## 12. Status de Implementação (Agosto/2026)
+
+| Módulo | Status | Endpoints | Detalhe |
+|---|---|---|---|
+| BACK-01 Fundação | ✅ | — | main.py, security, config, fake_client, seed (40 tabelas) |
+| BACK-02 Campanha | ✅ | 9 | CRUD + ciclo (7 estados) + versionamento + guards |
+| BACK-03 Peças | ✅ | 10 | CRUD + aprovação multi-etapa + render Jinja2 + variáveis |
+| BACK-04 Canais | ✅ | 6 | CRUD + health check + providers Email/WhatsApp |
+| BACK-05 Jornada | ✅ | 10 | CRUD + grafo_validator (8 etapas) + preview engine + ciclo |
+| BACK-06 a 13 | ⏳ | — | Próximo: Orquestrador (Waterfall + Capping) |
+| JOBS (7) | ⏳ | — | Aguarda BACK-06+ |
+| FRONT (9) | ⏳ | — | Aguarda BACK completo |
+
+**Total: 35 endpoints implementados** | 5/29 cards completos (17%)
+
+### Endpoints por Módulo
+
+```
+/api/campanhas (9):
+  GET, GET/{id}, POST, PUT/{id}
+  POST /{id}/aprovar, /ativar, /pausar, /encerrar
+  PUT /{id}/limite
+
+/api/pecas (10):
+  GET /variaveis, GET, GET/{id}, POST, PUT/{id}
+  POST /{id}/submeter, /aprovar, /reprovar, /preview
+  POST /assets (placeholder)
+
+/api/canais (6):
+  GET /providers, GET, GET/{id}, POST, PUT/{id}
+  POST /{id}/health
+
+/api/jornadas (10):
+  GET, GET/{id}, POST, PUT/{id}
+  POST /{id}/validar, /preview, /aprovar, /ativar, /pausar, /encerrar
+```
+
+---
+
 *Documentação gerada a partir dos DDLs e roadmap validados em Agosto/2026.*
