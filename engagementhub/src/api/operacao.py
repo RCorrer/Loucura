@@ -125,14 +125,20 @@ async def dashboard_operacional(
 async def saude_sistema(
     user: dict = Depends(require_perfil(["admin"])),
 ):
-    """Status de saúde dos componentes do sistema."""
+    """Status de saúde dos componentes do sistema (latest per escopo)."""
     client = get_client()
 
+    # Buscar apenas a última verificação por escopo (evita histórico poluindo status)
     rows = client.fetch_all(
         f"""
-        SELECT metrica_id, escopo, valor, status, detalhe, ultima_verificacao
-        FROM {TABLE_SAUDE_OP}
-        ORDER BY ultima_verificacao DESC
+        SELECT s.metrica_id, s.escopo, s.valor, s.status, s.detalhe, s.ultima_verificacao
+        FROM {TABLE_SAUDE_OP} s
+        INNER JOIN (
+            SELECT escopo, MAX(ultima_verificacao) as max_verif
+            FROM {TABLE_SAUDE_OP}
+            GROUP BY escopo
+        ) latest ON s.escopo = latest.escopo AND s.ultima_verificacao = latest.max_verif
+        ORDER BY s.escopo
         """
     )
 
