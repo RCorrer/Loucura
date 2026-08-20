@@ -231,6 +231,11 @@ def _create_tables(c):
         status_atual TEXT, erro_detalhe TEXT,
         provider_message_id TEXT, atualizado_em TEXT
     );
+    CREATE TABLE IF NOT EXISTS disparo_eventos (
+        evento_id TEXT PRIMARY KEY, envio_id TEXT, tipo_evento TEXT,
+        canal TEXT, cpf_cnpj TEXT, campanha_id TEXT, jornada_id TEXT,
+        ocorrido_em TEXT, metadata_json TEXT, criado_em TEXT
+    );
 
     -- Otimização
     CREATE TABLE IF NOT EXISTS config_otimizacao (

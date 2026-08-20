@@ -41,6 +41,7 @@ TABLE_JORNADA_LOG = f"{CATALOG}.{SCHEMA_ENG}.jornada_log"
 TABLE_POLITICA_JORNADA = f"{CATALOG}.{SCHEMA_ENG}.config_jornada_politica"
 TABLE_DISPARO_TENTATIVA = f"{CATALOG}.{SCHEMA_ENG}.disparo_tentativa"
 TABLE_CONFIG_RETRY = f"{CATALOG}.{SCHEMA_ENG}.config_retry"
+TABLE_DISPARO_EVENTOS = f"{CATALOG}.{SCHEMA_ENG}.disparo_eventos"
 
 # App
 APP_NAME = "EngagementHub"
