@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from src.db.databricks_client import get_client
 from src.core.security import get_user_or_raise, require_perfil
 from src.core.config import TABLE_JORNADA, TABLE_CAMPANHA, CATALOG, SCHEMA_ENG
+from src.core.grafo_validator import validar_grafo
 from src.models.jornada import (
     JornadaCreate, JornadaUpdate, StatusJornada, TRANSICOES_JORNADA,
 )
@@ -235,3 +236,101 @@ async def editar_jornada(
     )
 
     return {"data": {"jornada_id": jornada_id, "versao": nova_versao}}
+
+
+# --- POST /api/jornadas/{id}/validar ---
+@router.post("/{jornada_id}/validar")
+async def validar_jornada(jornada_id: str, user: dict = Depends(get_user_or_raise)):
+    """Valida o grafo da jornada: estrutura, conectividade, peças, loops."""
+    client = get_client()
+    row = client.fetch_one(
+        f"SELECT grafo_json FROM {TABLE_JORNADA} WHERE jornada_id = ?",
+        (jornada_id,)
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Jornada não encontrada")
+
+    grafo_json = row[0]
+
+    # Busca peças existentes para validação cruzada
+    pecas_rows = client.fetch_all(
+        f"SELECT peca_id FROM {CATALOG}.{SCHEMA_ENG}.peca"
+    )
+    peca_ids_existentes = {r[0] for r in pecas_rows} if pecas_rows else set()
+
+    resultado = validar_grafo(grafo_json, peca_ids_existentes)
+
+    return {"data": {
+        "valido": resultado.valido,
+        "erros": resultado.erros,
+        "avisos": resultado.avisos,
+        "stats": resultado.stats,
+    }}
+
+
+# --- POST /api/jornadas/{id}/ativar ---
+@router.post("/{jornada_id}/ativar")
+async def ativar_jornada(jornada_id: str, user: dict = Depends(require_perfil(["admin"]))):
+    """Transita jornada para ATIVA. Exige: status=aprovada + grafo válido + peças aprovadas."""
+    client = get_client()
+    row = client.fetch_one(
+        f"SELECT status, grafo_json FROM {TABLE_JORNADA} WHERE jornada_id = ?",
+        (jornada_id,)
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Jornada não encontrada")
+
+    status_atual = row[0]
+    grafo_json = row[1]
+
+    # Guard: só ativa a partir de APROVADA
+    if status_atual != StatusJornada.APROVADA.value:
+        permitidos = TRANSICOES_JORNADA.get(StatusJornada(status_atual), [])
+        raise HTTPException(
+            status_code=422,
+            detail=f"Não é possível ativar no status '{status_atual}'. "
+                   f"Transições permitidas: {[e.value for e in permitidos]}"
+        )
+
+    # Busca peças existentes
+    pecas_rows = client.fetch_all(
+        f"SELECT peca_id FROM {CATALOG}.{SCHEMA_ENG}.peca"
+    )
+    peca_ids_existentes = {r[0] for r in pecas_rows} if pecas_rows else set()
+
+    # Validação do grafo
+    resultado = validar_grafo(grafo_json, peca_ids_existentes)
+    if not resultado.valido:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": "Grafo possui erros que impedem a ativação",
+                "erros": resultado.erros,
+            }
+        )
+
+    # Valida que peças referenciadas estão APROVADAS
+    pecas_ref = set(resultado.stats.get("pecas_referenciadas", []))
+    if pecas_ref:
+        placeholders = ', '.join(['?' for _ in pecas_ref])
+        pecas_nao_aprovadas = client.fetch_all(
+            f"SELECT peca_id, nome, status_aprovacao FROM {CATALOG}.{SCHEMA_ENG}.peca "
+            f"WHERE peca_id IN ({placeholders}) AND status_aprovacao != 'aprovada'",
+            tuple(pecas_ref)
+        )
+        if pecas_nao_aprovadas:
+            nomes = [f"{r[1]} ({r[2]})" for r in pecas_nao_aprovadas]
+            raise HTTPException(
+                status_code=422,
+                detail=f"Peças não aprovadas: {nomes}. Todas devem estar aprovadas para ativar."
+            )
+
+    # Transita estado
+    client.execute_insert(
+        f"UPDATE {TABLE_JORNADA} SET status = ?, atualizado_em = current_timestamp() "
+        f"WHERE jornada_id = ?",
+        (StatusJornada.ATIVA.value, jornada_id)
+    )
+
+    logger.info(f"✓ Jornada ativada: {jornada_id}")
+    return {"data": {"status": "ativa", "avisos": resultado.avisos}}
