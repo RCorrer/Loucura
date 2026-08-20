@@ -1,7 +1,7 @@
 # ROADMAP-S3-ENGAGEMENTHUB.md
 
 > **29 cartões** (13 BACK + 7 JOBS + 9 FRONT) | Plataforma CDP Bradesco
-> Status: **3/29 completos (10%)** — BACK-01 ✅ BACK-02 ✅ BACK-03 ✅ | DDL auditado ✅
+> Status: **4/29 completos (14%)** — BACK-01 ✅ BACK-02 ✅ BACK-03 ✅ BACK-04 ✅ | DDL auditado ✅
 
 ---
 
@@ -23,7 +23,7 @@ BACK (13):
 [x] S3-BACK-01  Fundação (db + security + main)                    ← Commit #26
 [x] S3-BACK-02  Campanha (CRUD + ciclo de vida + guards)           ← Commits #27-28
 [x] S3-BACK-03  Peças (CRUD + aprovação + variáveis + preview)    ← Commits #31-32
-[ ] S3-BACK-04  Canais + Providers (Email + WhatsApp reais)        ← Parcial (scaffolds prontos)
+[x] S3-BACK-04  Canais + Providers (Email + WhatsApp reais)        ← Commitado
 [ ] S3-BACK-05  Jornada (CRUD + grafo + validações + preview)
 [ ] S3-BACK-06  Orquestrador (Waterfall + Capping + Consentimento)
 [ ] S3-BACK-07  Motor de Jornada (lógica core)
@@ -255,7 +255,7 @@ databricks/ddl/s3_engagement/
   10_contratos_saida.sql        ← 2 views + 3 GRANTs
 ```
 
-* = não commitados ainda (BACK-04 em andamento, interrompido)
+* BACK-04 commitado: providers/, api/canal.py, models/canal.py
 
 ---
 
