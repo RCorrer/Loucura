@@ -195,7 +195,7 @@ async def editar_jornada(
     """Edita jornada e cria nova versão (só rascunho)."""
     client = get_client()
     row = client.fetch_one(
-        f"SELECT status, versao_atual FROM {TABLE_JORNADA} WHERE jornada_id = ?",
+        f"SELECT status, versao_atual, grafo_json FROM {TABLE_JORNADA} WHERE jornada_id = ?",
         (jornada_id,)
     )
     if not row:
@@ -208,6 +208,7 @@ async def editar_jornada(
         raise HTTPException(status_code=422, detail="Nenhum campo para atualizar")
 
     nova_versao = row[1] + 1
+    grafo_atual = row[2]  # grafo vigente (fallback se não editou grafo)
     updates, params = [], []
 
     for campo, valor in dados.items():
@@ -224,8 +225,8 @@ async def editar_jornada(
         tuple(params)
     )
 
-    # Nova versão (snapshot do grafo)
-    grafo_snap = dados.get("grafo_json", None)
+    # Nova versão (sempre snapshot do grafo vigente, mesmo se não editado)
+    grafo_snap = dados.get("grafo_json", grafo_atual)
     client.execute_insert(
         f"INSERT INTO {CATALOG}.{SCHEMA_ENG}.jornada_versao "
         f"(jornada_id, versao, grafo_json, alterado_por, alterado_em, motivo) "
