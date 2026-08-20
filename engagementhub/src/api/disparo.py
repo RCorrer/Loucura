@@ -35,8 +35,8 @@ async def listar_fila(
         params.append(canal)
 
     where = " AND ".join(filtros)
-    params.append(limit)
 
+    # LIMIT via f-string: Databricks SQL não suporta LIMIT com parâmetro bind
     rows = client.fetch_all(
         f"""
         SELECT fila_id, cpf_cnpj, campanha_id, jornada_id, peca_id, canal,
@@ -45,7 +45,7 @@ async def listar_fila(
         FROM {TABLE_FILA}
         WHERE {where}
         ORDER BY agendado_para DESC
-        LIMIT ?
+        LIMIT {int(limit)}
         """,
         tuple(params),
     )
