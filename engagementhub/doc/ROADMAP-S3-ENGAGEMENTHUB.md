@@ -1,7 +1,7 @@
 # ROADMAP-S3-ENGAGEMENTHUB.md
 
 > **29 cartões** (13 BACK + 7 JOBS + 9 FRONT) | Plataforma CDP Bradesco
-> Status: **5/29 completos (17%)** — BACK-01 ✅ BACK-02 ✅ BACK-03 ✅ BACK-04 ✅ BACK-05 ✅ | DDL auditado ✅
+> Status: **7/29 completos (24%)** — BACK-01 ✅ BACK-02 ✅ BACK-03 ✅ BACK-04 ✅ BACK-05 ✅ BACK-06 ✅ BACK-07 ✅ | DDL auditado ✅
 
 ---
 

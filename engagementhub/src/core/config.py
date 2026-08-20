@@ -37,6 +37,8 @@ TABLE_CAMPANHA_JORNADA = f"{CATALOG}.{SCHEMA_ENG}.campanha_jornada"
 TABLE_JORNADA_PARTICIPACAO = f"{CATALOG}.{SCHEMA_ENG}.jornada_participacao"
 TABLE_CONFIG_JANELA = f"{CATALOG}.{SCHEMA_ENG}.config_janela_envio"
 TABLE_EXECUCAO_ORQUESTRADOR = f"{CATALOG}.{SCHEMA_ENG}.execucao_orquestrador"
+TABLE_JORNADA_LOG = f"{CATALOG}.{SCHEMA_ENG}.jornada_log"
+TABLE_POLITICA_JORNADA = f"{CATALOG}.{SCHEMA_ENG}.config_jornada_politica"
 
 # App
 APP_NAME = "EngagementHub"

@@ -280,6 +280,12 @@ def _create_tables(c):
         resultado_json TEXT, executado_por TEXT, executado_em TEXT
     );
 
+    -- Golden Record (S0 core_cliente — consumido)
+    CREATE TABLE IF NOT EXISTS golden_record (
+        cpf_cnpj TEXT PRIMARY KEY, nome TEXT, primeiro_nome TEXT,
+        email TEXT, telefone TEXT, agencia TEXT, conta TEXT
+    );
+
     -- View variaveis_disponiveis (mock local do contrato S1/metadata)
     CREATE TABLE IF NOT EXISTS variaveis_disponiveis (
         campo_id TEXT, campo_label TEXT, tipo_dado TEXT, descricao TEXT
