@@ -384,7 +384,7 @@ def _simular_percurso(grafo: dict, decisoes: dict, variaveis: dict) -> dict:
     Returns:
         dict com: caminho, nos_visitados, decisoes_tomadas, tempo_estimado_dias, alertas
     """
-    nodes = {n["id"]: n for n in grafo.get("nodes", [])}
+    nodes = {n["id"]: n for n in grafo.get("nodes", []) if isinstance(n, dict) and "id" in n}
     edges = grafo.get("edges", [])
 
     # Monta adjacência com labels das arestas
@@ -405,20 +405,27 @@ def _simular_percurso(grafo: dict, decisoes: dict, variaveis: dict) -> dict:
     if not entrada_id:
         return {"erro": "Nenhum nó de entrada encontrado", "caminho": []}
 
+    # Calcula limite de iterações permitido (baseado em max_iteracoes global)
+    max_iter_global = 0
+    for nd in nodes.values():
+        mi = nd.get("data", {}).get("max_iteracoes")
+        if mi is not None and isinstance(mi, (int, float)) and int(mi) > max_iter_global:
+            max_iter_global = int(mi)
+
     # Percorre
     caminho = []
     decisoes_tomadas = []
     tempo_total_dias = 0
     alertas = []
-    visitados = set()
+    visitas = {}  # node_id -> count (permite loops controlados)
     atual = entrada_id
     max_passos = 50  # guard contra loops infinitos
 
     for _ in range(max_passos):
-        if atual in visitados and atual not in [n for n, nd in nodes.items() if nd.get("data", {}).get("max_iteracoes")]:
-            alertas.append(f"Loop detectado em '{atual}' — simulação interrompida")
+        visitas[atual] = visitas.get(atual, 0) + 1
+        if visitas[atual] > max_iter_global + 1:
+            alertas.append(f"Loop detectado em '{atual}' — simulação interrompida após {visitas[atual] - 1} iterações")
             break
-        visitados.add(atual)
 
         node = nodes.get(atual)
         if not node:
