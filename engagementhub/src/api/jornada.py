@@ -11,7 +11,7 @@ import uuid
 import json
 import logging
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
 from src.db.databricks_client import get_client
 from src.core.security import get_user_or_raise, require_perfil
@@ -339,3 +339,269 @@ async def ativar_jornada(jornada_id: str, user: dict = Depends(require_perfil(["
 
     logger.info(f"✓ Jornada ativada: {jornada_id}")
     return {"data": {"status": "ativa", "avisos": resultado.avisos}}
+
+
+# --- POST /api/jornadas/{id}/preview ---
+@router.post("/{jornada_id}/preview")
+async def preview_jornada(jornada_id: str, payload: dict = Body(default={}), user: dict = Depends(get_user_or_raise)):
+    """Simula percurso no grafo sem enviar (dry-run).
+
+    Payload opcional: {"variaveis": {...}, "decisoes": {"<node_id>": true/false}}
+    - variaveis: override de variáveis para renderização
+    - decisoes: força resultado de nós condição (true/false path)
+    """
+    client = get_client()
+    row = client.fetch_one(
+        f"SELECT grafo_json FROM {TABLE_JORNADA} WHERE jornada_id = ?",
+        (jornada_id,)
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Jornada não encontrada")
+
+    grafo_json = row[0]
+    if not grafo_json:
+        raise HTTPException(status_code=422, detail="Jornada não possui grafo definido")
+
+    try:
+        grafo = json.loads(grafo_json)
+    except (json.JSONDecodeError, TypeError):
+        raise HTTPException(status_code=422, detail="grafo_json inválido")
+
+    # Parâmetros de simulação
+    body = payload or {}
+    decisoes_override = body.get("decisoes", {})
+    variaveis = body.get("variaveis", {})
+
+    # Simula percurso
+    resultado = _simular_percurso(grafo, decisoes_override, variaveis)
+
+    return {"data": resultado}
+
+
+def _simular_percurso(grafo: dict, decisoes: dict, variaveis: dict) -> dict:
+    """Percorre o grafo a partir da entrada, simulando execução.
+
+    Returns:
+        dict com: caminho, nos_visitados, decisoes_tomadas, tempo_estimado_dias, alertas
+    """
+    nodes = {n["id"]: n for n in grafo.get("nodes", [])}
+    edges = grafo.get("edges", [])
+
+    # Monta adjacência com labels das arestas
+    adjacencia = {}  # node_id -> [(target, edge_data)]
+    for edge in edges:
+        src = edge.get("source")
+        tgt = edge.get("target")
+        if src and tgt:
+            adjacencia.setdefault(src, []).append((tgt, edge.get("data", {})))
+
+    # Encontra nó entrada
+    entrada_id = None
+    for nid, node in nodes.items():
+        if node.get("type") == "entrada":
+            entrada_id = nid
+            break
+
+    if not entrada_id:
+        return {"erro": "Nenhum nó de entrada encontrado", "caminho": []}
+
+    # Percorre
+    caminho = []
+    decisoes_tomadas = []
+    tempo_total_dias = 0
+    alertas = []
+    visitados = set()
+    atual = entrada_id
+    max_passos = 50  # guard contra loops infinitos
+
+    for _ in range(max_passos):
+        if atual in visitados and atual not in [n for n, nd in nodes.items() if nd.get("data", {}).get("max_iteracoes")]:
+            alertas.append(f"Loop detectado em '{atual}' — simulação interrompida")
+            break
+        visitados.add(atual)
+
+        node = nodes.get(atual)
+        if not node:
+            alertas.append(f"Nó '{atual}' não encontrado no grafo")
+            break
+
+        tipo = node.get("type", "")
+        data = node.get("data", {})
+
+        passo = {"node_id": atual, "tipo": tipo, "acao": None}
+
+        if tipo == "entrada":
+            passo["acao"] = "Segmento de entrada carregado"
+
+        elif tipo == "enviar_peca":
+            peca_id = data.get("peca_id", "?")
+            passo["acao"] = f"Enviaria peça '{peca_id}'"
+            passo["peca_id"] = peca_id
+
+        elif tipo == "esperar":
+            dias = data.get("dias", 0)
+            horas = data.get("horas", 0)
+            tempo_total_dias += dias + (horas / 24)
+            if data.get("ate_evento"):
+                passo["acao"] = f"Aguardaria evento '{data['ate_evento']}'"
+            else:
+                passo["acao"] = f"Aguardaria {dias}d {horas}h"
+
+        elif tipo == "condicao":
+            campo = data.get("campo", "?")
+            op = data.get("op", "?")
+            valor = data.get("valor", "?")
+            # Decide com base no override ou default True
+            decisao = decisoes.get(atual, True)
+            passo["acao"] = f"Condição: {campo} {op} {valor} → {'SIM' if decisao else 'NÃO'}"
+            passo["decisao"] = decisao
+            decisoes_tomadas.append({"node_id": atual, "resultado": decisao})
+
+        elif tipo == "ab_split":
+            variantes = data.get("variantes", [])
+            escolhida = variantes[0] if variantes else "A"
+            passo["acao"] = f"A/B Split → variante '{escolhida}'"
+            passo["variante"] = escolhida
+
+        elif tipo == "acao":
+            tipo_acao = data.get("tipo_acao", "?")
+            passo["acao"] = f"Executaria ação '{tipo_acao}'"
+
+        elif tipo == "saida":
+            passo["acao"] = "Cliente sai da jornada"
+            caminho.append(passo)
+            break
+
+        caminho.append(passo)
+
+        # Próximo nó
+        vizinhos = adjacencia.get(atual, [])
+        if not vizinhos:
+            alertas.append(f"Nó '{atual}' não tem arestas de saída (dead-end)")
+            break
+
+        # Escolhe próximo baseado no tipo
+        if tipo == "condicao" and len(vizinhos) >= 2:
+            # Primeira aresta = true path, segunda = false path
+            decisao = decisoes.get(atual, True)
+            atual = vizinhos[0][0] if decisao else vizinhos[1][0]
+        elif tipo == "ab_split" and len(vizinhos) >= 1:
+            # Sempre segue primeira variante na simulação
+            atual = vizinhos[0][0]
+        else:
+            atual = vizinhos[0][0]
+    else:
+        alertas.append(f"Simulação atingiu limite de {max_passos} passos")
+
+    return {
+        "caminho": caminho,
+        "total_passos": len(caminho),
+        "tempo_estimado_dias": round(tempo_total_dias, 1),
+        "decisoes_tomadas": decisoes_tomadas,
+        "alertas": alertas,
+    }
+
+
+# --- POST /api/jornadas/{id}/aprovar ---
+@router.post("/{jornada_id}/aprovar")
+async def aprovar_jornada(jornada_id: str, user: dict = Depends(require_perfil(["admin"]))):
+    """Transita jornada para APROVADA. Exige: status=rascunho + grafo válido."""
+    client = get_client()
+    row = client.fetch_one(
+        f"SELECT status, grafo_json FROM {TABLE_JORNADA} WHERE jornada_id = ?",
+        (jornada_id,)
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Jornada não encontrada")
+
+    status_atual = row[0]
+    grafo_json = row[1]
+
+    # Guard: só aprova de RASCUNHO
+    if status_atual != StatusJornada.RASCUNHO.value:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Só é possível aprovar no status 'rascunho'. Atual: '{status_atual}'"
+        )
+
+    # Valida grafo antes de aprovar
+    pecas_rows = client.fetch_all(
+        f"SELECT peca_id FROM {CATALOG}.{SCHEMA_ENG}.peca"
+    )
+    peca_ids_existentes = {r[0] for r in pecas_rows} if pecas_rows else set()
+
+    resultado = validar_grafo(grafo_json, peca_ids_existentes)
+    if not resultado.valido:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": "Grafo possui erros que impedem a aprovação",
+                "erros": resultado.erros,
+            }
+        )
+
+    # Transita
+    client.execute_insert(
+        f"UPDATE {TABLE_JORNADA} SET status = ?, aprovado_por = ?, "
+        f"aprovado_em = current_timestamp(), atualizado_em = current_timestamp() "
+        f"WHERE jornada_id = ?",
+        (StatusJornada.APROVADA.value, user["usuario_id"], jornada_id)
+    )
+
+    logger.info(f"✓ Jornada aprovada: {jornada_id}")
+    return {"data": {"status": "aprovada", "avisos": resultado.avisos}}
+
+
+# --- POST /api/jornadas/{id}/pausar ---
+@router.post("/{jornada_id}/pausar")
+async def pausar_jornada(jornada_id: str, user: dict = Depends(get_user_or_raise)):
+    """Transita jornada para PAUSADA (só de ATIVA)."""
+    client = get_client()
+    row = client.fetch_one(
+        f"SELECT status FROM {TABLE_JORNADA} WHERE jornada_id = ?",
+        (jornada_id,)
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Jornada não encontrada")
+
+    if row[0] != StatusJornada.ATIVA.value:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Só é possível pausar no status 'ativa'. Atual: '{row[0]}'"
+        )
+
+    client.execute_insert(
+        f"UPDATE {TABLE_JORNADA} SET status = ?, atualizado_em = current_timestamp() "
+        f"WHERE jornada_id = ?",
+        (StatusJornada.PAUSADA.value, jornada_id)
+    )
+
+    return {"data": {"status": "pausada"}}
+
+
+# --- POST /api/jornadas/{id}/encerrar ---
+@router.post("/{jornada_id}/encerrar")
+async def encerrar_jornada(jornada_id: str, user: dict = Depends(get_user_or_raise)):
+    """Transita jornada para ENCERRADA (de ATIVA ou PAUSADA)."""
+    client = get_client()
+    row = client.fetch_one(
+        f"SELECT status FROM {TABLE_JORNADA} WHERE jornada_id = ?",
+        (jornada_id,)
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Jornada não encontrada")
+
+    status_atual = row[0]
+    if status_atual not in (StatusJornada.ATIVA.value, StatusJornada.PAUSADA.value):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Só é possível encerrar nos status 'ativa' ou 'pausada'. Atual: '{status_atual}'"
+        )
+
+    client.execute_insert(
+        f"UPDATE {TABLE_JORNADA} SET status = ?, atualizado_em = current_timestamp() "
+        f"WHERE jornada_id = ?",
+        (StatusJornada.ENCERRADA.value, jornada_id)
+    )
+
+    return {"data": {"status": "encerrada"}}
