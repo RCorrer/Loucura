@@ -257,11 +257,24 @@ engagementhub/
 
 ## 11. Índice da Documentação
 
+### S3 — Técnico (fonte de verdade para implementação)
+
 | # | Documento | Conteúdo |
 |---|---|---|
 | 01 | **Este arquivo** | Visão geral, arquitetura, stack |
 | 02 | [Schemas e Tabelas](02-SCHEMAS-TABELAS.md) | DDLs completas, colunas, relacionamentos |
-| 03 | [Roadmap](ROADMAP-S3-ENGAGEMENTHUB.md) | 29 cartões (13 BACK + 7 JOBS + 9 FRONT) |
+| 03 | [Contratos de Saída](03-CONTRATOS-SAIDA.md) | Views DDL-aligned, GRANTs para S2 |
+| 04 | [Integração S1↔S3](04-INTEGRACAO-S1-S3.md) | Fluxo MERGE, validações, cenários de borda |
+| 05 | [ADR: Resultado Segmento](05-ADR-RESULTADO-SEGMENTO.md) | Decisão tabela única vs table-per-segment |
+| 06 | [Arquitetura Backend](06-ARQUITETURA-BACKEND.md) | Camadas, core modules, patterns |
+| 07 | [API Endpoints](07-API-ENDPOINTS.md) | 70 endpoints completos, request/response |
+| 08 | [Ciclo de Vida e Estados](08-CICLO-VIDA-ESTADOS.md) | State machines (campanha, jornada, peça, DAV) |
+
+### S3 — Gestão
+
+| # | Documento | Conteúdo |
+|---|---|---|
+| — | [Roadmap](ROADMAP-S3-ENGAGEMENTHUB.md) | 29 cartões (13 BACK + 7 JOBS + 9 FRONT) |
 
 ---
 
@@ -269,16 +282,23 @@ engagementhub/
 
 | Módulo | Status | Endpoints | Detalhe |
 |---|---|---|---|
-| BACK-01 Fundação | ✅ | — | main.py, security, config, fake_client, seed (40 tabelas) |
+| BACK-01 Fundação | ✅ | — | main.py, security, config, fake_client, seed (33 tabelas + 3 views) |
 | BACK-02 Campanha | ✅ | 9 | CRUD + ciclo (7 estados) + versionamento + guards |
 | BACK-03 Peças | ✅ | 10 | CRUD + aprovação multi-etapa + render Jinja2 + variáveis |
 | BACK-04 Canais | ✅ | 6 | CRUD + health check + providers Email/WhatsApp |
 | BACK-05 Jornada | ✅ | 10 | CRUD + grafo_validator (8 etapas) + preview engine + ciclo |
-| BACK-06 a 13 | ⏳ | — | Próximo: Orquestrador (Waterfall + Capping) |
-| JOBS (7) | ⏳ | — | Aguarda BACK-06+ |
-| FRONT (9) | ⏳ | — | Aguarda BACK completo |
+| BACK-06 Orquestrador | ✅ | 4 | Waterfall + capping + consentimento + elegibilidade (6 etapas) |
+| BACK-07 Motor Jornada | ✅ | — | Percorre grafo (7 tipos de nó), move estados, expire timeouts |
+| BACK-08 Motor Disparo | ✅ | 4 | Consome fila, renderiza, despacha providers, retry |
+| BACK-09 Tracking | ✅ | 6 | Pixel open, redirect click, webhooks (Meta/email), funil |
+| BACK-10 Avulso (DAV) | ✅ | 6 | CRUD + aprovação + execução com governança completa |
+| BACK-11 Admin/MAB | ✅ | 7 | Thompson Sampling, configurações, converge/fixar vencedora |
+| BACK-12 Operação | ✅ | 8 | Saúde operacional, notificações, alertas, pausar automático |
+| BACK-13 Contratos | ✅ | — | 3 views DDL-aligned + GRANTs para S2 |
+| **JOBS (7)** | ⏳ | — | Próximo: notebooks em `/databricks/jobs/s3_engagement/` |
+| **FRONT (9)** | ⏳ | — | Aguarda JOBS completo |
 
-**Total: 35 endpoints implementados** | 5/29 cards completos (17%)
+**Total: 70 endpoints implementados** | **13/29 cards completos (45%) — BACKEND COMPLETO**
 
 ### Endpoints por Módulo
 
@@ -291,7 +311,7 @@ engagementhub/
 /api/pecas (10):
   GET /variaveis, GET, GET/{id}, POST, PUT/{id}
   POST /{id}/submeter, /aprovar, /reprovar, /preview
-  POST /assets (placeholder)
+  POST /assets
 
 /api/canais (6):
   GET /providers, GET, GET/{id}, POST, PUT/{id}
@@ -300,6 +320,34 @@ engagementhub/
 /api/jornadas (10):
   GET, GET/{id}, POST, PUT/{id}
   POST /{id}/validar, /preview, /aprovar, /ativar, /pausar, /encerrar
+
+/api/orquestrador (4):
+  POST /executar, GET /status, GET /historico, POST /simular
+
+/api/disparos (4):
+  GET /fila, GET /fila/{id}, POST /reprocessar, GET /metricas
+
+/track (6):
+  GET /open/{envio_id}.gif, GET /click/{envio_id}
+  POST /webhook/email, /webhook/whatsapp
+  POST /conversao, GET /funil/{campanha_id}
+
+/api/avulso (6):
+  POST, GET, GET/{id}
+  POST /{id}/aprovar, /{id}/executar
+  DELETE /{id}
+
+/api/admin (7):
+  GET /config/otimizacao, PUT /config/otimizacao
+  POST /mab/recalcular, POST /mab/fixar
+  GET /mab/historico
+  PUT /config/capping, PUT /config/janela
+
+/api/operacao (8):
+  GET /saude, POST /verificar, GET /notificacoes
+  PUT /notificacoes/{id}/lida, POST /alertas
+  GET /metricas, POST /pausar-automatico
+  GET /dashboard
 ```
 
 ---
