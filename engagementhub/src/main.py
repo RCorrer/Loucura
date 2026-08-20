@@ -46,7 +46,7 @@ from src.api.jornada import router as jornada_router
 from src.api.orquestrador import router as orquestrador_router
 from src.api.disparo import router as disparo_router
 from src.api.avulso import router as avulso_router
-# from src.api.operacao import router as operacao_router
+from src.api.operacao import router as operacao_router
 from src.api.admin import router as admin_router
 #
 app.include_router(campanha_router, prefix="/api/campanhas", tags=["Campanhas"])
