@@ -103,7 +103,7 @@ O **EngagementHub** é o motor de campanhas digitais da Plataforma CDP. Permite 
 | **Compute** | SQL Warehouse Serverless | Queries parametrizadas |
 | **Jobs** | Databricks Jobs | 7 jobs (orquestrador, motores, MAB, saúde) |
 | **Providers** | SMTP + Meta Cloud API | Email real + WhatsApp (templates HSM) |
-| **Otimização** | Thompson Sampling | numpy/scipy (Beta distribution) |
+| **Otimização** | Thompson Sampling | stdlib random.betavariate (Beta distribution) |
 | **Autenticação** | Service Principal + RBAC | `governanca.usuarios_perfil` (sistema=engagement) |
 
 ---

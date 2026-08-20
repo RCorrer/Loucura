@@ -177,6 +177,7 @@ def calcular_pesos_thompson(
 
         dados.append({
             "variante_id": v["variante_id"],
+            "jornada_id": v["jornada_id"],
             "peso_anterior": v["peso_atual"],
             "envios": envios,
             "sucessos": sucessos,

@@ -23,8 +23,6 @@ from typing import Optional
 from src.core.config import (
     TABLE_CONFIG_OTIMIZACAO,
     TABLE_OTIMIZACAO_HISTORICO,
-    TABLE_OTIMIZACAO_RESULTADO,
-    TABLE_OTIMIZACAO_VARIANTE,
 )
 from src.core.mab import (
     carregar_config_otimizacao,
