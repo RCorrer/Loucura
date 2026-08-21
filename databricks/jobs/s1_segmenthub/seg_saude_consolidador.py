@@ -105,11 +105,12 @@ print(f"✓ {df_problematicas.count()} segmentações com problemas detectadas")
 # não sobre TODAS as ativas (milhares). Escalabilidade garantida.
 # ============================================================
 
-# 2a. Detectar execuções travadas (>2h em 'rodando' ou 'em_execucao')
+# 2a. Detectar execuções travadas (>2h em 'em_execucao')
+# Nota: backend insere 'em_execucao' (não 'rodando'). Status 'rodando' removido.
 df_travadas = spark.sql(f"""
   SELECT seg_id, exec_id
   FROM {CATALOG}.{SCHEMA_SEG}.seg_execucao
-  WHERE status IN ('rodando', 'em_execucao')
+  WHERE status = 'em_execucao'
     AND executado_em < current_timestamp() - INTERVAL 2 HOURS
 """)
 
@@ -227,30 +228,30 @@ print(f"✓ seg_saude atualizada para {len(saude_updates)} segmentações (1 MER
 
 # DBTITLE 1,Step 5: Gerar notificações para owners
 # ============================================================
-# STEP 5: Gerar notificações para owners
+# STEP 5: Gerar notificações para owners (parametrizado — RF-05)
 # ============================================================
 
-for alerta in alertas_gerados:
-    titulo = f"⚠️ Saúde crítica: {alerta['nome']}".replace("'", "''")
-    mensagem = f"Problemas detectados: {'; '.join(alerta['problemas'])}".replace("'", "''")
-    import uuid as _uuid
-    notif_id = f"notif_saude_{_uuid.uuid4().hex[:12]}"
-    owner_safe = alerta['owner'].replace("'", "''") if alerta.get('owner') else 'system'
+import uuid as _uuid
 
-    spark.sql(f"""
-      INSERT INTO {CATALOG}.{SCHEMA_SEG}.seg_notificacao
-      (notif_id, destinatario, tipo, seg_id, titulo, mensagem, lida, criado_em)
-      VALUES (
-        '{notif_id}',
-        '{owner_safe}',
-        'alerta_saude',
-        '{alerta['seg_id']}',
-        '{titulo}',
-        '{mensagem}',
-        false,
-        current_timestamp()
-      )
-    """)
+for alerta in alertas_gerados:
+    notif_id = f"notif_saude_{_uuid.uuid4().hex[:12]}"
+    titulo = f"⚠️ Saúde crítica: {alerta['nome']}"
+    mensagem = f"Problemas detectados: {'; '.join(alerta['problemas'])}"
+    destinatario = alerta.get('owner') or 'system'
+
+    spark.sql(
+        f"""INSERT INTO {CATALOG}.{SCHEMA_SEG}.seg_notificacao
+        (notif_id, destinatario, tipo, seg_id, titulo, mensagem, lida, criado_em)
+        VALUES (:notif_id, :destinatario, 'alerta_saude', :seg_id,
+                :titulo, :mensagem, false, current_timestamp())""",
+        args={
+            "notif_id": notif_id,
+            "destinatario": destinatario,
+            "seg_id": alerta["seg_id"],
+            "titulo": titulo,
+            "mensagem": mensagem,
+        }
+    )
 
 print(f"✓ {len(alertas_gerados)} notificações geradas")
 

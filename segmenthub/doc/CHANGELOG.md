@@ -120,3 +120,27 @@
 12. **`segmentacao_service.py` — prints restantes**  
     ~30 `print()` nos métodos `criar()` e `clonar()` não foram removidos no fix #8 original.  
     Todos convertidos para `logger.debug/info/warning/error` com `exc_info=True` nos excepts.
+
+---
+
+## [2026-08-21] Validação DDL ↔ Jobs (notebooks)
+
+### Escopo
+Validados os 2 notebooks de job S1 (`seg_exec`, `seg_saude_consolidador`) contra os DDLs.
+
+### seg_exec.py — ✅ ZERO inconsistências
+6 operações SQL (SELECT, MERGE, INSERT, UPDATE) em 7 tabelas:
+`seg_definicao`, `catalogo_caracteristicas`, `catalogo_publicos`, `seg_resultado_corrente`,
+`seg_resultado_historico`, `seg_execucao`, `seg_saude`. Todas as colunas batem com DDL.
+
+### seg_saude_consolidador.py — 2 fixes
+
+13. **Step 2: status `'rodando'` inexistente no filtro**  
+    `WHERE status IN ('rodando', 'em_execucao')` — backend nunca insere `rodando` (DDL define apenas `em_execucao`).  
+    Corrigido para `WHERE status = 'em_execucao'`.  
+    *Impacto:* Condição morta (nunca matchava), mas confusa e inconsistente com DDL.
+
+14. **Step 5: INSERT notificação com f-string (SQL Injection risk)**  
+    Usava interpolação direta de `titulo`, `mensagem`, `owner` (com `.replace("'", "''")`).  
+    Convertido para `spark.sql(..., args={...})` (parametrização nativa Spark 3.4+).  
+    *Impacto:* Eliminava risco de SQL injection se nome/owner contivessem chars especiais.
