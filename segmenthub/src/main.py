@@ -99,6 +99,7 @@ app.include_router(comentario.comentario_router, prefix="/api")
 app.include_router(comentario.notificacao_router, prefix="/api")
 app.include_router(saude.router, prefix="/api")
 app.include_router(metadata_admin.router, prefix="/api")
+app.include_router(chat.router, prefix="/api")
 
 # ============================================================
 # Static files + SPA fallback

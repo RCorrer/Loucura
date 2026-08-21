@@ -238,3 +238,58 @@ Problema:
 
 - `retorno_atendimento` e `disparo_eventos` não são seed (runtime S2/S3) — DDL cria vazias
 - Segmentações seed estão status=ativa mas sem `job_id_databricks` (design: ativar via API para criar job)
+
+---
+
+## [2026-08-21] Validação Integração Frontend ↔ Backend
+
+### Issue Crítico: chat.router não registrado em main.py
+
+**Fix #4 original estava incompleto**: importou `chat` mas nunca fez `app.include_router(chat.router, prefix="/api")`.
+Resultado: `POST /api/chat/mensagem` retornava 404 — página Chat quebrada.
+
+### Fix #18: Registrar chat.router
+
+- Adicionado `app.include_router(chat.router, prefix="/api")` em main.py
+- Corrigido path em `frontend/src/api/chat.js` de `/api/chat` para `/api/chat/mensagem` (dead code, mas consistente)
+
+### Validação Completa (sem outros issues)
+
+**Endpoints mapeados:** 48 (7 routers + main.py)
+**Chamadas frontend mapeadas:** 49 funções em 7 hooks + 2 shared hooks
+
+| Área | Front | Back | Status |
+|------|-------|------|--------|
+| CRUD segmentação (criar/listar/buscar/atualizar/deletar) | segmentacoes.js | segmentacao.py | ✅ |
+| Ciclo vida (aprovar/ativar/pausar/reativar/encerrar) | segmentacoes.js | segmentacao.py | ✅ |
+| Execução manual | segmentacoes.js | segmentacao.py | ✅ |
+| Clone | segmentacoes.js | segmentacao.py | ✅ |
+| Destinos + Vigência | segmentacoes.js | segmentacao.py | ✅ |
+| Validação + Enviar aprovação | segmentacoes.js | segmentacao.py | ✅ |
+| Versões + Execuções + Estados + Timeline | segmentacoes.js | segmentacao.py | ✅ |
+| Comentários (listar/criar/editar) | segmentacoes.js | comentario.py | ✅ |
+| Notificações (listar/marcar lida) | notificacoes.js + useNotifications | comentario.py | ✅ |
+| Metadata (temas/campos/publicos/em-uso) | metadata.js | metadata.py | ✅ |
+| Metadata Admin (campos/flags/status/hist) | metadataAdmin.js | metadata_admin.py | ✅ |
+| Estimativa preview | estimativa.js | estimativa.py | ✅ |
+| Saúde (dashboard/detalhe) | saude.js | saude.py | ✅ |
+| Chat (mensagem) | useChat hook | chat.py | ✅ (fix #18) |
+
+### Contratos DTO validados
+
+- `SegmentacaoCreateDTO` ↔ Builder payload: 15 campos alinhados
+- `SegmentacaoUpdateDTO` ↔ Builder edit: todos Optional, match
+- `SegmentacaoDetalheDTO` ↔ DetalheSegmentacao: campos consumidos corretamente
+- `RegrasJson` ↔ estimativa + builder: {publico_base, inclusao, exclusao}
+- `CloneSegmentacaoDTO` ↔ clonar: 4 campos Optional
+- Response `{data, meta}` ↔ ListaSegmentacoes: paginado corretamente
+
+### Auth validado
+
+- Frontend `useApi` não envia auth headers (correto — Databricks Apps proxy)
+- Backend lê `X-Forwarded-Email` do proxy
+- Fallback `DEV_USER` apenas em `ENV != production`
+
+### Rotas React validadas
+
+12 rotas → 8 pages, todas com APIs correspondentes no backend
