@@ -144,3 +144,42 @@ Validados os 2 notebooks de job S1 (`seg_exec`, `seg_saude_consolidador`) contra
     Usava interpolação direta de `titulo`, `mensagem`, `owner` (com `.replace("'", "''")`).  
     Convertido para `spark.sql(..., args={...})` (parametrização nativa Spark 3.4+).  
     *Impacto:* Eliminava risco de SQL injection se nome/owner contivessem chars especiais.
+
+---
+
+## [2026-08-21] Validação Integração Backend ↔ Jobs
+
+### Issue Crítico Encontrado
+
+**Registro `seg_execucao` preso em `em_execucao` quando job falha prematuramente.**
+
+Fluxo problemático (antes do fix):
+1. Backend gera `exec_id` e insere em `seg_execucao` com status `em_execucao`
+2. Backend dispara `run_now` com `exec_id` propagado via widget param
+3. Job faz validação (status, vigência) e chama `dbutils.notebook.exit()`
+4. **Registro fica preso** em `em_execucao` por 2h até consolidador detectar
+
+### Fix #15: Error handler global em `seg_exec`
+
+- Adicionada função `_marcar_exec_erro(motivo)` no Setup
+- Step 1: todas as 3 saídas prematuras agora chamam `_marcar_exec_erro()` antes de `exit()`
+- Step 2: público base não encontrado → graceful exit com UPDATE `erro`
+- Step 3: exception na query SQL → try/except → `_marcar_exec_erro()` + exit
+- Step 4: exception na persistência → try/except → `_marcar_exec_erro()` + exit
+- Steps 5-6: se falharem após resultado computado, o notebook crasha mas o
+  consolidador detecta em 2h (aceitável — resultado já está em seg_resultado_corrente)
+
+*Impacto:* Feedback imediato para o usuário em execuções manuais. Antes: até 2h de delay.
+
+### Validado (sem issues)
+
+- Contrato `exec_id` entre service e notebook: ✅ (IS_PREREGISTERED → UPDATE, agendada → INSERT)
+- Params `notebook_params` do `run_now`: ✅ (seg_id, origem_execucao, exec_id)
+- Params `base_parameters` do `criar_job`: ✅ (seg_id, origem_execucao=agendada, sem exec_id)
+- Ciclo ativar/pausar/reativar/deletar ↔ jobs.create/update/delete: ✅
+- `atualizar_vigencia` sync cron → `atualizar_schedule`: ✅
+- Consolidador lê `seg_definicao.status='ativa'` + `seg_execucao`: ✅
+- Consolidador marca `falha_timeout` → backend lê via `listar_execucoes()`: ✅
+- Consolidador gera `seg_notificacao` → backend lê via `listar_notificacoes()`: ✅
+- `seg_saude` escrita por seg_exec (individual) e consolidador (bulk): ✅
+- Backend lê `seg_saude` via `saude_repository.buscar_saude_por_seg_id()`: ✅

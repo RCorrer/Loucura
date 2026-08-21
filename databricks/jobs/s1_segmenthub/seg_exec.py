@@ -69,6 +69,24 @@ CATALOG = "plataforma"
 SCHEMA_SEG = "segmentacao"
 SCHEMA_META = "metadata"
 
+
+def _marcar_exec_erro(motivo: str):
+    """Atualiza registro pré-registrado para 'erro' em caso de saída prematura.
+    Só atua se IS_PREREGISTERED (execução manual com exec_id do service).
+    Para execuções agendadas (sem pré-registro), não há registro a atualizar."""
+    if not IS_PREREGISTERED:
+        return
+    try:
+        spark.sql(
+            f"""UPDATE {CATALOG}.{SCHEMA_SEG}.seg_execucao
+            SET status = 'erro', qtd_clientes = 0
+            WHERE exec_id = :exec_id AND status = 'em_execucao'""",
+            args={"exec_id": EXEC_ID_PARAM}
+        )
+        print(f"⚠️ Execução {EXEC_ID_PARAM} marcada como 'erro': {motivo}")
+    except Exception as e:
+        print(f"❌ Falha ao marcar execução como erro: {e}")
+
 # COMMAND ----------
 
 # DBTITLE 1,Step 1: Carregar definição da segmentação
@@ -86,6 +104,7 @@ df_definicao = spark.sql(
 )
 
 if df_definicao.count() == 0:
+    _marcar_exec_erro(f"Segmentação {SEG_ID} não encontrada ou desabilitada")
     dbutils.notebook.exit(json.dumps({
         "status": "erro",
         "mensagem": f"Segmentação {SEG_ID} não encontrada ou desabilitada"
@@ -97,16 +116,18 @@ print(f"  Status: {seg['status']}")
 
 # Validação de status
 if seg["status"] not in ("ativa", "aprovada"):
+    _marcar_exec_erro(f"Status '{seg['status']}' não permite execução")
     dbutils.notebook.exit(json.dumps({
-        "status": "ignorado",
+        "status": "erro",
         "mensagem": f"Status '{seg['status']}' não permite execução"
     }))
 
 # Validação de vigência (usa naive datetime para compatibilidade com Spark timestamps)
 agora = datetime.utcnow()
 if seg["vigencia_fim"] and seg["vigencia_fim"] < agora:
+    _marcar_exec_erro(f"Vigência encerrada em {seg['vigencia_fim']}")
     dbutils.notebook.exit(json.dumps({
-        "status": "expirado",
+        "status": "erro",
         "mensagem": f"Vigência encerrada em {seg['vigencia_fim']}"
     }))
 
@@ -257,7 +278,10 @@ df_publicos = spark.table(f"{CATALOG}.{SCHEMA_META}.catalogo_publicos")
 publico_info = df_publicos.filter(F.col("publico_id") == publico_base).first()
 
 if not publico_info:
-    raise ValueError(f"Público base '{publico_base}' não encontrado")
+    _marcar_exec_erro(f"Público base '{publico_base}' não encontrado")
+    dbutils.notebook.exit(json.dumps({
+        "status": "erro", "mensagem": f"Público base '{publico_base}' não encontrado"
+    }))
 
 tabela_base = publico_info["tabela_fisica"]
 join_key_base = publico_info["join_key"]
@@ -306,12 +330,18 @@ print(f"🔒 Parâmetros ({len(query_params)}): {list(query_params.keys())}")
 # STEP 3: Executar query e medir resultado
 # ============================================================
 
-t0 = time.time()
-df_resultado = spark.sql(query_sql, args=query_params)
-qtd_clientes = df_resultado.count()
-tempo_exec = round(time.time() - t0, 2)
-
-print(f"\n✓ Resultado: {qtd_clientes:,} clientes em {tempo_exec}s")
+try:
+    t0 = time.time()
+    df_resultado = spark.sql(query_sql, args=query_params)
+    qtd_clientes = df_resultado.count()
+    tempo_exec = round(time.time() - t0, 2)
+    print(f"\n✓ Resultado: {qtd_clientes:,} clientes em {tempo_exec}s")
+except Exception as e:
+    _marcar_exec_erro(f"Erro na execução da query: {e}")
+    dbutils.notebook.exit(json.dumps({
+        "status": "erro",
+        "mensagem": f"Erro na execução SQL: {str(e)[:500]}"
+    }))
 
 # COMMAND ----------
 
@@ -320,8 +350,9 @@ print(f"\n✓ Resultado: {qtd_clientes:,} clientes em {tempo_exec}s")
 # STEP 4: Persistir resultado
 # ============================================================
 
-# RF-01: Reutiliza exec_id do service (se propagado) ou gera novo (execução agendada)
-exec_id = EXEC_ID_PARAM or f"exec_{SEG_ID}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+try:
+    # RF-01: Reutiliza exec_id do service (se propagado) ou gera novo (execução agendada)
+    exec_id = EXEC_ID_PARAM or f"exec_{SEG_ID}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 exec_timestamp = datetime.utcnow()
 
 # 4a. MERGE em seg_resultado_corrente (snapshot atual)
@@ -351,7 +382,13 @@ spark.sql(
     args={"exec_id": exec_id, "seg_id": SEG_ID, "versao": seg["versao_atual"]}
 )
 
-print(f"✓ seg_resultado_historico inserido ({qtd_clientes} registros)")
+    print(f"✓ seg_resultado_historico inserido ({qtd_clientes} registros)")
+except Exception as e:
+    _marcar_exec_erro(f"Erro ao persistir resultado: {e}")
+    dbutils.notebook.exit(json.dumps({
+        "status": "erro",
+        "mensagem": f"Erro ao persistir: {str(e)[:500]}"
+    }))
 
 # COMMAND ----------
 
