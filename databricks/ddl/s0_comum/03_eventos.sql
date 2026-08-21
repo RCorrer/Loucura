@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS plataforma.eventos.seg_eventos (
   evento_id    STRING   NOT NULL,
   seg_id       STRING,
   exec_id      STRING,
-  tipo_evento  STRING   COMMENT 'publicada/executada/aprovada/pausada/encerrada/reativad',
+  tipo_evento  STRING   COMMENT 'publicada/executada/aprovada/pausada/encerrada/reativada',
   destino      STRING,
   payload_json STRING,
   criado_em    TIMESTAMP DEFAULT current_timestamp()

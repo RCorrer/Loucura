@@ -50,7 +50,7 @@ WITH defs AS (
   SELECT seg_id, seg_codigo, status,
          regexp_extract_all(regras_json, '"campo_id"\s*:\s*"([^"]+)"', 1) AS campos
   FROM plataforma.segmentacao.seg_definicao
-  WHERE status IN ('ativa', 'pausada', 'agendada')
+  WHERE status IN ('ativa', 'aprovada', 'pausada', 'encerrada')
 ),
 exploded AS (
   SELECT seg_id, seg_codigo, explode(campos) AS campo_id FROM defs

@@ -35,6 +35,8 @@ class SegmentacaoCreateDTO(BaseModel):
     publico_base_id: str
     regras_json: Dict[str, Any]  # será validado pelo RegrasJson
     tipo: Optional[str] = "direta"  # direta/composta
+    seg_origem_id: Optional[str] = None  # link com segmentação pai (clone/derivada)
+    tipo_origem: Optional[str] = "nova"  # nova/clone/derivada/chatbot
 
 
 class SegmentacaoUpdateDTO(BaseModel):
@@ -95,6 +97,8 @@ class SegmentacaoDetalheDTO(SegmentacaoResponseDTO):
     observacoes: Optional[str] = None
     documentacao_md: Optional[str] = None
     email_contato: Optional[str] = None
+    seg_origem_id: Optional[str] = None  # link com segmentação pai (clone/derivada)
+    tipo_origem: Optional[str] = None  # nova/clone/derivada/chatbot
     vigencia_inicio: Optional[datetime] = None
     vigencia_fim: Optional[datetime] = None
     agendamento_cron: Optional[str] = None
@@ -103,6 +107,7 @@ class SegmentacaoDetalheDTO(SegmentacaoResponseDTO):
     aprovado_em: Optional[datetime] = None
     checklist_validacao_json: Optional[Dict[str, Any]] = None
     habilitado: bool = True
+    job_id_databricks: Optional[str] = None  # ID do Databricks Job (uso admin)
 
 
 class TransicaoStatusDTO(BaseModel):

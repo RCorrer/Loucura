@@ -6,9 +6,12 @@ Gerencia CRUD, ciclo de vida, validações e geração de IDs/slugs.
 import uuid
 import re
 import json
+import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from fastapi import HTTPException
+
+logger = logging.getLogger(__name__)
 
 from src.models.regras import RegrasJson
 from src.models.dto.segmentacao_dto import (
@@ -116,6 +119,8 @@ class SegmentacaoService:
                 "publico_base_id": dados.publico_base_id,
                 "regras_json": json.dumps(dados.regras_json),
                 "tipo": dados.tipo or "direta",
+                "seg_origem_id": getattr(dados, 'seg_origem_id', None),
+                "tipo_origem": getattr(dados, 'tipo_origem', 'nova'),
                 "status": "rascunho",
                 "versao_atual": 1,
                 "criado_em": now,
@@ -183,8 +188,7 @@ class SegmentacaoService:
         """Lista segmentações com paginação."""
         offset = (page - 1) * size
 
-        # 🔍 DEBUG: exibe os valores no log do app
-        print(f"🔍 listar: page={page}, size={size}, offset={offset}")
+        logger.debug(f"listar: page={page}, size={size}, offset={offset}")
 
         resultados = self.repository.listar(
             status=status,
@@ -398,7 +402,8 @@ class SegmentacaoService:
         # Passa exec_id ao job via widget param — job fará UPDATE (não INSERT).
         # Se job falhar sem atualizar, consolidador detecta como travada (>2h em em_execucao).
         exec_id = f"exec_{uuid.uuid4().hex[:12]}"
-        self.repository.executar_segmentacao(seg_id, exec_id)
+        versao_usada = atual.get("versao_atual", 1)
+        self.repository.executar_segmentacao(seg_id, exec_id, versao_usada=versao_usada, origem=origem)
 
         # Dispara run_now no Databricks com exec_id propagado
         run_id = self.job_manager.executar_agora(
@@ -479,6 +484,9 @@ class SegmentacaoService:
                 descricao=dados.descricao or original.get("descricao"),
                 # Fallback para segs legadas com objetivo vazio (pré-validator)
                 objetivo=original.get("objetivo") or "AQUISICAO",
+                # Rastreabilidade de origem
+                seg_origem_id=seg_id,
+                tipo_origem="clone",
                 seg_tags=original.get("seg_tags"),
                 resumo=original.get("resumo"),
                 objetivo_negocio=original.get("objetivo_negocio"),

@@ -21,9 +21,13 @@ CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_job_log (
   detalhes        STRING             COMMENT 'Mensagem de erro ou detalhes adicionais (JSON)',
   executado_por   STRING             COMMENT 'Usuário que disparou a ação',
   criado_em       TIMESTAMP NOT NULL DEFAULT current_timestamp()
+) USING DELTA
+CLUSTER BY (seg_id)
+TBLPROPERTIES (
+  'delta.autoOptimize.optimizeWrite' = 'true',
+  'delta.enableChangeDataFeed' = 'true'
 )
-COMMENT 'Log de auditoria de todas as operações do JobManagerService'
-TBLPROPERTIES ('delta.enableChangeDataFeed' = 'true');
+COMMENT 'Log de auditoria de todas as operações do JobManagerService';
 
 -- 3. Índices para consultas frequentes
 -- (Delta Lake não suporta CREATE INDEX, mas otimizamos com ZORDER)

@@ -11,9 +11,9 @@
                         │              MÁQUINA DE ESTADOS — SEGMENTAÇÃO                │
                         └─────────────────────────────────────────────────────────────┘
 
-    ╔══════════╗    Enviar p/     ╔══════════════╗     Aprovar        ╔══════════╗
-    ║ RASCUNHO ║───aprovação────▶ ║ EM_APROVAÇÃO ║────(cria Job)────▶ ║  ATIVA   ║
-    ╚══════════╝                  ╚══════════════╝                    ╚══════════╝
+    ╔══════════╗    Enviar p/     ╔══════════════╗     Aprovar       ╔═══════════╗    Ativar       ╔══════════╗
+    ║ RASCUNHO ║───aprovação────▶ ║ EM_APROVAÇÃO ║───(checklist)───▶ ║ APROVADA  ║──(cria Job)─▶ ║  ATIVA   ║
+    ╚══════════╝                  ╚══════════════╝                   ╚═══════════╝                  ╚══════════╝
          │              ▲              │                              │    │    │
          │              │  Rejeitar    │                   Pausar     │    │    │
          │              └──────────────┘                 (rm sched.)  │    │    │
@@ -124,10 +124,12 @@
 | Transição | Quem pode | Efeito no Job | Evento |
 |---|---|---|---|
 | `rascunho` → `em_aprovacao` | analista, admin | — | — |
-| `em_aprovacao` → `ativa` | **admin** | `jobs.create()` | `aprovada` |
+| `em_aprovacao` → `aprovada` | **admin** | — | `aprovada` |
+| `aprovada` → `ativa` | analista, admin | `jobs.create()` | — |
 | `ativa` → `pausada` | analista, admin | `jobs.update(schedule=None)` | `pausada` |
 | `pausada` → `ativa` | analista, admin | `jobs.update(schedule=cron)` | `reativada` |
 | `ativa` → `encerrada` | analista, admin | `jobs.delete()` | `encerrada` |
+| `encerrada` → `ativa` | analista, admin | `jobs.create()` (novo) | `reativada` |
 | `*` → `arquivada` | analista, admin | `jobs.delete()` (se existir) | — |
 
 ---

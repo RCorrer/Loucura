@@ -24,9 +24,11 @@ async def get_current_user(request: Request) -> Optional[dict]:
     # 1. Identifica o usuário
     user_email = request.headers.get("X-Forwarded-Email")
     if not user_email:
-        user_email = os.getenv("DEV_USER")
-        if user_email:
-            logger.info(f"🔧 Modo desenvolvimento: usando DEV_USER={user_email}")
+        # DEV_USER só é aceito fora de produção (prevenção de bypass acidental)
+        if os.getenv("ENV") != "production":
+            user_email = os.getenv("DEV_USER")
+            if user_email:
+                logger.info(f"🔧 Modo desenvolvimento: usando DEV_USER={user_email}")
 
     if not user_email:
         logger.warning("Nenhum usuário identificado na requisição")

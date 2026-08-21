@@ -44,8 +44,9 @@ class SegmentacaoRepository:
                 seg_tags, resumo, objetivo_negocio, publico_alvo_descricao,
                 observacoes, documentacao_md, owner, area_responsavel,
                 email_contato, criado_por, publico_base_id, regras_json,
-                tipo, status, versao_atual, criado_em, atualizado_em
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                tipo, seg_origem_id, tipo_origem,
+                status, versao_atual, criado_em, atualizado_em
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         # Converte regras_json para string se for dict
         regras_json = dados.get("regras_json")
@@ -73,6 +74,8 @@ class SegmentacaoRepository:
             dados["publico_base_id"],
             regras_json,
             dados.get("tipo", "direta"),
+            dados.get("seg_origem_id"),
+            dados.get("tipo_origem", "nova"),
             dados.get("status", "rascunho"),
             dados.get("versao_atual", 1),
             dados.get("criado_em", datetime.now()),
@@ -92,7 +95,7 @@ class SegmentacaoRepository:
                 tipo_origem, tipo, publico_base_id, regras_json, status,
                 vigencia_inicio, vigencia_fim, agendamento_cron, recorrencia,
                 aprovado_por, aprovado_em, checklist_validacao_json,
-                versao_atual, atualizado_em, habilitado
+                versao_atual, atualizado_em, habilitado, job_id_databricks
             FROM plataforma.segmentacao.seg_definicao
             WHERE seg_id = ?
         """
@@ -105,7 +108,7 @@ class SegmentacaoRepository:
             "tipo_origem", "tipo", "publico_base_id", "regras_json", "status",
             "vigencia_inicio", "vigencia_fim", "agendamento_cron", "recorrencia",
             "aprovado_por", "aprovado_em", "checklist_validacao_json",
-            "versao_atual", "atualizado_em", "habilitado"
+            "versao_atual", "atualizado_em", "habilitado", "job_id_databricks"
         ]
         if rows:
             row = list(rows[0])
@@ -283,14 +286,14 @@ class SegmentacaoRepository:
         ))
         return True
 
-    def executar_segmentacao(self, seg_id: str, exec_id: str) -> bool:
-        """Cria um registro de execução (chamado pelo Job posteriormente)."""
+    def executar_segmentacao(self, seg_id: str, exec_id: str, versao_usada: int = 1, origem: str = "manual") -> bool:
+        """Cria um registro de execução com todos os campos obrigatórios do DDL."""
         sql = """
             INSERT INTO plataforma.segmentacao.seg_execucao
-            (exec_id, seg_id, origem_execucao, status)
-            VALUES (?, ?, 'manual', 'em_execucao')
+            (exec_id, seg_id, versao_usada, origem_execucao, executado_em, status)
+            VALUES (?, ?, ?, ?, current_timestamp(), 'em_execucao')
         """
-        self.client.execute_insert(sql, (exec_id, seg_id))
+        self.client.execute_insert(sql, (exec_id, seg_id, versao_usada, origem))
         return True
 
     # ============================================================
