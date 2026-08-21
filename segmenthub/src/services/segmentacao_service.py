@@ -76,27 +76,21 @@ class SegmentacaoService:
     def criar(self, dados: SegmentacaoCreateDTO, usuario: str) -> Dict[str, str]:
         """Cria uma nova segmentação."""
         try:
-            print(f"🔍 CRIAR: Iniciando criação")
-            print(f"🔍 CRIAR: dados.regras_json = {dados.regras_json}, type = {type(dados.regras_json)}")
+            logger.debug(f"criar: iniciando para usuario={usuario}")
             
             # 1. Valida regras
-            print(f"🔍 CRIAR: Validando regras...")
             erros = self._validar_regras(dados.regras_json)
-            print(f"🔍 CRIAR: erros = {erros}")
             if erros:
-                erro_msg = f"Regras inválidas: {erros}"
-                print(f"❌ CRIAR: {erro_msg}")
-                raise ValueError(erro_msg)
+                logger.warning(f"criar: regras inválidas: {erros}")
+                raise ValueError(f"Regras inválidas: {erros}")
 
             # 2. Gera IDs
-            print(f"🔍 CRIAR: Gerando IDs...")
             seg_id = self._gerar_seg_id()
             seg_codigo = self._gerar_seg_codigo(dados.nome)
             seg_slug = self._gerar_seg_slug(dados.nome)
-            print(f"🔍 CRIAR: seg_id={seg_id}, seg_codigo={seg_codigo}")
+            logger.debug(f"criar: seg_id={seg_id}, seg_codigo={seg_codigo}")
 
             # 3. Prepara dados para inserção
-            print(f"🔍 CRIAR: Preparando dados para inserção...")
             now = datetime.now()
             dados_insert = {
                 "seg_id": seg_id,
@@ -126,15 +120,11 @@ class SegmentacaoService:
                 "criado_em": now,
                 "atualizado_em": now,
             }
-            print(f"🔍 CRIAR: dados_insert preparados")
-
             # 4. Insere no banco
-            print(f"🔍 CRIAR: Inserindo no banco...")
             self.repository.inserir(dados_insert)
-            print(f"✅ CRIAR: Inserido com sucesso")
+            logger.info(f"criar: segmentação {seg_id} inserida")
 
             # 5. Insere versão inicial
-            print(f"🔍 CRIAR: Inserindo versão inicial...")
             self.repository.inserir_versao(
                 seg_id=seg_id,
                 versao=1,
@@ -142,17 +132,12 @@ class SegmentacaoService:
                 motivo="Versão inicial",
                 alterado_por=usuario,
             )
-            print(f"✅ CRIAR: Versão inserida com sucesso")
-
             result = {"seg_id": seg_id, "seg_codigo": seg_codigo, "seg_slug": seg_slug}
-            print(f"✅ CRIAR: Concluído com sucesso! result={result}")
+            logger.info(f"criar: concluído {seg_id}")
             return result
             
         except Exception as e:
-            erro = f"{type(e).__name__}: {str(e)}"
-            print(f"❌ CRIAR ERROR: {erro}")
-            import traceback
-            print(f"❌ CRIAR TRACEBACK:\n{traceback.format_exc()}")
+            logger.error(f"criar: erro {type(e).__name__}: {e}", exc_info=True)
             raise
 
     def buscar_por_id(self, seg_id: str) -> Optional[Dict]:
@@ -455,29 +440,22 @@ class SegmentacaoService:
     def clonar(self, seg_id: str, dados: CloneSegmentacaoDTO, usuario: str) -> Dict[str, str]:
         """Clona uma segmentação existente."""
         try:
-            print(f"🔍 CLONE: Iniciando clone de {seg_id}")
+            logger.debug(f"clonar: iniciando clone de {seg_id}")
             
             original = self.buscar_por_id(seg_id)
             if not original:
                 raise ValueError("Segmentação original não encontrada")
-            
-            print(f"🔍 CLONE: Original encontrado: {original.get('nome')}")
 
             # Garante que regras_json seja um dict válido
             regras_json = original.get("regras_json")
-            print(f"🔍 CLONE: regras_json = {regras_json}, type = {type(regras_json)}")
-            
-            # Se for lista ou None ou não for dict, usa dict vazio
             if isinstance(regras_json, list):
-                print(f"⚠️ CLONE: regras_json é LISTA, convertendo para dict vazio")
+                logger.warning(f"clonar: regras_json é lista, convertendo para dict vazio")
                 regras_json = {}
             elif not regras_json or not isinstance(regras_json, dict):
-                print(f"🔍 CLONE: regras_json não é dict, usando dict vazio")
                 regras_json = {}
 
             # Prepara dados do clone
             nome_clone = dados.nome or f"{original['nome']} (Clone)"
-            print(f"🔍 CLONE: Criando DTO com nome={nome_clone}")
             
             create_dto = SegmentacaoCreateDTO(
                 nome=nome_clone,
@@ -501,16 +479,12 @@ class SegmentacaoService:
                 tipo="clone",
             )
             
-            print(f"🔍 CLONE: DTO criado, chamando criar()")
             result = self.criar(create_dto, usuario)
-            print(f"🔍 CLONE: Sucesso! seg_id={result.get('seg_id')}")
+            logger.info(f"clonar: clone de {seg_id} criado como {result.get('seg_id')}")
             return result
             
         except Exception as e:
-            erro = f"{type(e).__name__}: {str(e)}"
-            print(f"❌ CLONE ERROR: {erro}")
-            import traceback
-            print(f"❌ CLONE TRACEBACK:\n{traceback.format_exc()}")
+            logger.error(f"clonar: erro ao clonar {seg_id}: {e}", exc_info=True)
             raise
 
     def listar_versoes(self, seg_id: str) -> List[Dict]:

@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_execucao (
   origem_execucao STRING   COMMENT 'agendada/manual/reativacao',
   executado_em    TIMESTAMP DEFAULT current_timestamp(),
   qtd_clientes    BIGINT   COMMENT 'COUNT exato',
-  status          STRING   COMMENT 'sucesso/erro/erro_metadado/em_execucao',
+  status          STRING   COMMENT 'sucesso/erro/erro_metadado/em_execucao/falha_timeout',
   job_id          STRING,
   run_id          STRING,
   job_run_url     STRING

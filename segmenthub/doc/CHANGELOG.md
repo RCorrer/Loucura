@@ -95,3 +95,28 @@
 - `02-SCHEMAS-TABELAS.md`: Status +`aprovada`; `exec_id` formato corrigido
 - `04-CICLO-VIDA-ESTADOS.md`: Estado `aprovada` documentado (diagrama + transições)
 - `CHANGELOG.md`: Criado (este arquivo)
+
+---
+
+## [2026-08-21] Validação DDL ↔ Backend — Fixes Adicionais
+
+### Bug Fixes (4 correções)
+
+#### CRÍTICO
+
+9. **`comentario_repository.py:atualizar_comentario()`**  
+   Ordem dos params posicionais invertida: `comentario_id` era inserido antes dos SET values.  
+   *Impacto:* UPDATE executava `SET texto = <comentario_id>` + `WHERE comentario_id = <texto>` — corrupção silenciosa.
+
+#### MÉDIOS
+
+10. **`02_segmentacao.sql` — `seg_execucao.status` COMMENT**  
+    Adicionado `falha_timeout` aos valores válidos (usado pelo job_manager ao atingir deadline).
+
+11. **`05_governanca_hist.sql`**  
+    Faltavam `CLUSTER BY (caracteristica_id)` e `TBLPROPERTIES ('delta.autoOptimize.optimizeWrite' = 'true')`.  
+    *Impacto:* Performance degradada em queries de auditoria por característica.
+
+12. **`segmentacao_service.py` — prints restantes**  
+    ~30 `print()` nos métodos `criar()` e `clonar()` não foram removidos no fix #8 original.  
+    Todos convertidos para `logger.debug/info/warning/error` com `exc_info=True` nos excepts.
