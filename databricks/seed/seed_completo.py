@@ -110,6 +110,7 @@ clientes_data = [gerar_cliente(cpf) for cpf in cpf_list]
 
 # COMMAND ----------
 
+# DBTITLE 1,1. Golden Record
 # 1. GOLDEN RECORD
 print("1. Golden Record...")
 schema_golden = StructType([
@@ -121,10 +122,12 @@ schema_golden = StructType([
     StructField("data_nascimento", DateType(), True),
     StructField("agencia", StringType(), True),
     StructField("gerente_nome", StringType(), True),
-    StructField("tempo_relacionamento_meses", IntegerType(), True)
+    StructField("tempo_relacionamento_meses", IntegerType(), True),
+    StructField("atualizado_em", TimestampType(), True)
 ])
 golden_rows = [(d["cpf_cnpj"], d["nome"], d["email"], d["telefone"], d["segmento"], 
-                d["data_nascimento"], d["agencia"], d["gerente_nome"], d["tempo_relacionamento_meses"]) 
+                d["data_nascimento"], d["agencia"], d["gerente_nome"], d["tempo_relacionamento_meses"],
+                datetime.now()) 
                for d in clientes_data]
 spark.createDataFrame(golden_rows, schema_golden).write.mode("overwrite").saveAsTable(f"{CATALOG}.core_cliente.golden_record")
 print("  OK")
@@ -433,9 +436,9 @@ spark.createDataFrame(pub_cat_data, schema_pub).write.mode("overwrite").saveAsTa
 print(f"  catalogo_publicos: {len(pub_cat_data)} públicos")
 print("  OK — catálogos prontos para segmentação via API")
 
-# NOTA: catalogo_canais do S3 movido para seed específico do EngagementHub
-# para manter independência entre sistemas.
-print("  OK"), descricao="Score de crédito"),
+# [DEAD CODE REMOVED - fix #16: código duplicado antigo (Row-based) causava SyntaxError
+#  e sobrescrevia dados bons com tabela_fisica não-FQ e operadores incompletos]
+"""
     Row(caracteristica_id="idade", tema="Demográfico", tema_ordem=1, tabela_fisica="caracteristicas.customer_features_wide", tabela_label="Idade", campo_fisico="idade", campo_label="Idade", tipo_dado="numeric", operadores=["=", ">", "<", "between"], valores_dominio=None, join_key="cpf_cnpj", sensibilidade="normal", usavel_em_peca=True, usavel_em_visao360=True, bloco_visao360="cadastral", ativo=True, descricao="Idade do cliente"),
     Row(caracteristica_id="faixa_etaria", tema="Demográfico", tema_ordem=2, tabela_fisica="caracteristicas.customer_features_wide", tabela_label="Faixa Etária", campo_fisico="faixa_etaria", campo_label="Faixa Etária", tipo_dado="categorical", operadores=["="], valores_dominio=["18-25","26-35","36-50","51-65","65+"], join_key="cpf_cnpj", sensibilidade="normal", usavel_em_peca=True, usavel_em_visao360=True, bloco_visao360="cadastral", ativo=True, descricao="Faixa etária"),
     Row(caracteristica_id="estado", tema="Demográfico", tema_ordem=3, tabela_fisica="caracteristicas.customer_features_wide", tabela_label="Estado", campo_fisico="estado", campo_label="Estado", tipo_dado="categorical", operadores=["="], valores_dominio=None, join_key="cpf_cnpj", sensibilidade="normal", usavel_em_peca=False, usavel_em_visao360=True, bloco_visao360="cadastral", ativo=True, descricao="UF"),
@@ -472,6 +475,7 @@ pub_cat_rows = [
     Row(publico_id="pub_private", nome="Base Private", descricao="Clientes do segmento private", tabela_fisica=f"{CATALOG}.publico.pub_private", criado_por_time="Private", ativo=True),
 ]
 spark.createDataFrame(pub_cat_rows).write.mode("overwrite").saveAsTable(f"{CATALOG}.metadata.catalogo_publicos")
+"""
 
 # catalogo_canais
 canais_rows = [

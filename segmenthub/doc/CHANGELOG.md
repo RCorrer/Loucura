@@ -183,3 +183,58 @@ Fluxo problemático (antes do fix):
 - Consolidador gera `seg_notificacao` → backend lê via `listar_notificacoes()`: ✅
 - `seg_saude` escrita por seg_exec (individual) e consolidador (bulk): ✅
 - Backend lê `seg_saude` via `saude_repository.buscar_saude_por_seg_id()`: ✅
+
+---
+
+## [2026-08-21] Validação DDL ↔ Seed Notebook
+
+### Issue Crítico: SyntaxError no Cell 11 (Catálogos)
+
+**Código duplicado antigo (Row-based) mesclado após código bom (tuple-based).**
+
+Problema:
+1. Cell 11 tinha DUAS versões do seed para `catalogo_caracteristicas` e `catalogo_publicos`
+2. Primeira versão (correta): tuples com `tabela_fisica` fully-qualified e operadores completos
+3. Segunda versão (morta): Row-based com `tabela_fisica` sem catálogo e operadores limitados
+4. A junção gerava **SyntaxError** (`print("  OK"), descricao="Score de crédito"),`)
+5. Resultado: **toda a cell falhava** — NENHUM catálogo era seed
+
+### Fix #16: Remover código morto do Cell 11
+
+- Bloco antigo (linhas 436-474) encapsulado em docstring `"""..."""`
+- Primeira versão (tuple-based) agora é a única que executa
+- `catalogo_canais` (S3) preservado no final da cell
+
+### Fix #17: golden_record missing `atualizado_em`
+
+- DDL define `atualizado_em TIMESTAMP DEFAULT current_timestamp()`
+- Seed não incluía esta coluna → `saveAsTable(overwrite)` criava tabela sem ela
+- Fix: adicionado `atualizado_em` ao schema + `datetime.now()` nos dados
+
+### Validado (sem issues)
+
+| Tabela | Seed Colunas | DDL Colunas | Status |
+|--------|-------------|-------------|--------|
+| catalogo_caracteristicas | 17 | 17 | ✅ |
+| catalogo_publicos | 7 (incl. join_key) | 7 | ✅ |
+| seg_definicao | 34 (incl. job_id_databricks) | 34 | ✅ |
+| seg_execucao | 10 | 10 | ✅ |
+| seg_resultado_corrente | 4 | 4 | ✅ |
+| seg_resultado_historico | 5 | 5 | ✅ |
+| seg_comentario | 11 | 11 | ✅ |
+| seg_notificacao | 8 | 8 | ✅ |
+| seg_saude | 8 | 8 | ✅ |
+| seg_versao | 7 | 7 | ✅ |
+| seg_historico_estado | 7 | 7 | ✅ |
+| seg_destino | 4 | 4 | ✅ |
+| seg_job_log | 9 | 9 | ✅ |
+| golden_record | 10 (fix #17) | 10 | ✅ |
+| usuarios_perfil | 9 | 9 | ✅ |
+| consentimento | 6 | 6 | ✅ |
+| seg_eventos | 7 | 7 | ✅ |
+| catalogo_governanca_hist | 10 | 10 | ✅ |
+
+### Notas
+
+- `retorno_atendimento` e `disparo_eventos` não são seed (runtime S2/S3) — DDL cria vazias
+- Segmentações seed estão status=ativa mas sem `job_id_databricks` (design: ativar via API para criar job)
