@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS plataforma.engagement.fila_disparo (
   criado_em TIMESTAMP DEFAULT current_timestamp(),
   atualizado_em TIMESTAMP DEFAULT current_timestamp()
 ) USING DELTA
+TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported')
 CLUSTER BY (status, agendado_para)
 COMMENT 'Fila única de disparo (jornada + avulso). Processada pelo motor_disparo';
 
@@ -30,6 +31,7 @@ CREATE TABLE IF NOT EXISTS plataforma.engagement.disparo_tentativa (
   provider_response STRING,
   executado_em TIMESTAMP DEFAULT current_timestamp()
 ) USING DELTA
+TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported')
 COMMENT 'Cada tentativa de envio (retry com backoff)';
 
 CREATE TABLE IF NOT EXISTS plataforma.engagement.disparo_avulso (
@@ -52,6 +54,7 @@ CREATE TABLE IF NOT EXISTS plataforma.engagement.disparo_avulso (
   criado_por STRING,
   criado_em TIMESTAMP DEFAULT current_timestamp()
 ) USING DELTA
+TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported')
 COMMENT 'Disparo avulso (DAV). Respeita toda governança (capping/consentimento/janela)';
 
 CREATE TABLE IF NOT EXISTS plataforma.engagement.config_janela_envio (
@@ -65,6 +68,7 @@ CREATE TABLE IF NOT EXISTS plataforma.engagement.config_janela_envio (
   atualizado_por STRING,
   atualizado_em TIMESTAMP DEFAULT current_timestamp()
 ) USING DELTA
+TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported')
 COMMENT 'Horários/dias permitidos para envio (importante p/ banco)';
 
 CREATE TABLE IF NOT EXISTS plataforma.engagement.config_retry (
@@ -76,4 +80,5 @@ CREATE TABLE IF NOT EXISTS plataforma.engagement.config_retry (
   atualizado_por STRING,
   atualizado_em TIMESTAMP DEFAULT current_timestamp()
 ) USING DELTA
+TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported')
 COMMENT 'Política de retry por canal';

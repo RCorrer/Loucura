@@ -186,8 +186,6 @@ schema_wide = StructType([
     StructField("nps", IntegerType(), True),
     StructField("churn_score", DoubleType(), True),
     StructField("engajamento_score", DoubleType(), True),
-    StructField("dias_desde_ultimo_acesso", IntegerType(), True),
-    StructField("segmento", StringType(), True),
     StructField("atualizado_em", TimestampType(), True)
 ])
 wide_rows = [(d["cpf_cnpj"],
@@ -201,7 +199,7 @@ d["renda_mensal"], d["faixa_renda"], d["renda_comprovada"], d["saldo_medio"], d[
                 d["valor_credito_contratado"], d["tipo_credito"], d["qtd_transacoes_mes"], d["ticket_medio"], 
                 d["valor_movimentado_mes"], d["usa_app"], d["usa_internet_banking"], d["canal_preferido"], 
                 d["frequencia_acesso"], d["nps"], d["churn_score"], d["engajamento_score"],
-                d["dias_desde_ultimo_acesso"], d["segmento"], datetime.now()) 
+                datetime.now()) 
                for d in clientes_data]
 spark.createDataFrame(wide_rows, schema_wide).write.mode("overwrite").saveAsTable(f"{CATALOG}.caracteristicas.customer_features_wide")
 print("  OK")
@@ -599,7 +597,7 @@ otim_rows = [
     Row(config_id="mab_global", escopo="global", metrica_alvo="conversao", metrica_custom_json=None, janela_avaliacao_horas=72, trafego_minimo_pct=10, min_amostras_por_variante=100, frequencia_recalculo="diario", otimizacao_ativa=True, ativo=True, atualizado_por="admin", atualizado_em=datetime.now()),
     Row(config_id="mab_jornada_default", escopo="por_jornada", metrica_alvo="clique", metrica_custom_json=None, janela_avaliacao_horas=48, trafego_minimo_pct=20, min_amostras_por_variante=200, frequencia_recalculo="diario", otimizacao_ativa=True, ativo=True, atualizado_por="admin", atualizado_em=datetime.now()),
 ]
-schema_otim = StructType([StructField("config_id", StringType(), False), StructField("escopo", StringType(), True), StructField("metrica_alvo", StringType(), True), StructField("metrica_custom_json", StringType(), True), StructField("janela_avaliacao_horas", IntegerType(), True), StructField("trafego_minimo_pct", IntegerType(), True), StructField("min_amostras_por_variante", IntegerType(), True), StructField("frequencia_recalculo", StringType(), True), StructField("otimizacao_ativa", BooleanType(), True), StructField("ativo", BooleanType(), True), StructField("atualizado_por", StringType(), True), StructField("atualizado_em", TimestampType(), True)])
+schema_otim = StructType([StructField("config_id", StringType(), False), StructField("escopo", StringType(), True), StructField("metrica_alvo", StringType(), True), StructField("metrica_custom_json", StringType(), True), StructField("janela_avaliacao_horas", IntegerType(), True), StructField("trafego_minimo_pct", DoubleType(), True), StructField("min_amostras_por_variante", IntegerType(), True), StructField("frequencia_recalculo", StringType(), True), StructField("otimizacao_ativa", BooleanType(), True), StructField("ativo", BooleanType(), True), StructField("atualizado_por", StringType(), True), StructField("atualizado_em", TimestampType(), True)])
 otim_tuples = [(r.config_id, r.escopo, r.metrica_alvo, r.metrica_custom_json, r.janela_avaliacao_horas, r.trafego_minimo_pct, r.min_amostras_por_variante, r.frequencia_recalculo, r.otimizacao_ativa, r.ativo, r.atualizado_por, r.atualizado_em) for r in otim_rows]
 spark.createDataFrame(otim_tuples, schema_otim).write.mode("overwrite").saveAsTable(f"{CATALOG}.engagement.config_otimizacao")
 
@@ -615,26 +613,111 @@ print("  OK")
 
 # COMMAND ----------
 
-# 10. DADOS DE CAMPANHA, JORNADA, PEÇA (mais completos)
+# DBTITLE 1,10. Campanhas, Jornadas, Peças (SCHEMAS CORRIGIDOS)
+# 10. DADOS DE CAMPANHA, JORNADA, PEÇA — SCHEMAS ALINHADOS COM DDL
 print("10. Campanhas, Jornadas, Peças...")
-# Campanha
+
+# Campanha (conforme DDL real - 24 campos)
 campanha_id = "camp_001"
-schema_camp = StructType([StructField("campanha_id", StringType(), False), StructField("campanha_codigo", StringType(), True), StructField("nome", StringType(), True), StructField("descricao", StringType(), True), StructField("objetivo", StringType(), True), StructField("tags", ArrayType(StringType()), True), StructField("resumo", StringType(), True), StructField("objetivo_negocio", StringType(), True), StructField("observacoes", StringType(), True), StructField("owner", StringType(), True), StructField("area_responsavel", StringType(), True), StructField("email_contato", StringType(), True), StructField("criado_por", StringType(), True), StructField("status", StringType(), True), StructField("vigencia_inicio", TimestampType(), True), StructField("vigencia_fim", TimestampType(), True), StructField("limite_envios", LongType(), True), StructField("alerta_pct_limite", IntegerType(), True), StructField("envios_realizados", LongType(), True), StructField("versao_atual", IntegerType(), True), StructField("atualizado_em", TimestampType(), True)])
-camp_tuples = [(campanha_id, "CAM-2025-CROSSSELL-00001", "Campanha Cross-Sell Q3", "Oferta de produtos financeiros", "RENTABILIZACAO", ["cross-sell","q3"], "Oferta de produtos financeiros", "Aumentar rentabilidade", "Usar segmentos de alta renda", "marketing", "Marketing", "marketing@banco.com", "admin", "ativa", datetime.now(), datetime.now()+timedelta(days=90), int(100000), int(80), int(0), int(1), datetime.now())]
+schema_camp = StructType([
+    StructField("campanha_id", StringType(), False),
+    StructField("campanha_codigo", StringType(), True),
+    StructField("nome", StringType(), True),
+    StructField("descricao", StringType(), True),
+    StructField("objetivo", StringType(), True),
+    StructField("tags", ArrayType(StringType()), True),
+    StructField("resumo", StringType(), True),
+    StructField("objetivo_negocio", StringType(), True),
+    StructField("observacoes", StringType(), True),
+    StructField("owner", StringType(), True),
+    StructField("area_responsavel", StringType(), True),
+    StructField("email_contato", StringType(), True),
+    StructField("criado_por", StringType(), True),
+    StructField("criado_em", TimestampType(), True),
+    StructField("status", StringType(), True),
+    StructField("vigencia_inicio", TimestampType(), True),
+    StructField("vigencia_fim", TimestampType(), True),
+    StructField("aprovado_por", StringType(), True),
+    StructField("aprovado_em", TimestampType(), True),
+    StructField("limite_envios", LongType(), True),
+    StructField("alerta_pct_limite", IntegerType(), True),
+    StructField("envios_realizados", LongType(), True),
+    StructField("versao_atual", IntegerType(), True),
+    StructField("atualizado_em", TimestampType(), True)
+])
+camp_tuples = [
+    (campanha_id, "CAM-2025-CROSSSELL-00001", "Campanha Cross-Sell Q3", "Oferta de produtos financeiros", 
+     "RENTABILIZACAO", ["cross-sell","q3"], "Oferta de produtos financeiros", "Aumentar rentabilidade", 
+     "Usar segmentos de alta renda", "marketing", "Marketing", "marketing@banco.com", "admin", datetime.now(), 
+     "ativa", datetime.now(), datetime.now()+timedelta(days=90), None, None, 100000, 80, 0, 1, datetime.now())
+]
 spark.createDataFrame(camp_tuples, schema_camp).write.mode("overwrite").saveAsTable(f"{CATALOG}.engagement.campanha")
 
-# Jornada (conforme DDL real)
+# Jornada (conforme DDL real - 21 campos)
 jornada_id = "jorn_001"
-schema_jorn = StructType([StructField("jornada_id", StringType(), False), StructField("jornada_codigo", StringType(), True), StructField("nome", StringType(), True), StructField("descricao", StringType(), True), StructField("tags", ArrayType(StringType()), True), StructField("tipo", StringType(), True), StructField("tipo_gatilho", StringType(), True), StructField("gatilho_seg_id", StringType(), True), StructField("gatilho_evento", StringType(), True), StructField("gatilho_data", TimestampType(), True), StructField("multiplo_envio_permitido", BooleanType(), True), StructField("intervalo_reenvio_dias", IntegerType(), True), StructField("fluxo_json", StringType(), True), StructField("criado_por", StringType(), True), StructField("criado_em", TimestampType(), True), StructField("versao_atual", IntegerType(), True), StructField("status", StringType(), True), StructField("atualizado_em", TimestampType(), True)])
-jorn_tuples = [(jornada_id, "JOR-2025-00001", "Jornada Cross-Sell", "Fluxo de oferta com 3 etapas", ["cross-sell","email"], "scheduled", "segmento", "seg_alta_renda", None, None, False, int(7), '{"nodes":[{"id":"n1","type":"start","data":{"label":"Início"}},{"id":"n2","type":"email","data":{"label":"Envio Email"}},{"id":"n3","type":"wait","data":{"label":"Aguardar"}},{"id":"n4","type":"end","data":{"label":"Fim"}}],"edges":[{"source":"n1","target":"n2"},{"source":"n2","target":"n3"},{"source":"n3","target":"n4"}]}', "admin", datetime.now(), int(1), "ativa", datetime.now())]
+schema_jorn = StructType([
+    StructField("jornada_id", StringType(), False),
+    StructField("jornada_codigo", StringType(), True),
+    StructField("campanha_id", StringType(), True),
+    StructField("nome", StringType(), True),
+    StructField("descricao", StringType(), True),
+    StructField("grafo_json", StringType(), True),
+    StructField("seg_entrada_id", StringType(), True),
+    StructField("resumo", StringType(), True),
+    StructField("objetivo_negocio", StringType(), True),
+    StructField("observacoes", StringType(), True),
+    StructField("status", StringType(), True),
+    StructField("ao_sair_segmento", StringType(), True),
+    StructField("ao_pausar_campanha", StringType(), True),
+    StructField("cap_estourado", StringType(), True),
+    StructField("aprovado_por", StringType(), True),
+    StructField("aprovado_em", TimestampType(), True),
+    StructField("criado_por", StringType(), True),
+    StructField("criado_em", TimestampType(), True),
+    StructField("owner", StringType(), True),
+    StructField("versao_atual", IntegerType(), True),
+    StructField("atualizado_em", TimestampType(), True)
+])
+grafo = '{"nodes":[{"id":"n1","type":"start"},{"id":"n2","type":"email"},{"id":"n3","type":"end"}],"edges":[{"source":"n1","target":"n2"},{"source":"n2","target":"n3"}]}'
+jorn_tuples = [
+    (jornada_id, "JOR-2025-00001", campanha_id, "Jornada Cross-Sell", "Fluxo de oferta com 3 etapas", grafo, 
+     "seg_alta_renda", "Fluxo email para alta renda", "Rentabilizar", None, "ativa", "continua", "termina_quem_entrou", 
+     "pula", None, None, "admin", datetime.now(), "marketing", 1, datetime.now())
+]
 spark.createDataFrame(jorn_tuples, schema_jorn).write.mode("overwrite").saveAsTable(f"{CATALOG}.engagement.jornada")
 
-# Relação campanha_jornada (removida - não existe no DDL)
-
-# Peça (conforme DDL real)
+# Peça (conforme DDL real - 21 campos)
 peca_id = "peca_001"
-schema_peca = StructType([StructField("peca_id", StringType(), False), StructField("peca_codigo", StringType(), True), StructField("nome", StringType(), True), StructField("descricao", StringType(), True), StructField("canal_id", StringType(), True), StructField("tipo_conteudo", StringType(), True), StructField("template_html", StringType(), True), StructField("template_texto", StringType(), True), StructField("subject", StringType(), True), StructField("personalizacao_json", StringType(), True), StructField("bloco_variaveis_permitidas_json", StringType(), True), StructField("preview_desktop_url", StringType(), True), StructField("preview_mobile_url", StringType(), True), StructField("tags", ArrayType(StringType()), True), StructField("criado_por", StringType(), True), StructField("criado_em", TimestampType(), True), StructField("versao_atual", IntegerType(), True), StructField("atualizado_em", TimestampType(), True), StructField("ativo", BooleanType(), True)])
-peca_tuples = [(peca_id, "PEC-2025-EMAIL-00001", "Oferta Cross-Sell Email", "Email com oferta de cartão e investimentos", "email", "html", "<p>Olá {{nome}}, aproveite nossa oferta exclusiva!</p><p>Renda: {{renda_mensal}}</p>", "Olá [nome], aproveite nossa oferta exclusiva! Renda: [renda_mensal]", "Aproveite a oferta exclusiva", '{"nome": "string", "renda_mensal": "double"}', '{"permitidas": ["renda_mensal", "possui_cartao"]}', None, None, ["cross-sell","email"], "admin", datetime.now(), int(1), datetime.now(), True)]
+schema_peca = StructType([
+    StructField("peca_id", StringType(), False),
+    StructField("peca_codigo", StringType(), True),
+    StructField("nome", StringType(), True),
+    StructField("descricao", StringType(), True),
+    StructField("canal", StringType(), True),
+    StructField("tags", ArrayType(StringType()), True),
+    StructField("conteudo_json", StringType(), True),
+    StructField("html_renderizado", StringType(), True),
+    StructField("assunto", StringType(), True),
+    StructField("template_meta_id", StringType(), True),
+    StructField("variaveis_usadas", ArrayType(StringType()), True),
+    StructField("status_aprovacao", StringType(), True),
+    StructField("aprovado_por", StringType(), True),
+    StructField("aprovado_em", TimestampType(), True),
+    StructField("motivo_reprovacao", StringType(), True),
+    StructField("criado_por", StringType(), True),
+    StructField("criado_em", TimestampType(), True),
+    StructField("owner", StringType(), True),
+    StructField("area_responsavel", StringType(), True),
+    StructField("versao_atual", IntegerType(), True),
+    StructField("atualizado_em", TimestampType(), True)
+])
+conteudo = '{"template": "Olá {{nome}}, aproveite nossa oferta exclusiva! Renda: {{renda_mensal}}", "personalizacao": {"nome": "string", "renda_mensal": "double"}}'
+peca_tuples = [
+    (peca_id, "PEC-2025-EMAIL-00001", "Oferta Cross-Sell Email", "Email com oferta de cartão e investimentos", 
+     "email", ["cross-sell"], conteudo, "<p>Olá {{nome}}, aproveite nossa oferta exclusiva!</p>", 
+     "Aproveite a oferta exclusiva", None, ["nome","renda_mensal"], "aprovado", None, None, None, "admin", 
+     datetime.now(), "marketing", "Marketing", 1, datetime.now())
+]
 spark.createDataFrame(peca_tuples, schema_peca).write.mode("overwrite").saveAsTable(f"{CATALOG}.engagement.peca")
 
 print("  OK")
@@ -740,7 +823,7 @@ else:
     ])).write.mode("overwrite").saveAsTable(f"{CATALOG}.segmentacao.seg_resultado_corrente")
 
 # Atualizar o gatilho_seg_id da jornada para o primeiro segmento (para testar S3)
-spark.sql(f"UPDATE {CATALOG}.engagement.jornada SET gatilho_seg_id = '{seg_ids[0]}' WHERE jornada_id = 'jorn_001'")
+spark.sql(f"UPDATE {CATALOG}.engagement.jornada SET seg_entrada_id = '{seg_ids[0]}' WHERE jornada_id = 'jorn_001'")
 
 print("  OK")
 

@@ -14,4 +14,5 @@ CREATE TABLE IF NOT EXISTS plataforma.core_cliente.golden_record (
   tempo_relacionamento_meses INT,
   atualizado_em              TIMESTAMP DEFAULT current_timestamp()
 ) USING DELTA
+TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported')
 COMMENT 'Golden Record consolidado (POC). Fonte de dados cadastrais + contato';

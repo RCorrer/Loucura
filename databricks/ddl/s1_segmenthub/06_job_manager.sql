@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_job_log (
   executado_por   STRING             COMMENT 'Usuário que disparou a ação',
   criado_em       TIMESTAMP NOT NULL DEFAULT current_timestamp()
 ) USING DELTA
+TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported')
 CLUSTER BY (seg_id)
 TBLPROPERTIES (
   'delta.autoOptimize.optimizeWrite' = 'true',

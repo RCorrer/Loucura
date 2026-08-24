@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS plataforma.eventos.seg_eventos (
   payload_json STRING,
   criado_em    TIMESTAMP DEFAULT current_timestamp()
 ) USING DELTA
+TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported')
 COMMENT 'Eventos do S1. Consumido por S3 (novo público) e S4 (acompanhamento)';
 
 -- Produzido pelo S2 (ClientView 360)

@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_definicao (
   habilitado               BOOLEAN  DEFAULT true,
   job_id_databricks        STRING   COMMENT 'ID do Databricks Job associado (arquitetura job-per-segment)'
 ) USING DELTA
+TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported')
 CLUSTER BY (status, objetivo, owner)
 TBLPROPERTIES (
   'delta.autoOptimize.optimizeWrite' = 'true',
@@ -62,6 +63,7 @@ CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_execucao (
   run_id          STRING,
   job_run_url     STRING
 ) USING DELTA
+TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported')
 CLUSTER BY (seg_id, status)
 TBLPROPERTIES (
   'delta.autoOptimize.optimizeWrite' = 'true',
@@ -81,6 +83,7 @@ CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_resultado_corrente (
   exec_id   STRING,
   entrou_em TIMESTAMP DEFAULT current_timestamp()
 ) USING DELTA
+TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported')
 CLUSTER BY (seg_id, cpf_cnpj)
 TBLPROPERTIES (
   'delta.autoOptimize.optimizeWrite' = 'true',
@@ -103,6 +106,7 @@ CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_resultado_historico (
   cpf_cnpj     STRING   NOT NULL,
   snapshot_em  TIMESTAMP DEFAULT current_timestamp()
 ) USING DELTA
+TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported')
 CLUSTER BY (seg_id, exec_id)
 TBLPROPERTIES (
   'delta.autoOptimize.optimizeWrite' = 'true',
@@ -134,6 +138,7 @@ CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_comentario (
   criado_em        TIMESTAMP DEFAULT current_timestamp(),
   editado_em       TIMESTAMP
 ) USING DELTA
+TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported')
 CLUSTER BY (seg_id)
 COMMENT 'Thread de comentários colaborativos';
 
@@ -147,6 +152,7 @@ CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_notificacao (
   lida         BOOLEAN  DEFAULT false,
   criado_em    TIMESTAMP DEFAULT current_timestamp()
 ) USING DELTA
+TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported')
 CLUSTER BY (destinatario)
 COMMENT 'Notificações in-app do S1';
 
@@ -160,6 +166,7 @@ CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_saude (
   alertas_json         STRING,
   publico_atual        BIGINT
 ) USING DELTA
+TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported')
 CLUSTER BY (health_status)
 COMMENT 'Estado de saúde por segmentação (populado por Job)';
 
@@ -176,6 +183,7 @@ CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_versao (
   alterado_por STRING,
   alterado_em TIMESTAMP DEFAULT current_timestamp()
 ) USING DELTA
+TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported')
 CLUSTER BY (seg_id, versao)
 TBLPROPERTIES (
   'delta.autoOptimize.optimizeWrite' = 'true',
@@ -192,6 +200,7 @@ CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_historico_estado (
   alterado_por    STRING,
   alterado_em     TIMESTAMP DEFAULT current_timestamp()
 ) USING DELTA
+TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported')
 CLUSTER BY (seg_id)
 TBLPROPERTIES ('delta.autoOptimize.optimizeWrite' = 'true')
 COMMENT 'Auditoria de mudanças de status da segmentação';
@@ -202,6 +211,7 @@ CREATE TABLE IF NOT EXISTS plataforma.segmentacao.seg_destino (
   habilitado BOOLEAN DEFAULT true,
   criado_em  TIMESTAMP DEFAULT current_timestamp()
 ) USING DELTA
+TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported')
 CLUSTER BY (seg_id)
 COMMENT 'Destinos de publicação da segmentação (S2, S3, S4)';
 
