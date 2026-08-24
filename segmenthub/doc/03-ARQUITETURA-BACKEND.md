@@ -243,4 +243,121 @@ O FastAPI serve a API em `/api/*` e o frontend buildado (React) via `StaticFiles
 
 ---
 
-*Baseado no código-fonte real em `/segmenthub/src/`.*
+## 10. Segurança & RBAC
+
+> Consolidado do modelo de segurança completo. Autenticação, autorização e proteção de dados.
+
+### 10.1 Autenticação (OBO)
+
+| Aspecto | Detalhe |
+|---|---|
+| Mecanismo | Databricks Apps injeta `X-Forwarded-Email` |
+| Fallback (dev) | Variável `DEV_USER` (só se `ENV != production`) |
+| Produção | Sem fallback — sem header = 401 |
+
+```
+  Browser → Databricks Apps (Azure AD SSO) → FastAPI (X-Forwarded-Email)
+                                               └─ get_current_user()
+                                               └─ Busca perfil em usuarios_perfil
+```
+
+### 10.2 Autorização (RBAC)
+
+**Tabela de controle:** `plataforma.governanca.usuarios_perfil` (filtro: `sistema='segmenthub'`, `ativo=true`)
+
+| Operação | analista | admin |
+|---|:---:|:---:|
+| Criar / editar / listar / estimar | ✅ | ✅ |
+| Enviar para aprovação | ✅ | ✅ |
+| **Aprovar** | ❌ | ✅ |
+| Pausar / reativar / encerrar / executar | ✅ | ✅ |
+| Clonar / comentar / chatbot / saúde | ✅ | ✅ |
+| **Admin catálogo (flags S2/S3)** | ❌ | ✅ |
+| **Histórico governança** | ❌ | ✅ |
+
+**Mecanismo:** Factory `require_perfil(["admin"])` gera dependência FastAPI que retorna 403 se perfil insuficiente.
+
+### 10.3 Anti-Injection (Defesa em Profundidade)
+
+```
+  regras_json ─▶ Validator ─▶ QueryEngine ─▶ execute_query ─▶ SQL Warehouse
+                 (whitelist     (gera SQL      (sql, params)    (parametrizado)
+                  de campos)     com ?)
+```
+
+| Camada | Proteção |
+|---|---|
+| Validator | `campo_id` validado contra catálogo (whitelist) — não aceita arbitrário |
+| Validator | Operador verificado contra lista fixa por campo |
+| Validator | Tipo do valor verificado (numérico, categórico, date, boolean) |
+| QueryEngine | Valores como parâmetros posicionais (`?`) — nunca interpolados |
+| seg_exec (Job) | Valores escapados via `sql_val()` + lookup no catálogo |
+
+### 10.4 Proteção de Dados
+
+| Princípio | Implementação |
+|---|---|
+| Analista nunca vê dados individuais | API retorna só contagens (`approx_count_distinct`) |
+| CPFs nunca expostos via API | Endpoint de estimativa retorna apenas número |
+| Acesso via Service Principal | Analista não tem credencial direta |
+| Chatbot respeita mesmas regras | Tools retornam só contagens e metadados |
+| Campos sensíveis marcados | `sensibilidade = 'lgpd'` no catálogo |
+
+### 10.5 Variáveis de Ambiente
+
+| Variável | Uso |
+|---|---|
+| `DATABRICKS_WAREHOUSE_ID` | SQL Warehouse (via recurso `sql-warehouse` do App) |
+| `DATABRICKS_HOST` | Hostname |
+| `UC_CATALOG` | Catálogo (default: `plataforma`) |
+| `ENV` | `production` (desativa fallbacks) |
+| `SEG_EXEC_NOTEBOOK_PATH` | Path do notebook seg_exec |
+
+---
+
+## 11. Referência de Operadores
+
+> 17 operadores suportados pelo QueryEngine para construção de regras.
+
+### 11.1 Operadores por Categoria
+
+| Categoria | Operadores | Aplicável a |
+|---|---|---|
+| **Comparação** | `=`, `!=`, `>`, `<`, `>=`, `<=` | Numérico (direto), String (case-insensitive via LOWER) |
+| **Range/Lista** | `between`, `in`, `not_in` | Numérico + String |
+| **Texto** | `contains`, `not_contains`, `starts_with`, `ends_with`, `not_starts_with`, `not_ends_with` | Somente String (case-insensitive) |
+| **Nulidade** | `is_null`, `is_not_null` | Todos |
+
+### 11.2 Comportamento por Tipo de Dado
+
+| tipo_dado | Operadores disponíveis | Case-sensitive? | SQL gerado |
+|---|---|---|---|
+| `numeric` | Comparação + Range/Lista + Nulidade (11 ops) | N/A | `campo >= ?` |
+| `categorical` | Comparação + Texto + Lista + Nulidade (12 ops) | **Não** (LOWER) | `LOWER(campo) LIKE LOWER(?)` |
+| `date` | Comparação + Range + Nulidade | N/A | `campo BETWEEN ? AND ?` |
+| `boolean` | `=`, `!=`, `is_null`, `is_not_null` | N/A | `campo = ?` |
+
+### 11.3 Exemplos de SQL Gerado
+
+```sql
+-- Numérico: comparação direta
+WHERE customer_features_wide.idade >= ?
+
+-- Categórico: case-insensitive via LOWER
+WHERE LOWER(customer_features_wide.cidade) LIKE LOWER(?)
+-- params: ['%paulo%']
+
+-- Lista categórica: todos LOWER
+WHERE LOWER(customer_features_wide.estado) IN (LOWER(?), LOWER(?), LOWER(?))
+
+-- Between numérico
+WHERE customer_features_wide.score BETWEEN ? AND ?
+```
+
+### 11.4 Validação no Catálogo
+
+Cada campo em `catalogo_caracteristicas` possui coluna `operadores` (ARRAY<STRING>) que define quais operadores são válidos. O `Validator` rejeita com 422 se o operador usado não pertence à lista do campo.
+
+---
+
+*Baseado no código-fonte real em `/segmenthub/src/`. Seções 10-11 consolidadas dos antigos docs 08-SEGURANCA-RBAC e 10-OPERADORES-SISTEMA.*

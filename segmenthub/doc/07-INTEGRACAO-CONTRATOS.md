@@ -2,7 +2,7 @@
 
 > Detalhes de implementação específicos de como o S1 participa da integração.  
 > Para a visão completa de todos os contratos da plataforma (4 sistemas),  
-> ver [11-CONTRATOS-DADOS-EVENTOS.md](./11-CONTRATOS-DADOS-EVENTOS.md).
+> ver [08-CONTRATOS-DADOS-EVENTOS.md](./08-CONTRATOS-DADOS-EVENTOS.md).
 
 ---
 

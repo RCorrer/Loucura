@@ -1,5 +1,7 @@
 # Contratos de Dados e Eventos — Plataforma CDP
 
+> 📌 **Escopo: PLATAFORMA INTEIRA** (não é específico do S1 — cobre S1/S2/S3/S4)
+
 > **Documento mestre de integração** entre os 4 sistemas.  
 > Fonte de verdade dos contratos, eventos, payloads e decisões acordadas.  
 > Sempre que um cartão fizer integração entre sistemas, referencie este documento.

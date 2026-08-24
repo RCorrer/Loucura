@@ -1,5 +1,7 @@
 # Estrutura do Projeto — Plataforma CDP
 
+> 📌 **Escopo: PLATAFORMA INTEIRA** (não é específico do S1 — cobre todos os apps)
+
 > **4 projetos independentes** — cada um é um Databricks App separado (deploy isolado).  
 > **1 biblioteca de front compartilhada** (`shared-ui`) copiada via script de sync.  
 > Base do design system: **MUI** + tokens de cor Bradesco.

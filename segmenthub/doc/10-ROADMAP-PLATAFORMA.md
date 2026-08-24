@@ -1,5 +1,7 @@
 # Roadmap da Plataforma CDP
 
+> 📌 **Escopo: PLATAFORMA INTEIRA** (fases A-E, todos os sistemas)
+
 > Status consolidado das fases, cartões do S1 (reconciliados com implementação real),  
 > índice de roadmaps pendentes e convenções globais.
 
