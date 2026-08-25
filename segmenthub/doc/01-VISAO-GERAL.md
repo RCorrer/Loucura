@@ -83,7 +83,7 @@ O **SegmentHub** é o motor de segmentação da Plataforma CDP. Permite que anal
 
 ---
 
-## 4. Estrutura de Diretórios
+## 4. Estrutura do Projeto (Resumo)
 
 ```
 segmenthub/
@@ -233,16 +233,25 @@ O SegmentHub opera sobre o catálogo `plataforma` com os seguintes schemas:
 
 ## 8. Índice da Documentação
 
+### S1 — Core (7 docs — fonte de verdade para implementação)
+
 | # | Documento | Conteúdo |
 |---|---|---|
-| 01 | **Este arquivo** | Visão geral, arquitetura, stack, estrutura |
-| 02 | [Schemas e Tabelas](02-SCHEMAS-TABELAS.md) | DDLs, colunas, índices, relacionamentos |
-| 03 | [Arquitetura Backend](03-ARQUITETURA-BACKEND.md) | Camadas, padrões, módulos core |
-| 04 | [Ciclo de Vida e Estados](04-CICLO-VIDA-ESTADOS.md) | State machine, transições, versionamento |
-| 05 | [Jobs e Execução](05-JOBS-EXECUCAO.md) | Arquitetura job-per-segment, notebooks, fluxos |
-| 06 | [API REST](06-API-ENDPOINTS.md) | Endpoints completos, request/response |
-| 07 | [Integração e Contratos](07-INTEGRACAO-CONTRATOS.md) | Eventos, GRANT SELECT, dependências |
-| 08 | [Segurança e RBAC](08-SEGURANCA-RBAC.md) | Autenticação, autorização, anti-injection |
+| 01 | **Este arquivo** | Visão geral, arquitetura, stack, schemas, fluxo E2E |
+| 02 | [Schemas e Tabelas](02-SCHEMAS-TABELAS.md) | DDLs completos, colunas, índices, relacionamentos ER |
+| 03 | [Arquitetura Backend](03-ARQUITETURA-BACKEND.md) | Camadas, módulos core, **segurança/RBAC**, **operadores** |
+| 04 | [Ciclo de Vida e Estados](04-CICLO-VIDA-ESTADOS.md) | State machine, transições, efeitos colaterais, versionamento |
+| 05 | [Jobs e Execução](05-JOBS-EXECUCAO.md) | Arquitetura job-per-segment, notebooks (seg_exec, consolidador) |
+| 06 | [API REST](06-API-ENDPOINTS.md) | 48 endpoints, request/response, state machines por entidade |
+| 07 | [Integração S1](07-INTEGRACAO-CONTRATOS.md) | Governança de campos, resolução campo_id, dependências, fluxo S1→S3 |
+
+### Plataforma CDP (referência cross-system)
+
+| # | Documento | Conteúdo |
+|---|---|---|
+| 11 | [Contratos e Eventos](11-CONTRATOS-DADOS-EVENTOS.md) | 7 decisões de arquitetura, contratos GRANT SELECT entre S1/S2/S3/S4 |
+| 12 | [Estrutura do Projeto](12-ESTRUTURA-PROJETO.md) | 4 apps + shared-ui + DDLs + Jobs |
+| 13 | [Roadmap Plataforma](13-ROADMAP-PLATAFORMA.md) | Fases, cartões implementados, pendentes |
 
 ---
 

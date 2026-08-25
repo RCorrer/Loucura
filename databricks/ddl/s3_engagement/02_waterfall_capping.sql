@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS plataforma.engagement.campanha_prioridade (
   atualizado_por STRING,
   atualizado_em TIMESTAMP DEFAULT current_timestamp()
 ) USING DELTA
+TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported')
 COMMENT 'Ordem do waterfall (drag-drop na tela). Cliente entra na de maior prioridade';
 
 CREATE TABLE IF NOT EXISTS plataforma.engagement.regras_capping (
@@ -22,6 +23,7 @@ CREATE TABLE IF NOT EXISTS plataforma.engagement.regras_capping (
   atualizado_por STRING,
   atualizado_em TIMESTAMP DEFAULT current_timestamp()
 ) USING DELTA
+TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported')
 COMMENT 'Frequency capping (anti-fadiga). Global ou por canal';
 
 CREATE TABLE IF NOT EXISTS plataforma.engagement.config_conversao (
@@ -33,15 +35,18 @@ CREATE TABLE IF NOT EXISTS plataforma.engagement.config_conversao (
   atualizado_por STRING,
   atualizado_em TIMESTAMP DEFAULT current_timestamp()
 ) USING DELTA
+TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported')
 COMMENT 'Critério de conversão da cascata (configurável)';
 
-CREATE TABLE IF NOT EXISTS plataforma.engagement.supressao_optout (
+CREATE TABLE IF NOT EXISTS plataforma.engagement.supressao_log (
   supressao_id STRING NOT NULL,
   cpf_cnpj STRING,
   campanha_id STRING,
   canal STRING,
-  motivo STRING COMMENT 'opt_out/capping/blacklisted',
+  motivo STRING COMMENT 'opt_out/capping/waterfall/blacklisted/janela',
   detalhe STRING,
   data_execucao TIMESTAMP DEFAULT current_timestamp()
 ) USING DELTA
-COMMENT 'Registra CADA não-envio e o porquê (transparência)';
+TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported')
+CLUSTER BY (cpf_cnpj, data_execucao)
+COMMENT 'Registra CADA não-envio e o porquê (transparência). Consultável via admin';

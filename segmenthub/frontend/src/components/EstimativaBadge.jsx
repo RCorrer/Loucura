@@ -228,7 +228,7 @@ export default function EstimativaBadge({
         flexWrap: 'wrap',
         border: '1px solid',
         borderColor: erro ? 'error.light' : resultado ? 'success.light' : 'divider',
-        bgcolor: erro ? 'error.50' : 'background.paper',
+        bgcolor: erro ? '#FDE8E8' : 'background.paper',
         transition: 'all 0.3s ease',
       }}
     >

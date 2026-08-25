@@ -16,6 +16,7 @@ export default function PublicoSelector({ value, onChange, error, helperText, on
         console.error('Erro ao carregar públicos:', err);
       } finally {
         setCarregado(true);
+        onLoadComplete?.();
       }
     };
     carregar();

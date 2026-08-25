@@ -61,11 +61,12 @@ class QueryEngine:
         return f"{info['tabela_fisica']}.{info['campo_fisico']}"
 
     def _is_string_field(self, campo_id: str) -> bool:
-        """Verifica se um campo é do tipo string para aplicar LOWER() nas comparações."""
+        """Verifica se um campo é textual para aplicar LOWER() nas comparações.
+        No catálogo, campos textuais têm tipo_dado='categorical'."""
         info = self._cache_catalogo.get(campo_id)
         if not info:
             return False
-        return info.get("tipo_dado") == "string"
+        return info.get("tipo_dado") == "categorical"
 
     def _get_param(self) -> str:
         self._param_counter += 1
@@ -117,23 +118,23 @@ class QueryEngine:
         elif op == "in":
             if not isinstance(valor, list):
                 raise ValueError(f"Operador 'in' requer lista de valores: {valor}")
-            placeholders = ", ".join([self._get_param() for _ in valor])
             if is_string:
                 # Para strings, aplicar LOWER() tanto no campo quanto nos valores
                 lower_placeholders = ", ".join([f"LOWER({self._get_param()})" for _ in valor])
                 sql = f"LOWER({campo}) IN ({lower_placeholders})"
             else:
+                placeholders = ", ".join([self._get_param() for _ in valor])
                 sql = f"{campo} IN ({placeholders})"
             params.extend(valor)
         elif op == "not_in":
             if not isinstance(valor, list):
                 raise ValueError(f"Operador 'not_in' requer lista de valores: {valor}")
-            placeholders = ", ".join([self._get_param() for _ in valor])
             if is_string:
                 # Para strings, aplicar LOWER() tanto no campo quanto nos valores
                 lower_placeholders = ", ".join([f"LOWER({self._get_param()})" for _ in valor])
                 sql = f"LOWER({campo}) NOT IN ({lower_placeholders})"
             else:
+                placeholders = ", ".join([self._get_param() for _ in valor])
                 sql = f"{campo} NOT IN ({placeholders})"
             params.extend(valor)
         elif op == "contains":

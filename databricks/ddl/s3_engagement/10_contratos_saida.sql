@@ -43,3 +43,9 @@ FROM plataforma.engagement.jornada_estado_cliente e
 JOIN plataforma.engagement.jornada j ON j.jornada_id = e.jornada_id
 LEFT JOIN plataforma.engagement.campanha c ON c.campanha_id = e.campanha_id;
 -- S2 cruza por cpf_cnpj (RLS aplicada no lado do S2 ao consultar via cliente).
+
+-- GRANTs para o S2 (ClientView 360) consumir os contratos
+-- Ajustar <S2_PRINCIPAL> para o Service Principal do S2 no deploy
+GRANT SELECT ON VIEW plataforma.engagement.segmento_campanha_map TO `sp_clientview_s2`;
+GRANT SELECT ON VIEW plataforma.engagement.cliente_jornada_status TO `sp_clientview_s2`;
+GRANT SELECT ON TABLE plataforma.engagement.tracking_disparo TO `sp_clientview_s2`;

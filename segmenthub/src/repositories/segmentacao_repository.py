@@ -44,8 +44,9 @@ class SegmentacaoRepository:
                 seg_tags, resumo, objetivo_negocio, publico_alvo_descricao,
                 observacoes, documentacao_md, owner, area_responsavel,
                 email_contato, criado_por, publico_base_id, regras_json,
-                tipo, status, versao_atual, criado_em, atualizado_em
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                tipo, seg_origem_id, tipo_origem,
+                status, versao_atual, criado_em, atualizado_em
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         # Converte regras_json para string se for dict
         regras_json = dados.get("regras_json")
@@ -73,6 +74,8 @@ class SegmentacaoRepository:
             dados["publico_base_id"],
             regras_json,
             dados.get("tipo", "direta"),
+            dados.get("seg_origem_id"),
+            dados.get("tipo_origem", "nova"),
             dados.get("status", "rascunho"),
             dados.get("versao_atual", 1),
             dados.get("criado_em", datetime.now()),
@@ -92,7 +95,7 @@ class SegmentacaoRepository:
                 tipo_origem, tipo, publico_base_id, regras_json, status,
                 vigencia_inicio, vigencia_fim, agendamento_cron, recorrencia,
                 aprovado_por, aprovado_em, checklist_validacao_json,
-                versao_atual, atualizado_em, habilitado
+                versao_atual, atualizado_em, habilitado, job_id_databricks
             FROM plataforma.segmentacao.seg_definicao
             WHERE seg_id = ?
         """
@@ -105,7 +108,7 @@ class SegmentacaoRepository:
             "tipo_origem", "tipo", "publico_base_id", "regras_json", "status",
             "vigencia_inicio", "vigencia_fim", "agendamento_cron", "recorrencia",
             "aprovado_por", "aprovado_em", "checklist_validacao_json",
-            "versao_atual", "atualizado_em", "habilitado"
+            "versao_atual", "atualizado_em", "habilitado", "job_id_databricks"
         ]
         if rows:
             row = list(rows[0])
@@ -193,32 +196,40 @@ class SegmentacaoRepository:
             sql += " AND owner = ?"
             params.append(filtros["owner"])
         if filtros.get("busca"):
-            sql += " AND (nome LIKE ? OR seg_codigo LIKE ? OR descricao LIKE ?)"
-            busca_param = f"%{filtros['busca']}%"
+            sql += " AND (LOWER(nome) LIKE ? OR LOWER(seg_codigo) LIKE ? OR LOWER(descricao) LIKE ?)"
+            busca_param = f"%{filtros['busca'].lower()}%"
             params.extend([busca_param, busca_param, busca_param])
 
         result = self.client.execute_query(sql, tuple(params))
         return result[0][0] if result else 0
 
+    # Sentinel para diferenciar "não passou o campo" de "quer setar NULL"
+    _UNSET = object()
+
     def atualizar(self, seg_id: str, dados: Dict[str, Any]) -> bool:
-        """Atualiza uma segmentação existente."""
+        """Atualiza uma segmentação existente.
+        
+        Aceita None nos valores — seta o campo para NULL no banco.
+        Apenas chaves ausentes do dict são ignoradas.
+        """
         # Constrói SET dinamicamente
         set_parts = []
-        params = [seg_id]  # WHERE vem por último
+        set_params = []  # valores dos SET (antes do WHERE)
         for key, value in dados.items():
-            if value is not None:
-                set_parts.append(f"{key} = ?")
-                params.append(value)
+            set_parts.append(f"{key} = ?")
+            set_params.append(value)
         if not set_parts:
             return False
 
         set_parts.append("atualizado_em = current_timestamp()")
+        # seg_id vai no FINAL (WHERE é o último placeholder)
+        params = tuple(set_params) + (seg_id,)
         sql = f"""
             UPDATE plataforma.segmentacao.seg_definicao
             SET {", ".join(set_parts)}
             WHERE seg_id = ?
         """
-        rows = self.client.execute_insert(sql, tuple(params))
+        rows = self.client.execute_insert(sql, params)
         return rows > 0
 
     def arquivar(self, seg_id: str) -> bool:
@@ -235,7 +246,7 @@ class SegmentacaoRepository:
     # CICLO DE VIDA
     # ============================================================
 
-    def atualizar_status(self, seg_id: str, novo_status: str, motivo: Optional[str] = None) -> bool:
+    def atualizar_status(self, seg_id: str, novo_status: str, motivo: Optional[str] = None, usuario: str = "system") -> bool:
         """Atualiza o status de uma segmentação e registra no histórico."""
         atual = self.buscar_por_id(seg_id)
         if not atual:
@@ -248,10 +259,10 @@ class SegmentacaoRepository:
             WHERE seg_id = ?
         """
         self.client.execute_insert(sql, (novo_status, seg_id))
-        self.registrar_historico_estado(seg_id, status_anterior, novo_status, motivo)
+        self.registrar_historico_estado(seg_id, status_anterior, novo_status, motivo, usuario)
         return True
 
-    def registrar_historico_estado(self, seg_id: str, estado_anterior: str, estado_novo: str, motivo: Optional[str] = None):
+    def registrar_historico_estado(self, seg_id: str, estado_anterior: str, estado_novo: str, motivo: Optional[str] = None, usuario: str = "system"):
         """Registra transição de estado no histórico."""
         hist_id = f"hist_{uuid.uuid4().hex[:12]}"
         sql = """
@@ -259,8 +270,7 @@ class SegmentacaoRepository:
             (hist_id, seg_id, estado_anterior, estado_novo, motivo, alterado_por, alterado_em)
             VALUES (?, ?, ?, ?, ?, ?, current_timestamp())
         """
-        alterado_por = "system"  # será substituído pelo usuário autenticado
-        self.client.execute_insert(sql, (hist_id, seg_id, estado_anterior, estado_novo, motivo, alterado_por))
+        self.client.execute_insert(sql, (hist_id, seg_id, estado_anterior, estado_novo, motivo, usuario))
 
     def inserir_versao(self, seg_id: str, versao: int, regras_json: Dict, motivo: str, alterado_por: str) -> bool:
         """Insere uma nova versão da segmentação."""
@@ -276,14 +286,14 @@ class SegmentacaoRepository:
         ))
         return True
 
-    def executar_segmentacao(self, seg_id: str, exec_id: str) -> bool:
-        """Cria um registro de execução (chamado pelo Job posteriormente)."""
+    def executar_segmentacao(self, seg_id: str, exec_id: str, versao_usada: int = 1, origem: str = "manual") -> bool:
+        """Cria um registro de execução com todos os campos obrigatórios do DDL."""
         sql = """
             INSERT INTO plataforma.segmentacao.seg_execucao
-            (exec_id, seg_id, origem_execucao, status)
-            VALUES (?, ?, 'manual', 'em_execucao')
+            (exec_id, seg_id, versao_usada, origem_execucao, executado_em, status)
+            VALUES (?, ?, ?, ?, current_timestamp(), 'em_execucao')
         """
-        self.client.execute_insert(sql, (exec_id, seg_id))
+        self.client.execute_insert(sql, (exec_id, seg_id, versao_usada, origem))
         return True
 
     # ============================================================

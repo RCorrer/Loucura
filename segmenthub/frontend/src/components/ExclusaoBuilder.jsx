@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Typography, Paper } from '@mui/material';
 import RuleNode from './RuleNode';
+import { tokens } from '../shared-ui/theme/tokens';
 
 /**
  * ExclusaoBuilder — Mesmo engine recursivo do RuleBuilder, com visual de exclusão.
@@ -43,9 +44,9 @@ export default function ExclusaoBuilder({
   };
 
   return (
-    <Paper sx={{ p: 2, mb: 3, border: '1px dashed #d32f2f' }}>
+    <Paper sx={{ p: 2, mb: 3, border: `1px dashed ${tokens.feedback.error}` }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-        <Typography variant="h6" sx={{ color: '#d32f2f' }}>
+        <Typography variant="h6" sx={{ color: tokens.feedback.error }}>
           Exclusão (opcional)
         </Typography>
         <Typography variant="caption" color="text.secondary">

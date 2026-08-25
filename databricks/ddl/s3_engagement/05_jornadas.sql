@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS plataforma.engagement.jornada_estado_cliente (
   historico_nos ARRAY<STRING> COMMENT 'Nós percorridos',
   contexto_json STRING
 ) USING DELTA
+CLUSTER BY (cpf_cnpj)
 COMMENT 'Estado de cada cliente na jornada. Base do contrato cliente_jornada_status (S2)';
 
 CREATE TABLE IF NOT EXISTS plataforma.engagement.jornada_participacao (

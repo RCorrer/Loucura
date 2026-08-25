@@ -4,7 +4,7 @@ from fastapi.responses import FileResponse, Response
 import os
 import logging
 
-from src.api import metadata, segmentacao, estimativa, comentario, saude, metadata_admin
+from src.api import metadata, segmentacao, estimativa, comentario, saude, metadata_admin, chat
 from src.core.config import AppConfig
 from src.core.security import get_current_user, require_perfil
 
@@ -99,6 +99,7 @@ app.include_router(comentario.comentario_router, prefix="/api")
 app.include_router(comentario.notificacao_router, prefix="/api")
 app.include_router(saude.router, prefix="/api")
 app.include_router(metadata_admin.router, prefix="/api")
+app.include_router(chat.router, prefix="/api")
 
 # ============================================================
 # Static files + SPA fallback

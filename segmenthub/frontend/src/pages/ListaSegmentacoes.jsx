@@ -90,7 +90,7 @@ export default function ListaSegmentacoes() {
   const handleClone = async (id) => {
     try {
       setErrorMessage(null);
-      const response = await clonar(id, { owner: 'admin' });
+      const response = await clonar(id, {});  // owner vazio → backend auto-fill com OBO user
       
       console.log('Clone response:', response);
       

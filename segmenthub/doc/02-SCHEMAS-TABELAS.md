@@ -155,7 +155,7 @@ Tabela principal. Cada linha = 1 segmentação.
 | `tipo` | STRING | `direta` / `composta` |
 | `publico_base_id` | STRING FK | Público-base selecionado |
 | `regras_json` | STRING | Árvore de regras (JSON) |
-| `status` | STRING | `rascunho` / `em_aprovacao` / `ativa` / `pausada` / `encerrada` / `arquivada` |
+| `status` | STRING | `rascunho` / `em_aprovacao` / `aprovada` / `ativa` / `pausada` / `encerrada` / `arquivada` |
 | `vigencia_inicio` | TIMESTAMP | Início da vigência |
 | `vigencia_fim` | TIMESTAMP | Fim da vigência |
 | `agendamento_cron` | STRING | Expressão Quartz (6 campos) |
@@ -180,7 +180,7 @@ Registro de cada execução/recálculo.
 
 | Coluna | Tipo | Descrição |
 |---|---|---|
-| `exec_id` | STRING PK | Formato: `exec_{seg_id}_{YYYYMMDD_HHMMSS}` |
+| `exec_id` | STRING PK | Formato: `exec_{uuid12}` (gerado pelo backend) |
 | `seg_id` | STRING FK | Segmentação |
 | `versao_usada` | INT | Versão da regra usada |
 | `origem_execucao` | STRING | `agendada` / `manual` / `reativacao` |

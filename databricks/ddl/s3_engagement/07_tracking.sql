@@ -18,5 +18,6 @@ CREATE TABLE IF NOT EXISTS plataforma.engagement.tracking_disparo (
   provider_message_id STRING,
   atualizado_em TIMESTAMP DEFAULT current_timestamp()
 ) USING DELTA
+TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported')
 CLUSTER BY (cpf_cnpj)
 COMMENT 'Funil por envio. CONTRATO: lido por S2 (engajamento) e S4 (KPIs). converteu_em vem do S2';

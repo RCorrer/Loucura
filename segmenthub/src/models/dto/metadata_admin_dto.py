@@ -26,10 +26,10 @@ class CampoAdminDTO(BaseModel):
     tema: str
     tipo_dado: str
     sensibilidade: str
-    ativo: bool
-    usavel_em_visao360: bool
-    usavel_em_peca: bool
-    bloco_visao360: Optional[str]
+    ativo: bool = False
+    usavel_em_visao360: bool = False  # default False para campos com NULL no banco
+    usavel_em_peca: bool = False      # default False para campos com NULL no banco
+    bloco_visao360: Optional[str] = None
 
 
 class CampoAdminDetalheDTO(CampoAdminDTO):

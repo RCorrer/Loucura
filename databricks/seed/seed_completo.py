@@ -14,6 +14,7 @@
 
 # COMMAND ----------
 
+# DBTITLE 1,Geração de dados de clientes
 import random
 import uuid
 from datetime import datetime, timedelta
@@ -71,7 +72,7 @@ def gerar_cliente(cpf):
         "genero": random.choice(["M", "F"]),
         "estado": fake.state_abbr(),
         "cidade": fake.city(),
-        "estado_civil": random.choice(["Solteiro", "Casado", "Divorciado", "Viúvo"]),
+        "estado_civil": random.choice(["solteiro", "casado", "divorciado", "viúvo"]),
         "profissao": random.choice(["Administrador", "Engenheiro", "Médico", "Professor", "Autônomo", "Empresário"]),
         "setor": random.choice(["Público", "Privado", "ONG"]),
         "tipo_vinculo": random.choice(["CLT", "PJ", "Servidor Público", "Aposentado"]),
@@ -102,12 +103,14 @@ def gerar_cliente(cpf):
         "nps": int(random.randint(-100, 100)),
         "churn_score": round(random.uniform(0, 100), 2),
         "engajamento_score": round(random.uniform(0, 100), 2),
+        "dias_desde_ultimo_acesso": int(random.randint(0, 120)),
     }
 
 clientes_data = [gerar_cliente(cpf) for cpf in cpf_list]
 
 # COMMAND ----------
 
+# DBTITLE 1,1. Golden Record
 # 1. GOLDEN RECORD
 print("1. Golden Record...")
 schema_golden = StructType([
@@ -119,16 +122,19 @@ schema_golden = StructType([
     StructField("data_nascimento", DateType(), True),
     StructField("agencia", StringType(), True),
     StructField("gerente_nome", StringType(), True),
-    StructField("tempo_relacionamento_meses", IntegerType(), True)
+    StructField("tempo_relacionamento_meses", IntegerType(), True),
+    StructField("atualizado_em", TimestampType(), True)
 ])
 golden_rows = [(d["cpf_cnpj"], d["nome"], d["email"], d["telefone"], d["segmento"], 
-                d["data_nascimento"], d["agencia"], d["gerente_nome"], d["tempo_relacionamento_meses"]) 
+                d["data_nascimento"], d["agencia"], d["gerente_nome"], d["tempo_relacionamento_meses"],
+                datetime.now()) 
                for d in clientes_data]
 spark.createDataFrame(golden_rows, schema_golden).write.mode("overwrite").saveAsTable(f"{CATALOG}.core_cliente.golden_record")
 print("  OK")
 
 # COMMAND ----------
 
+# DBTITLE 1,2. Customer Features Wide (com segmento + dias_desde_ultimo_acesso)
 # 2. CUSTOMER_FEATURES_WIDE
 print("2. Customer Features Wide...")
 schema_wide = StructType([
@@ -192,7 +198,8 @@ d["renda_mensal"], d["faixa_renda"], d["renda_comprovada"], d["saldo_medio"], d[
                 d["perfil_investidor"], d["possui_seguro"], d["tipos_seguro"], d["possui_credito"], 
                 d["valor_credito_contratado"], d["tipo_credito"], d["qtd_transacoes_mes"], d["ticket_medio"], 
                 d["valor_movimentado_mes"], d["usa_app"], d["usa_internet_banking"], d["canal_preferido"], 
-                d["frequencia_acesso"], d["nps"], d["churn_score"], d["engajamento_score"], datetime.now()) 
+                d["frequencia_acesso"], d["nps"], d["churn_score"], d["engajamento_score"],
+                datetime.now()) 
                for d in clientes_data]
 spark.createDataFrame(wide_rows, schema_wide).write.mode("overwrite").saveAsTable(f"{CATALOG}.caracteristicas.customer_features_wide")
 print("  OK")
@@ -299,7 +306,10 @@ print("  OK")
 
 # COMMAND ----------
 
-# 7. RBAC
+# DBTITLE 1,7. RBAC (usuarios_perfil)
+# 7. RBAC (usuarios_perfil)
+# O backend usa o email do header X-Forwarded-Email para lookup.
+# Precisamos de usuários com EMAIL como usuario_id.
 print("7. RBAC...")
 schema_rbac = StructType([
     StructField("usuario_id", StringType(), False),
@@ -312,27 +322,121 @@ schema_rbac = StructType([
     StructField("revogado_por", StringType(), True),
     StructField("revogado_em", TimestampType(), True)
 ])
+
+# Usuário principal (OBO) — email real que chega via Databricks Apps
+MAIN_USER = "rafael.correr@bradesco.com.br"
+
+now = datetime.now()
 rbac_rows = [
-    ("admin", "Administrador", "segmenthub", "admin", True, "bootstrap", datetime.now(), None, None),
-    ("admin", "Administrador", "clientview360", "admin", True, "bootstrap", datetime.now(), None, None),
-    ("admin", "Administrador", "engagement", "admin", True, "bootstrap", datetime.now(), None, None),
-    ("admin", "Administrador", "analytics", "admin", True, "bootstrap", datetime.now(), None, None),
+    # Admin principal em todos os sistemas
+    (MAIN_USER, "Rafael Correr", "segmenthub", "admin", True, "bootstrap", now, None, None),
+    (MAIN_USER, "Rafael Correr", "clientview360", "admin", True, "bootstrap", now, None, None),
+    (MAIN_USER, "Rafael Correr", "engagement", "admin", True, "bootstrap", now, None, None),
+    (MAIN_USER, "Rafael Correr", "analytics", "admin", True, "bootstrap", now, None, None),
+    # Usuário dev fallback (DEV_USER env)
+    ("admin", "Admin Dev", "segmenthub", "admin", True, "bootstrap", now, None, None),
+    ("admin", "Admin Dev", "clientview360", "admin", True, "bootstrap", now, None, None),
+    ("admin", "Admin Dev", "engagement", "admin", True, "bootstrap", now, None, None),
+    ("admin", "Admin Dev", "analytics", "admin", True, "bootstrap", now, None, None),
+    # Analistas para teste
+    ("analista1@bradesco.com.br", "Analista Um", "segmenthub", "analista", True, "bootstrap", now, None, None),
+    ("analista2@bradesco.com.br", "Analista Dois", "segmenthub", "analista", True, "bootstrap", now, None, None),
+    ("analista1@bradesco.com.br", "Analista Um", "engagement", "analista", True, "bootstrap", now, None, None),
 ]
+# Gerentes para S2
 for i in range(1, 6):
-    uid = f"gerente_{i:03d}"
-    rbac_rows.append((uid, f"Gerente {i}", "clientview360", "gerente", True, "bootstrap", datetime.now(), None, None))
+    uid = f"gerente{i}@bradesco.com.br"
+    rbac_rows.append((uid, f"Gerente {i}", "clientview360", "gerente", True, "bootstrap", now, None, None))
+
 spark.createDataFrame(rbac_rows, schema_rbac).write.mode("overwrite").saveAsTable(f"{CATALOG}.governanca.usuarios_perfil")
-print("  OK")
+print(f"  OK — {len(rbac_rows)} registros")
 
 # COMMAND ----------
 
-# 8. CATÁLOGOS (metadados)
+# DBTITLE 1,8. Catálogos (metadata) — ALINHADO COM BACKEND
+# 8. CATÁLOGOS (metadata) — alinhado com QueryEngine + Validator
+# IMPORTANTE: tabela_fisica DEVE ser fully qualified (plataforma.schema.table)
+# IMPORTANTE: catalogo_publicos DEVE ter join_key
+# IMPORTANTE: operadores devem incluir todos os suportados pelo query_engine
 print("8. Catálogos...")
-# catalogo_caracteristicas
-carac_rows = [
-    Row(caracteristica_id="renda_mensal", tema="Financeiro", tema_ordem=1, tabela_fisica="caracteristicas.customer_features_wide", tabela_label="Renda Mensal", campo_fisico="renda_mensal", campo_label="Renda Mensal", tipo_dado="numeric", operadores=["=", ">", "<", "between"], valores_dominio=None, join_key="cpf_cnpj", sensibilidade="normal", usavel_em_peca=True, usavel_em_visao360=True, bloco_visao360="financeiro", ativo=True, descricao="Renda mensal do cliente"),
-    Row(caracteristica_id="faixa_renda", tema="Financeiro", tema_ordem=2, tabela_fisica="caracteristicas.customer_features_wide", tabela_label="Faixa de Renda", campo_fisico="faixa_renda", campo_label="Faixa de Renda", tipo_dado="categorical", operadores=["="], valores_dominio=["baixa","media","alta"], join_key="cpf_cnpj", sensibilidade="normal", usavel_em_peca=True, usavel_em_visao360=True, bloco_visao360="financeiro", ativo=True, descricao="Faixa de renda"),
-    Row(caracteristica_id="score", tema="Financeiro", tema_ordem=3, tabela_fisica="caracteristicas.customer_features_wide", tabela_label="Score de Crédito", campo_fisico="score", campo_label="Score", tipo_dado="numeric", operadores=["=", ">", "<"], valores_dominio=None, join_key="cpf_cnpj", sensibilidade="sensivel", usavel_em_peca=False, usavel_em_visao360=True, bloco_visao360="financeiro", ativo=True, descricao="Score de crédito"),
+
+# Operadores padrão por tipo
+OPS_NUMERIC = ["=", "!=", ">", "<", ">=", "<=", "between", "in", "not_in", "is_null", "is_not_null"]
+OPS_CATEGORICAL = ["=", "!=", "in", "not_in", "contains", "starts_with", "is_null", "is_not_null"]
+OPS_BOOLEAN = ["=", "is_null", "is_not_null"]
+OPS_DATE = ["=", "!=", ">", "<", ">=", "<=", "between", "is_null", "is_not_null"]
+
+FEATURES_TABLE = f"{CATALOG}.caracteristicas.customer_features_wide"
+
+carac_data = [
+    # Financeiro
+    ("renda_mensal", "Financeiro", 1, FEATURES_TABLE, "Renda", "renda_mensal", "Renda Mensal", "numeric", OPS_NUMERIC, None, "cpf_cnpj", "normal", True, True, "financeiro", True, "Renda mensal declarada"),
+    ("faixa_renda", "Financeiro", 2, FEATURES_TABLE, "Renda", "faixa_renda", "Faixa de Renda", "categorical", OPS_CATEGORICAL, ["baixa","media","alta"], "cpf_cnpj", "normal", True, True, "financeiro", True, "Faixa de renda"),
+    ("saldo_medio", "Financeiro", 3, FEATURES_TABLE, "Saldo", "saldo_medio", "Saldo Médio", "numeric", OPS_NUMERIC, None, "cpf_cnpj", "normal", True, True, "financeiro", True, "Saldo médio em conta"),
+    ("score", "Financeiro", 4, FEATURES_TABLE, "Score", "score", "Score de Crédito", "numeric", OPS_NUMERIC, None, "cpf_cnpj", "sensivel", False, True, "financeiro", True, "Score de crédito (300-950)"),
+    ("inadimplente", "Financeiro", 5, FEATURES_TABLE, "Inadimplência", "inadimplente", "Inadimplente", "boolean", OPS_BOOLEAN, None, "cpf_cnpj", "sensivel", False, True, "financeiro", True, "Cliente inadimplente"),
+    ("valor_endividamento", "Financeiro", 6, FEATURES_TABLE, "Dívida", "valor_endividamento", "Valor Endividamento", "numeric", OPS_NUMERIC, None, "cpf_cnpj", "sensivel", False, True, "financeiro", True, "Valor total de endividamento"),
+    # Demográfico
+    ("idade", "Demográfico", 1, FEATURES_TABLE, "Idade", "idade", "Idade", "numeric", OPS_NUMERIC, None, "cpf_cnpj", "normal", True, True, "cadastral", True, "Idade do cliente"),
+    ("faixa_etaria", "Demográfico", 2, FEATURES_TABLE, "Faixa Etária", "faixa_etaria", "Faixa Etária", "categorical", OPS_CATEGORICAL, ["18-25","26-35","36-50","51-65","65+"], "cpf_cnpj", "normal", True, True, "cadastral", True, "Faixa etária"),
+    ("genero", "Demográfico", 3, FEATURES_TABLE, "Gênero", "genero", "Gênero", "categorical", OPS_CATEGORICAL, ["M","F","Outro"], "cpf_cnpj", "normal", True, True, "cadastral", True, "Gênero"),
+    ("estado", "Demográfico", 4, FEATURES_TABLE, "Estado", "estado", "Estado (UF)", "categorical", OPS_CATEGORICAL, None, "cpf_cnpj", "normal", False, True, "cadastral", True, "UF"),
+    ("estado_civil", "Demográfico", 5, FEATURES_TABLE, "Estado Civil", "estado_civil", "Estado Civil", "categorical", OPS_CATEGORICAL, ["solteiro","casado","divorciado","viúvo"], "cpf_cnpj", "normal", True, True, "cadastral", True, "Estado civil"),
+    ("segmento", "Demográfico", 6, FEATURES_TABLE, "Segmento", "segmento", "Segmento Bancário", "categorical", OPS_CATEGORICAL, ["varejo","uniclass","private"], "cpf_cnpj", "normal", True, True, "cadastral", True, "Segmento do cliente"),
+    # Produtos
+    ("possui_cartao", "Produtos", 1, FEATURES_TABLE, "Cartão", "possui_cartao", "Possui Cartão", "boolean", OPS_BOOLEAN, None, "cpf_cnpj", "normal", True, True, "produtos", True, "Possui cartão de crédito"),
+    ("qtd_cartoes", "Produtos", 2, FEATURES_TABLE, "Cartão", "qtd_cartoes", "Qtd Cartões", "numeric", OPS_NUMERIC, None, "cpf_cnpj", "normal", False, True, "produtos", True, "Quantidade de cartões ativos"),
+    ("possui_investimento", "Produtos", 3, FEATURES_TABLE, "Investimentos", "possui_investimento", "Possui Investimento", "boolean", OPS_BOOLEAN, None, "cpf_cnpj", "normal", True, True, "produtos", True, "Possui investimentos"),
+    # Comportamento
+    ("engajamento_score", "Comportamento", 1, FEATURES_TABLE, "Engajamento", "engajamento_score", "Score Engajamento", "numeric", OPS_NUMERIC, None, "cpf_cnpj", "normal", True, True, "comportamento", True, "Score de engajamento digital (0-100)"),
+    ("usa_app", "Comportamento", 2, FEATURES_TABLE, "App", "usa_app", "Usa App Mobile", "boolean", OPS_BOOLEAN, None, "cpf_cnpj", "normal", True, True, "comportamento", True, "Utiliza app mobile"),
+    ("dias_desde_ultimo_acesso", "Comportamento", 3, FEATURES_TABLE, "Acesso", "dias_desde_ultimo_acesso", "Dias s/ Acesso", "numeric", OPS_NUMERIC, None, "cpf_cnpj", "normal", True, True, "comportamento", True, "Dias desde último acesso digital"),
+]
+
+schema_carac = StructType([
+    StructField("caracteristica_id", StringType(), False),
+    StructField("tema", StringType(), True),
+    StructField("tema_ordem", IntegerType(), True),
+    StructField("tabela_fisica", StringType(), True),
+    StructField("tabela_label", StringType(), True),
+    StructField("campo_fisico", StringType(), True),
+    StructField("campo_label", StringType(), True),
+    StructField("tipo_dado", StringType(), True),
+    StructField("operadores", ArrayType(StringType()), True),
+    StructField("valores_dominio", ArrayType(StringType()), True),
+    StructField("join_key", StringType(), True),
+    StructField("sensibilidade", StringType(), True),
+    StructField("usavel_em_peca", BooleanType(), True),
+    StructField("usavel_em_visao360", BooleanType(), True),
+    StructField("bloco_visao360", StringType(), True),
+    StructField("ativo", BooleanType(), True),
+    StructField("descricao", StringType(), True)
+])
+spark.createDataFrame(carac_data, schema_carac).write.mode("overwrite").saveAsTable(f"{CATALOG}.metadata.catalogo_caracteristicas")
+print(f"  catalogo_caracteristicas: {len(carac_data)} campos")
+
+# catalogo_publicos — COM join_key (obrigatório para QueryEngine)
+schema_pub = StructType([
+    StructField("publico_id", StringType(), False),
+    StructField("nome", StringType(), True),
+    StructField("descricao", StringType(), True),
+    StructField("tabela_fisica", StringType(), True),
+    StructField("join_key", StringType(), True),
+    StructField("criado_por_time", StringType(), True),
+    StructField("ativo", BooleanType(), True)
+])
+pub_cat_data = [
+    ("pub_varejo", "Base Varejo", "Todos os clientes varejo", f"{CATALOG}.publico.pub_varejo", "cpf_cnpj", "Marketing", True),
+    ("pub_uniclass", "Base Uniclass", "Clientes uniclass", f"{CATALOG}.publico.pub_uniclass", "cpf_cnpj", "Marketing", True),
+    ("pub_private", "Base Private", "Clientes private", f"{CATALOG}.publico.pub_private", "cpf_cnpj", "Private Banking", True),
+]
+spark.createDataFrame(pub_cat_data, schema_pub).write.mode("overwrite").saveAsTable(f"{CATALOG}.metadata.catalogo_publicos")
+print(f"  catalogo_publicos: {len(pub_cat_data)} públicos")
+print("  OK — catálogos prontos para segmentação via API")
+
+# [DEAD CODE REMOVED - fix #16: código duplicado antigo (Row-based) causava SyntaxError
+#  e sobrescrevia dados bons com tabela_fisica não-FQ e operadores incompletos]
+"""
     Row(caracteristica_id="idade", tema="Demográfico", tema_ordem=1, tabela_fisica="caracteristicas.customer_features_wide", tabela_label="Idade", campo_fisico="idade", campo_label="Idade", tipo_dado="numeric", operadores=["=", ">", "<", "between"], valores_dominio=None, join_key="cpf_cnpj", sensibilidade="normal", usavel_em_peca=True, usavel_em_visao360=True, bloco_visao360="cadastral", ativo=True, descricao="Idade do cliente"),
     Row(caracteristica_id="faixa_etaria", tema="Demográfico", tema_ordem=2, tabela_fisica="caracteristicas.customer_features_wide", tabela_label="Faixa Etária", campo_fisico="faixa_etaria", campo_label="Faixa Etária", tipo_dado="categorical", operadores=["="], valores_dominio=["18-25","26-35","36-50","51-65","65+"], join_key="cpf_cnpj", sensibilidade="normal", usavel_em_peca=True, usavel_em_visao360=True, bloco_visao360="cadastral", ativo=True, descricao="Faixa etária"),
     Row(caracteristica_id="estado", tema="Demográfico", tema_ordem=3, tabela_fisica="caracteristicas.customer_features_wide", tabela_label="Estado", campo_fisico="estado", campo_label="Estado", tipo_dado="categorical", operadores=["="], valores_dominio=None, join_key="cpf_cnpj", sensibilidade="normal", usavel_em_peca=False, usavel_em_visao360=True, bloco_visao360="cadastral", ativo=True, descricao="UF"),
@@ -369,6 +473,7 @@ pub_cat_rows = [
     Row(publico_id="pub_private", nome="Base Private", descricao="Clientes do segmento private", tabela_fisica=f"{CATALOG}.publico.pub_private", criado_por_time="Private", ativo=True),
 ]
 spark.createDataFrame(pub_cat_rows).write.mode("overwrite").saveAsTable(f"{CATALOG}.metadata.catalogo_publicos")
+"""
 
 # catalogo_canais
 canais_rows = [
@@ -492,7 +597,7 @@ otim_rows = [
     Row(config_id="mab_global", escopo="global", metrica_alvo="conversao", metrica_custom_json=None, janela_avaliacao_horas=72, trafego_minimo_pct=10, min_amostras_por_variante=100, frequencia_recalculo="diario", otimizacao_ativa=True, ativo=True, atualizado_por="admin", atualizado_em=datetime.now()),
     Row(config_id="mab_jornada_default", escopo="por_jornada", metrica_alvo="clique", metrica_custom_json=None, janela_avaliacao_horas=48, trafego_minimo_pct=20, min_amostras_por_variante=200, frequencia_recalculo="diario", otimizacao_ativa=True, ativo=True, atualizado_por="admin", atualizado_em=datetime.now()),
 ]
-schema_otim = StructType([StructField("config_id", StringType(), False), StructField("escopo", StringType(), True), StructField("metrica_alvo", StringType(), True), StructField("metrica_custom_json", StringType(), True), StructField("janela_avaliacao_horas", IntegerType(), True), StructField("trafego_minimo_pct", IntegerType(), True), StructField("min_amostras_por_variante", IntegerType(), True), StructField("frequencia_recalculo", StringType(), True), StructField("otimizacao_ativa", BooleanType(), True), StructField("ativo", BooleanType(), True), StructField("atualizado_por", StringType(), True), StructField("atualizado_em", TimestampType(), True)])
+schema_otim = StructType([StructField("config_id", StringType(), False), StructField("escopo", StringType(), True), StructField("metrica_alvo", StringType(), True), StructField("metrica_custom_json", StringType(), True), StructField("janela_avaliacao_horas", IntegerType(), True), StructField("trafego_minimo_pct", DoubleType(), True), StructField("min_amostras_por_variante", IntegerType(), True), StructField("frequencia_recalculo", StringType(), True), StructField("otimizacao_ativa", BooleanType(), True), StructField("ativo", BooleanType(), True), StructField("atualizado_por", StringType(), True), StructField("atualizado_em", TimestampType(), True)])
 otim_tuples = [(r.config_id, r.escopo, r.metrica_alvo, r.metrica_custom_json, r.janela_avaliacao_horas, r.trafego_minimo_pct, r.min_amostras_por_variante, r.frequencia_recalculo, r.otimizacao_ativa, r.ativo, r.atualizado_por, r.atualizado_em) for r in otim_rows]
 spark.createDataFrame(otim_tuples, schema_otim).write.mode("overwrite").saveAsTable(f"{CATALOG}.engagement.config_otimizacao")
 
@@ -508,71 +613,187 @@ print("  OK")
 
 # COMMAND ----------
 
-# 10. DADOS DE CAMPANHA, JORNADA, PEÇA (mais completos)
+# DBTITLE 1,10. Campanhas, Jornadas, Peças (SCHEMAS CORRIGIDOS)
+# 10. DADOS DE CAMPANHA, JORNADA, PEÇA — SCHEMAS ALINHADOS COM DDL
 print("10. Campanhas, Jornadas, Peças...")
-# Campanha
+
+# Campanha (conforme DDL real - 24 campos)
 campanha_id = "camp_001"
-schema_camp = StructType([StructField("campanha_id", StringType(), False), StructField("campanha_codigo", StringType(), True), StructField("nome", StringType(), True), StructField("descricao", StringType(), True), StructField("objetivo", StringType(), True), StructField("tags", ArrayType(StringType()), True), StructField("resumo", StringType(), True), StructField("objetivo_negocio", StringType(), True), StructField("observacoes", StringType(), True), StructField("owner", StringType(), True), StructField("area_responsavel", StringType(), True), StructField("email_contato", StringType(), True), StructField("criado_por", StringType(), True), StructField("status", StringType(), True), StructField("vigencia_inicio", TimestampType(), True), StructField("vigencia_fim", TimestampType(), True), StructField("limite_envios", LongType(), True), StructField("alerta_pct_limite", IntegerType(), True), StructField("envios_realizados", LongType(), True), StructField("versao_atual", IntegerType(), True), StructField("atualizado_em", TimestampType(), True)])
-camp_tuples = [(campanha_id, "CAM-2025-CROSSSELL-00001", "Campanha Cross-Sell Q3", "Oferta de produtos financeiros", "RENTABILIZACAO", ["cross-sell","q3"], "Oferta de produtos financeiros", "Aumentar rentabilidade", "Usar segmentos de alta renda", "marketing", "Marketing", "marketing@banco.com", "admin", "ativa", datetime.now(), datetime.now()+timedelta(days=90), int(100000), int(80), int(0), int(1), datetime.now())]
+schema_camp = StructType([
+    StructField("campanha_id", StringType(), False),
+    StructField("campanha_codigo", StringType(), True),
+    StructField("nome", StringType(), True),
+    StructField("descricao", StringType(), True),
+    StructField("objetivo", StringType(), True),
+    StructField("tags", ArrayType(StringType()), True),
+    StructField("resumo", StringType(), True),
+    StructField("objetivo_negocio", StringType(), True),
+    StructField("observacoes", StringType(), True),
+    StructField("owner", StringType(), True),
+    StructField("area_responsavel", StringType(), True),
+    StructField("email_contato", StringType(), True),
+    StructField("criado_por", StringType(), True),
+    StructField("criado_em", TimestampType(), True),
+    StructField("status", StringType(), True),
+    StructField("vigencia_inicio", TimestampType(), True),
+    StructField("vigencia_fim", TimestampType(), True),
+    StructField("aprovado_por", StringType(), True),
+    StructField("aprovado_em", TimestampType(), True),
+    StructField("limite_envios", LongType(), True),
+    StructField("alerta_pct_limite", IntegerType(), True),
+    StructField("envios_realizados", LongType(), True),
+    StructField("versao_atual", IntegerType(), True),
+    StructField("atualizado_em", TimestampType(), True)
+])
+camp_tuples = [
+    (campanha_id, "CAM-2025-CROSSSELL-00001", "Campanha Cross-Sell Q3", "Oferta de produtos financeiros", 
+     "RENTABILIZACAO", ["cross-sell","q3"], "Oferta de produtos financeiros", "Aumentar rentabilidade", 
+     "Usar segmentos de alta renda", "marketing", "Marketing", "marketing@banco.com", "admin", datetime.now(), 
+     "ativa", datetime.now(), datetime.now()+timedelta(days=90), None, None, 100000, 80, 0, 1, datetime.now())
+]
 spark.createDataFrame(camp_tuples, schema_camp).write.mode("overwrite").saveAsTable(f"{CATALOG}.engagement.campanha")
 
-# Jornada (conforme DDL real)
+# Jornada (conforme DDL real - 21 campos)
 jornada_id = "jorn_001"
-schema_jorn = StructType([StructField("jornada_id", StringType(), False), StructField("jornada_codigo", StringType(), True), StructField("nome", StringType(), True), StructField("descricao", StringType(), True), StructField("tags", ArrayType(StringType()), True), StructField("tipo", StringType(), True), StructField("tipo_gatilho", StringType(), True), StructField("gatilho_seg_id", StringType(), True), StructField("gatilho_evento", StringType(), True), StructField("gatilho_data", TimestampType(), True), StructField("multiplo_envio_permitido", BooleanType(), True), StructField("intervalo_reenvio_dias", IntegerType(), True), StructField("fluxo_json", StringType(), True), StructField("criado_por", StringType(), True), StructField("criado_em", TimestampType(), True), StructField("versao_atual", IntegerType(), True), StructField("status", StringType(), True), StructField("atualizado_em", TimestampType(), True)])
-jorn_tuples = [(jornada_id, "JOR-2025-00001", "Jornada Cross-Sell", "Fluxo de oferta com 3 etapas", ["cross-sell","email"], "scheduled", "segmento", "seg_alta_renda", None, None, False, int(7), '{"nodes":[{"id":"n1","type":"start","data":{"label":"Início"}},{"id":"n2","type":"email","data":{"label":"Envio Email"}},{"id":"n3","type":"wait","data":{"label":"Aguardar"}},{"id":"n4","type":"end","data":{"label":"Fim"}}],"edges":[{"source":"n1","target":"n2"},{"source":"n2","target":"n3"},{"source":"n3","target":"n4"}]}', "admin", datetime.now(), int(1), "ativa", datetime.now())]
+schema_jorn = StructType([
+    StructField("jornada_id", StringType(), False),
+    StructField("jornada_codigo", StringType(), True),
+    StructField("campanha_id", StringType(), True),
+    StructField("nome", StringType(), True),
+    StructField("descricao", StringType(), True),
+    StructField("grafo_json", StringType(), True),
+    StructField("seg_entrada_id", StringType(), True),
+    StructField("resumo", StringType(), True),
+    StructField("objetivo_negocio", StringType(), True),
+    StructField("observacoes", StringType(), True),
+    StructField("status", StringType(), True),
+    StructField("ao_sair_segmento", StringType(), True),
+    StructField("ao_pausar_campanha", StringType(), True),
+    StructField("cap_estourado", StringType(), True),
+    StructField("aprovado_por", StringType(), True),
+    StructField("aprovado_em", TimestampType(), True),
+    StructField("criado_por", StringType(), True),
+    StructField("criado_em", TimestampType(), True),
+    StructField("owner", StringType(), True),
+    StructField("versao_atual", IntegerType(), True),
+    StructField("atualizado_em", TimestampType(), True)
+])
+grafo = '{"nodes":[{"id":"n1","type":"start"},{"id":"n2","type":"email"},{"id":"n3","type":"end"}],"edges":[{"source":"n1","target":"n2"},{"source":"n2","target":"n3"}]}'
+jorn_tuples = [
+    (jornada_id, "JOR-2025-00001", campanha_id, "Jornada Cross-Sell", "Fluxo de oferta com 3 etapas", grafo, 
+     "seg_alta_renda", "Fluxo email para alta renda", "Rentabilizar", None, "ativa", "continua", "termina_quem_entrou", 
+     "pula", None, None, "admin", datetime.now(), "marketing", 1, datetime.now())
+]
 spark.createDataFrame(jorn_tuples, schema_jorn).write.mode("overwrite").saveAsTable(f"{CATALOG}.engagement.jornada")
 
-# Relação campanha_jornada (removida - não existe no DDL)
-
-# Peça (conforme DDL real)
+# Peça (conforme DDL real - 21 campos)
 peca_id = "peca_001"
-schema_peca = StructType([StructField("peca_id", StringType(), False), StructField("peca_codigo", StringType(), True), StructField("nome", StringType(), True), StructField("descricao", StringType(), True), StructField("canal_id", StringType(), True), StructField("tipo_conteudo", StringType(), True), StructField("template_html", StringType(), True), StructField("template_texto", StringType(), True), StructField("subject", StringType(), True), StructField("personalizacao_json", StringType(), True), StructField("bloco_variaveis_permitidas_json", StringType(), True), StructField("preview_desktop_url", StringType(), True), StructField("preview_mobile_url", StringType(), True), StructField("tags", ArrayType(StringType()), True), StructField("criado_por", StringType(), True), StructField("criado_em", TimestampType(), True), StructField("versao_atual", IntegerType(), True), StructField("atualizado_em", TimestampType(), True), StructField("ativo", BooleanType(), True)])
-peca_tuples = [(peca_id, "PEC-2025-EMAIL-00001", "Oferta Cross-Sell Email", "Email com oferta de cartão e investimentos", "email", "html", "<p>Olá {{nome}}, aproveite nossa oferta exclusiva!</p><p>Renda: {{renda_mensal}}</p>", "Olá [nome], aproveite nossa oferta exclusiva! Renda: [renda_mensal]", "Aproveite a oferta exclusiva", '{"nome": "string", "renda_mensal": "double"}', '{"permitidas": ["renda_mensal", "possui_cartao"]}', None, None, ["cross-sell","email"], "admin", datetime.now(), int(1), datetime.now(), True)]
+schema_peca = StructType([
+    StructField("peca_id", StringType(), False),
+    StructField("peca_codigo", StringType(), True),
+    StructField("nome", StringType(), True),
+    StructField("descricao", StringType(), True),
+    StructField("canal", StringType(), True),
+    StructField("tags", ArrayType(StringType()), True),
+    StructField("conteudo_json", StringType(), True),
+    StructField("html_renderizado", StringType(), True),
+    StructField("assunto", StringType(), True),
+    StructField("template_meta_id", StringType(), True),
+    StructField("variaveis_usadas", ArrayType(StringType()), True),
+    StructField("status_aprovacao", StringType(), True),
+    StructField("aprovado_por", StringType(), True),
+    StructField("aprovado_em", TimestampType(), True),
+    StructField("motivo_reprovacao", StringType(), True),
+    StructField("criado_por", StringType(), True),
+    StructField("criado_em", TimestampType(), True),
+    StructField("owner", StringType(), True),
+    StructField("area_responsavel", StringType(), True),
+    StructField("versao_atual", IntegerType(), True),
+    StructField("atualizado_em", TimestampType(), True)
+])
+conteudo = '{"template": "Olá {{nome}}, aproveite nossa oferta exclusiva! Renda: {{renda_mensal}}", "personalizacao": {"nome": "string", "renda_mensal": "double"}}'
+peca_tuples = [
+    (peca_id, "PEC-2025-EMAIL-00001", "Oferta Cross-Sell Email", "Email com oferta de cartão e investimentos", 
+     "email", ["cross-sell"], conteudo, "<p>Olá {{nome}}, aproveite nossa oferta exclusiva!</p>", 
+     "Aproveite a oferta exclusiva", None, ["nome","renda_mensal"], "aprovado", None, None, None, "admin", 
+     datetime.now(), "marketing", "Marketing", 1, datetime.now())
+]
 spark.createDataFrame(peca_tuples, schema_peca).write.mode("overwrite").saveAsTable(f"{CATALOG}.engagement.peca")
 
 print("  OK")
 
 # COMMAND ----------
 
+# DBTITLE 1,11. Segmentação S1 (regras_json alinhado com RegrasJson model)
 # 11. DADOS INICIAIS DE SEGMENTAÇÃO (S1)
+# Formato correto: RegrasJson { publico_base, inclusao: RegraNo, exclusao: RegraNo|null }
+# RegraNo: { operator: AND|OR, rules: [RegraFolha|RegraNo] }
+# RegraFolha: { campo_id, op, value }
 print("11. Segmentação (S1)...")
-# Criar 2 segmentos: "Alta Renda" e "Digital"
+import json as _json
+
 seg_ids = ["seg_alta_renda", "seg_digital"]
 
-# Definir regras JSON (exemplo)
-regras_alta_renda = '{"operator":"AND","conditions":[{"campo_id":"renda_mensal","operator":">","value":10000},{"campo_id":"segmento","operator":"=","value":"varejo"}]}'
-regras_digital = '{"operator":"AND","conditions":[{"campo_id":"usa_app","operator":"=","value":true},{"campo_id":"engajamento_score","operator":">","value":60}]}'
+# Regras no formato CORRETO do modelo RegrasJson
+regras_alta_renda = _json.dumps({
+    "publico_base": "pub_varejo",
+    "inclusao": {
+        "operator": "AND",
+        "rules": [
+            {"campo_id": "renda_mensal", "op": ">=", "value": 10000},
+            {"campo_id": "score", "op": ">", "value": 600}
+        ]
+    },
+    "exclusao": {
+        "operator": "OR",
+        "rules": [
+            {"campo_id": "inadimplente", "op": "=", "value": True}
+        ]
+    }
+})
+regras_digital = _json.dumps({
+    "publico_base": "pub_varejo",
+    "inclusao": {
+        "operator": "AND",
+        "rules": [
+            {"campo_id": "usa_app", "op": "=", "value": True},
+            {"campo_id": "engajamento_score", "op": ">", "value": 60}
+        ]
+    },
+    "exclusao": None
+})
 
 # Inserir definições
 seg_def_rows = [
-    Row(seg_id=seg_ids[0], seg_codigo="SEG-ALTA-RENDA", seg_slug="alta-renda", nome="Alta Renda Varejo", descricao="Clientes varejo com renda > 10k", objetivo="AQUISICAO", seg_tags=["varejo","alta-renda"], resumo="Público de alta renda do varejo", objetivo_negocio="Aumentar cross-sell", publico_alvo_descricao="Clientes varejo com alta renda", observacoes=None, documentacao_md="# Alta Renda\nSegmento para ofertas de produtos premium.", owner="admin", area_responsavel="Marketing", email_contato="marketing@banco.com", criado_por="admin", criado_em=datetime.now(), seg_origem_id=None, tipo_origem="nova", tipo="direta", publico_base_id="pub_varejo", regras_json=regras_alta_renda, status="ativa", vigencia_inicio=datetime.now(), vigencia_fim=datetime.now()+timedelta(days=90), agendamento_cron=None, recorrencia="once", aprovado_por="admin", aprovado_em=datetime.now(), checklist_validacao_json=None, versao_atual=1, atualizado_em=datetime.now(), habilitado=True),
-    Row(seg_id=seg_ids[1], seg_codigo="SEG-DIGITAL", seg_slug="digital", nome="Clientes Digitais", descricao="Clientes que usam app e têm alto engajamento", objetivo="ENGAJAMENTO", seg_tags=["digital","app"], resumo="Público digital engajado", objetivo_negocio="Aumentar uso digital", publico_alvo_descricao="Clientes com alta interação digital", observacoes=None, documentacao_md="# Digital\nSegmento para ofertas digitais.", owner="admin", area_responsavel="Digital", email_contato="digital@banco.com", criado_por="admin", criado_em=datetime.now(), seg_origem_id=None, tipo_origem="nova", tipo="direta", publico_base_id=None, regras_json=regras_digital, status="ativa", vigencia_inicio=datetime.now(), vigencia_fim=datetime.now()+timedelta(days=90), agendamento_cron=None, recorrencia="once", aprovado_por="admin", aprovado_em=datetime.now(), checklist_validacao_json=None, versao_atual=1, atualizado_em=datetime.now(), habilitado=True),
+    Row(seg_id=seg_ids[0], seg_codigo="SEG-ALTA-RENDA", seg_slug="alta-renda", nome="Alta Renda Varejo", descricao="Clientes varejo com renda > 10k", objetivo="AQUISICAO", seg_tags=["varejo","alta-renda"], resumo="Público de alta renda do varejo", objetivo_negocio="Aumentar cross-sell", publico_alvo_descricao="Clientes varejo com alta renda", observacoes=None, documentacao_md="# Alta Renda\nSegmento para ofertas de produtos premium.", owner=MAIN_USER, area_responsavel="Marketing", email_contato="marketing@banco.com", criado_por=MAIN_USER, criado_em=datetime.now(), seg_origem_id=None, tipo_origem="nova", tipo="direta", publico_base_id="pub_varejo", regras_json=regras_alta_renda, status="ativa", vigencia_inicio=datetime.now(), vigencia_fim=datetime.now()+timedelta(days=90), agendamento_cron=None, recorrencia="once", aprovado_por=MAIN_USER, aprovado_em=datetime.now(), checklist_validacao_json=None, versao_atual=1, atualizado_em=datetime.now(), habilitado=True),
+    Row(seg_id=seg_ids[1], seg_codigo="SEG-DIGITAL", seg_slug="digital", nome="Clientes Digitais", descricao="Clientes que usam app e têm alto engajamento", objetivo="ENGAJAMENTO", seg_tags=["digital","app"], resumo="Público digital engajado", objetivo_negocio="Aumentar uso digital", publico_alvo_descricao="Clientes com alta interação digital", observacoes=None, documentacao_md="# Digital\nSegmento para ofertas digitais.", owner=MAIN_USER, area_responsavel="Digital", email_contato="digital@banco.com", criado_por=MAIN_USER, criado_em=datetime.now(), seg_origem_id=None, tipo_origem="nova", tipo="direta", publico_base_id="pub_varejo", regras_json=regras_digital, status="ativa", vigencia_inicio=datetime.now(), vigencia_fim=datetime.now()+timedelta(days=90), agendamento_cron=None, recorrencia="once", aprovado_por=MAIN_USER, aprovado_em=datetime.now(), checklist_validacao_json=None, versao_atual=1, atualizado_em=datetime.now(), habilitado=True),
 ]
-schema_seg_def = StructType([StructField("seg_id", StringType(), False), StructField("seg_codigo", StringType(), True), StructField("seg_slug", StringType(), True), StructField("nome", StringType(), True), StructField("descricao", StringType(), True), StructField("objetivo", StringType(), True), StructField("seg_tags", ArrayType(StringType()), True), StructField("resumo", StringType(), True), StructField("objetivo_negocio", StringType(), True), StructField("publico_alvo_descricao", StringType(), True), StructField("observacoes", StringType(), True), StructField("documentacao_md", StringType(), True), StructField("owner", StringType(), True), StructField("area_responsavel", StringType(), True), StructField("email_contato", StringType(), True), StructField("criado_por", StringType(), True), StructField("criado_em", TimestampType(), True), StructField("seg_origem_id", StringType(), True), StructField("tipo_origem", StringType(), True), StructField("tipo", StringType(), True), StructField("publico_base_id", StringType(), True), StructField("regras_json", StringType(), True), StructField("status", StringType(), True), StructField("vigencia_inicio", TimestampType(), True), StructField("vigencia_fim", TimestampType(), True), StructField("agendamento_cron", StringType(), True), StructField("recorrencia", StringType(), True), StructField("aprovado_por", StringType(), True), StructField("aprovado_em", TimestampType(), True), StructField("checklist_validacao_json", StringType(), True), StructField("versao_atual", IntegerType(), True), StructField("atualizado_em", TimestampType(), True), StructField("habilitado", BooleanType(), True)])
-seg_def_tuples = [(r.seg_id, r.seg_codigo, r.seg_slug, r.nome, r.descricao, r.objetivo, r.seg_tags, r.resumo, r.objetivo_negocio, r.publico_alvo_descricao, r.observacoes, r.documentacao_md, r.owner, r.area_responsavel, r.email_contato, r.criado_por, r.criado_em, r.seg_origem_id, r.tipo_origem, r.tipo, r.publico_base_id, r.regras_json, r.status, r.vigencia_inicio, r.vigencia_fim, r.agendamento_cron, r.recorrencia, r.aprovado_por, r.aprovado_em, r.checklist_validacao_json, r.versao_atual, r.atualizado_em, r.habilitado) for r in seg_def_rows]
+schema_seg_def = StructType([StructField("seg_id", StringType(), False), StructField("seg_codigo", StringType(), True), StructField("seg_slug", StringType(), True), StructField("nome", StringType(), True), StructField("descricao", StringType(), True), StructField("objetivo", StringType(), True), StructField("seg_tags", ArrayType(StringType()), True), StructField("resumo", StringType(), True), StructField("objetivo_negocio", StringType(), True), StructField("publico_alvo_descricao", StringType(), True), StructField("observacoes", StringType(), True), StructField("documentacao_md", StringType(), True), StructField("owner", StringType(), True), StructField("area_responsavel", StringType(), True), StructField("email_contato", StringType(), True), StructField("criado_por", StringType(), True), StructField("criado_em", TimestampType(), True), StructField("seg_origem_id", StringType(), True), StructField("tipo_origem", StringType(), True), StructField("tipo", StringType(), True), StructField("publico_base_id", StringType(), True), StructField("regras_json", StringType(), True), StructField("status", StringType(), True), StructField("vigencia_inicio", TimestampType(), True), StructField("vigencia_fim", TimestampType(), True), StructField("agendamento_cron", StringType(), True), StructField("recorrencia", StringType(), True), StructField("aprovado_por", StringType(), True), StructField("aprovado_em", TimestampType(), True), StructField("checklist_validacao_json", StringType(), True), StructField("versao_atual", IntegerType(), True), StructField("atualizado_em", TimestampType(), True), StructField("habilitado", BooleanType(), True), StructField("job_id_databricks", StringType(), True)])
+seg_def_tuples = [(r.seg_id, r.seg_codigo, r.seg_slug, r.nome, r.descricao, r.objetivo, r.seg_tags, r.resumo, r.objetivo_negocio, r.publico_alvo_descricao, r.observacoes, r.documentacao_md, r.owner, r.area_responsavel, r.email_contato, r.criado_por, r.criado_em, r.seg_origem_id, r.tipo_origem, r.tipo, r.publico_base_id, r.regras_json, r.status, r.vigencia_inicio, r.vigencia_fim, r.agendamento_cron, r.recorrencia, r.aprovado_por, r.aprovado_em, r.checklist_validacao_json, r.versao_atual, r.atualizado_em, r.habilitado, None) for r in seg_def_rows]
 spark.createDataFrame(seg_def_tuples, schema_seg_def).write.mode("overwrite").saveAsTable(f"{CATALOG}.segmentacao.seg_definicao")
 
-# Destino (seg_destino - conforme DDL real)
+# Destino (seg_destino - conforme DDL: seg_id, destino, habilitado, criado_em)
 seg_dest_rows = [
-    Row(seg_id=seg_ids[0], destino="sistema2", habilitado=True, atualizado_por="admin", atualizado_em=datetime.now()),
-    Row(seg_id=seg_ids[0], destino="sistema3", habilitado=True, atualizado_por="admin", atualizado_em=datetime.now()),
-    Row(seg_id=seg_ids[1], destino="sistema2", habilitado=True, atualizado_por="admin", atualizado_em=datetime.now()),
-    Row(seg_id=seg_ids[1], destino="sistema3", habilitado=True, atualizado_por="admin", atualizado_em=datetime.now()),
+    Row(seg_id=seg_ids[0], destino="sistema2", habilitado=True, criado_em=datetime.now()),
+    Row(seg_id=seg_ids[0], destino="sistema3", habilitado=True, criado_em=datetime.now()),
+    Row(seg_id=seg_ids[1], destino="sistema2", habilitado=True, criado_em=datetime.now()),
+    Row(seg_id=seg_ids[1], destino="sistema3", habilitado=True, criado_em=datetime.now()),
 ]
-schema_seg_dest = StructType([StructField("seg_id", StringType(), False), StructField("destino", StringType(), True), StructField("habilitado", BooleanType(), True), StructField("atualizado_por", StringType(), True), StructField("atualizado_em", TimestampType(), True)])
-seg_dest_tuples = [(r.seg_id, r.destino, r.habilitado, r.atualizado_por, r.atualizado_em) for r in seg_dest_rows]
+schema_seg_dest = StructType([StructField("seg_id", StringType(), False), StructField("destino", StringType(), True), StructField("habilitado", BooleanType(), True), StructField("criado_em", TimestampType(), True)])
+seg_dest_tuples = [(r.seg_id, r.destino, r.habilitado, r.criado_em) for r in seg_dest_rows]
 spark.createDataFrame(seg_dest_tuples, schema_seg_dest).write.mode("overwrite").saveAsTable(f"{CATALOG}.segmentacao.seg_destino")
 
 # Execução (simulada) - para cada segmento, gerar resultado corrente
 print("  Gerando seg_execucao e seg_resultado_corrente...")
-exec_id1 = f"exec_{seg_ids[0]}_{datetime.now().strftime('%Y%m%d_%H%M')}"
-exec_id2 = f"exec_{seg_ids[1]}_{datetime.now().strftime('%Y%m%d_%H%M')}"
+exec_id1 = f"exec_{uuid.uuid4().hex[:12]}"
+exec_id2 = f"exec_{uuid.uuid4().hex[:12]}"
 
 # Simular execução: para cada segmento, selecionar CPFs que atendem às regras
 # Vamos fazer uma consulta simples no Spark, mas para simplificar, usamos a lógica manual baseada nos dados gerados.
 # Como temos os dados em clientes_data, podemos filtrar.
 # Para "Alta Renda": segmento varejo e renda > 10000
-alta_renda_cpfs = [d["cpf_cnpj"] for d in clientes_data if d["segmento"] == "varejo" and d["renda_mensal"] > 10000]
+# Filtro alinhado com regras_json: pub_varejo(segmento==varejo) + renda>=10000 + score>600 - inadimplentes
+alta_renda_cpfs = [d["cpf_cnpj"] for d in clientes_data if d["segmento"] == "varejo" and d["renda_mensal"] >= 10000 and d["score"] > 600 and not d["inadimplente"]]
 digital_cpfs = [d["cpf_cnpj"] for d in clientes_data if d["usa_app"] and d["engajamento_score"] > 60]
 
 # Inserir execuções
@@ -602,8 +823,163 @@ else:
     ])).write.mode("overwrite").saveAsTable(f"{CATALOG}.segmentacao.seg_resultado_corrente")
 
 # Atualizar o gatilho_seg_id da jornada para o primeiro segmento (para testar S3)
-spark.sql(f"UPDATE {CATALOG}.engagement.jornada SET gatilho_seg_id = '{seg_ids[0]}' WHERE jornada_id = 'jorn_001'")
+spark.sql(f"UPDATE {CATALOG}.engagement.jornada SET seg_entrada_id = '{seg_ids[0]}' WHERE jornada_id = 'jorn_001'")
 
+print("  OK")
+
+# COMMAND ----------
+
+# DBTITLE 1,12. Tabelas auxiliares S1 (saúde + histórico estado + versão)
+# 12. TABELAS AUXILIARES S1
+# Garantir que tabelas acessíveis pelo backend existam com dados mínimos.
+# Estas tabelas são lidas durante transições de estado e dashboards.
+print("12. Tabelas auxiliares S1...")
+
+# seg_saude (dashboard de saúde)
+saude_rows = [
+    Row(seg_id="seg_alta_renda", health_status="verde", ultima_verificacao=datetime.now(),
+        variacao_publico_pct=2.5, taxa_sucesso_exec=100.0, tempo_medio_exec_seg=15,
+        alertas_json=None, publico_atual=int(len(alta_renda_cpfs))),
+    Row(seg_id="seg_digital", health_status="verde", ultima_verificacao=datetime.now(),
+        variacao_publico_pct=-1.2, taxa_sucesso_exec=100.0, tempo_medio_exec_seg=12,
+        alertas_json=None, publico_atual=int(len(digital_cpfs))),
+]
+schema_saude = StructType([
+    StructField("seg_id", StringType(), False),
+    StructField("health_status", StringType(), True),
+    StructField("ultima_verificacao", TimestampType(), True),
+    StructField("variacao_publico_pct", DoubleType(), True),
+    StructField("taxa_sucesso_exec", DoubleType(), True),
+    StructField("tempo_medio_exec_seg", IntegerType(), True),
+    StructField("alertas_json", StringType(), True),
+    StructField("publico_atual", LongType(), True)
+])
+saude_tuples = [(r.seg_id, r.health_status, r.ultima_verificacao, r.variacao_publico_pct, r.taxa_sucesso_exec, r.tempo_medio_exec_seg, r.alertas_json, r.publico_atual) for r in saude_rows]
+spark.createDataFrame(saude_tuples, schema_saude).write.mode("overwrite").saveAsTable(f"{CATALOG}.segmentacao.seg_saude")
+print("  seg_saude: 2 registros")
+
+# seg_versao (histórico de versões)
+versao_rows = [
+    Row(versao_id=f"v_{uuid.uuid4().hex[:8]}", seg_id="seg_alta_renda", versao=1,
+        regras_json=regras_alta_renda, motivo="Criação inicial",
+        alterado_por=MAIN_USER, alterado_em=datetime.now()),
+    Row(versao_id=f"v_{uuid.uuid4().hex[:8]}", seg_id="seg_digital", versao=1,
+        regras_json=regras_digital, motivo="Criação inicial",
+        alterado_por=MAIN_USER, alterado_em=datetime.now()),
+]
+schema_versao = StructType([
+    StructField("versao_id", StringType(), False),
+    StructField("seg_id", StringType(), True),
+    StructField("versao", IntegerType(), True),
+    StructField("regras_json", StringType(), True),
+    StructField("motivo", StringType(), True),
+    StructField("alterado_por", StringType(), True),
+    StructField("alterado_em", TimestampType(), True)
+])
+versao_tuples = [(r.versao_id, r.seg_id, r.versao, r.regras_json, r.motivo, r.alterado_por, r.alterado_em) for r in versao_rows]
+spark.createDataFrame(versao_tuples, schema_versao).write.mode("overwrite").saveAsTable(f"{CATALOG}.segmentacao.seg_versao")
+print("  seg_versao: 2 registros")
+
+# seg_historico_estado (auditoria de transições)
+hist_rows = [
+    Row(hist_id=f"h_{uuid.uuid4().hex[:8]}", seg_id="seg_alta_renda",
+        estado_anterior="rascunho", estado_novo="em_aprovacao",
+        motivo="Pronto para revisão", alterado_por=MAIN_USER, alterado_em=datetime.now() - timedelta(hours=2)),
+    Row(hist_id=f"h_{uuid.uuid4().hex[:8]}", seg_id="seg_alta_renda",
+        estado_anterior="em_aprovacao", estado_novo="aprovada",
+        motivo="Checklist OK", alterado_por=MAIN_USER, alterado_em=datetime.now() - timedelta(hours=1)),
+    Row(hist_id=f"h_{uuid.uuid4().hex[:8]}", seg_id="seg_alta_renda",
+        estado_anterior="aprovada", estado_novo="ativa",
+        motivo="Job criado", alterado_por=MAIN_USER, alterado_em=datetime.now()),
+]
+schema_hist = StructType([
+    StructField("hist_id", StringType(), False),
+    StructField("seg_id", StringType(), True),
+    StructField("estado_anterior", StringType(), True),
+    StructField("estado_novo", StringType(), True),
+    StructField("motivo", StringType(), True),
+    StructField("alterado_por", StringType(), True),
+    StructField("alterado_em", TimestampType(), True)
+])
+hist_tuples = [(r.hist_id, r.seg_id, r.estado_anterior, r.estado_novo, r.motivo, r.alterado_por, r.alterado_em) for r in hist_rows]
+spark.createDataFrame(hist_tuples, schema_hist).write.mode("overwrite").saveAsTable(f"{CATALOG}.segmentacao.seg_historico_estado")
+print("  seg_historico_estado: 3 registros")
+
+# seg_comentario (vazio com schema)
+spark.createDataFrame([], StructType([
+    StructField("comentario_id", StringType(), False),
+    StructField("seg_id", StringType(), True),
+    StructField("versao_referencia", IntegerType(), True),
+    StructField("tipo", StringType(), True),
+    StructField("autor", StringType(), True),
+    StructField("texto", StringType(), True),
+    StructField("respondendo_a", StringType(), True),
+    StructField("mencoes", ArrayType(StringType()), True),
+    StructField("resolvido", BooleanType(), True),
+    StructField("criado_em", TimestampType(), True),
+    StructField("editado_em", TimestampType(), True)
+])).write.mode("overwrite").saveAsTable(f"{CATALOG}.segmentacao.seg_comentario")
+
+# seg_notificacao (vazio com schema)
+spark.createDataFrame([], StructType([
+    StructField("notif_id", StringType(), False),
+    StructField("destinatario", StringType(), True),
+    StructField("tipo", StringType(), True),
+    StructField("seg_id", StringType(), True),
+    StructField("titulo", StringType(), True),
+    StructField("mensagem", StringType(), True),
+    StructField("lida", BooleanType(), True),
+    StructField("criado_em", TimestampType(), True)
+])).write.mode("overwrite").saveAsTable(f"{CATALOG}.segmentacao.seg_notificacao")
+
+# seg_job_log (vazio com schema)
+spark.createDataFrame([], StructType([
+    StructField("log_id", StringType(), False),
+    StructField("seg_id", StringType(), True),
+    StructField("acao", StringType(), True),
+    StructField("job_id", StringType(), True),
+    StructField("run_id", StringType(), True),
+    StructField("status", StringType(), True),
+    StructField("detalhes", StringType(), True),
+    StructField("executado_por", StringType(), True),
+    StructField("criado_em", TimestampType(), True)
+])).write.mode("overwrite").saveAsTable(f"{CATALOG}.segmentacao.seg_job_log")
+
+# seg_resultado_historico (vazio)
+spark.createDataFrame([], StructType([
+    StructField("exec_id", StringType(), False),
+    StructField("seg_id", StringType(), True),
+    StructField("versao_usada", IntegerType(), True),
+    StructField("cpf_cnpj", StringType(), True),
+    StructField("snapshot_em", TimestampType(), True)
+])).write.mode("overwrite").saveAsTable(f"{CATALOG}.segmentacao.seg_resultado_historico")
+
+# seg_eventos (vazio)
+spark.createDataFrame([], StructType([
+    StructField("evento_id", StringType(), False),
+    StructField("seg_id", StringType(), True),
+    StructField("exec_id", StringType(), True),
+    StructField("tipo_evento", StringType(), True),
+    StructField("destino", StringType(), True),
+    StructField("payload_json", StringType(), True),
+    StructField("criado_em", TimestampType(), True)
+])).write.mode("overwrite").saveAsTable(f"{CATALOG}.eventos.seg_eventos")
+
+# catalogo_governanca_hist (vazio)
+spark.createDataFrame([], StructType([
+    StructField("hist_id", StringType(), False),
+    StructField("caracteristica_id", StringType(), True),
+    StructField("campo_label", StringType(), True),
+    StructField("flag_alterada", StringType(), True),
+    StructField("sistema_alvo", StringType(), True),
+    StructField("valor_anterior", StringType(), True),
+    StructField("valor_novo", StringType(), True),
+    StructField("acao", StringType(), True),
+    StructField("alterado_por", StringType(), True),
+    StructField("alterado_em", TimestampType(), True)
+])).write.mode("overwrite").saveAsTable(f"{CATALOG}.metadata.catalogo_governanca_hist")
+
+print("  Tabelas auxiliares (vazias com schema): seg_comentario, seg_notificacao, seg_job_log, seg_resultado_historico, seg_eventos, catalogo_governanca_hist")
 print("  OK")
 
 # COMMAND ----------

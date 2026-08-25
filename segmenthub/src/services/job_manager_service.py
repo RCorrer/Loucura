@@ -234,9 +234,21 @@ class JobManagerService:
             raise
 
     def executar_agora(self, seg_id: str, job_id: str,
-                       origem: str = "manual", usuario: str = "system") -> str:
+                       origem: str = "manual", usuario: str = "system",
+                       exec_id: Optional[str] = None) -> str:
         """
         Dispara execução imediata do job (run_now).
+
+        Se exec_id for fornecido, propaga ao notebook como widget param.
+        O notebook fará UPDATE no registro existente em vez de INSERT novo.
+        Isso resolve RF-01 (exec_id duplicado) e RF-02 (execução fantasma).
+
+        Args:
+            seg_id: ID da segmentação
+            job_id: ID do Databricks Job
+            origem: 'manual' | 'reativacao'
+            usuario: email do usuário que disparou
+            exec_id: ID da execução pré-registrado pelo service (opcional)
 
         Returns:
             run_id: ID do run criado
@@ -244,17 +256,22 @@ class JobManagerService:
         logger.info(f"Executando job {job_id} (segmentação {seg_id}, origem: {origem})")
 
         try:
+            notebook_params = {
+                "seg_id": seg_id,
+                "origem_execucao": origem,
+            }
+            # Propaga exec_id para o notebook (RF-01: single source of truth)
+            if exec_id:
+                notebook_params["exec_id"] = exec_id
+
             run = self.client.jobs.run_now(
                 job_id=int(job_id),
-                notebook_params={
-                    "seg_id": seg_id,
-                    "origem_execucao": origem,
-                },
+                notebook_params=notebook_params,
             )
 
             run_id = str(run.run_id)
             self._registrar_log(seg_id, "executar", job_id, run_id, "sucesso", usuario)
-            logger.info(f"Run disparado: {run_id}")
+            logger.info(f"Run disparado: {run_id} (exec_id: {exec_id or 'auto-generated'})")
             return run_id
 
         except Exception as e:
@@ -330,27 +347,20 @@ class JobManagerService:
                        usuario: str = "system", detalhes: str = None):
         """
         Registra operação no log de auditoria (seg_job_log).
+        Usa queries parametrizadas para evitar SQL injection.
         """
         try:
             log_id = f"jlog_{uuid.uuid4().hex[:12]}"
-            detalhes_escaped = detalhes.replace("'", "''") if detalhes else None
 
-            from databricks.sdk.runtime import spark
-            spark.sql(f"""
+            from src.db.databricks_client import get_client
+            client = get_client()
+            sql = """
                 INSERT INTO plataforma.segmentacao.seg_job_log
                 (log_id, seg_id, acao, job_id, run_id, status, detalhes, executado_por, criado_em)
-                VALUES (
-                    '{log_id}',
-                    '{seg_id}',
-                    '{acao}',
-                    {f"'{job_id}'" if job_id else "NULL"},
-                    {f"'{run_id}'" if run_id else "NULL"},
-                    '{status}',
-                    {f"'{detalhes_escaped}'" if detalhes_escaped else "NULL"},
-                    '{usuario}',
-                    current_timestamp()
-                )
-            """)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, current_timestamp())
+            """
+            params = (log_id, seg_id, acao, job_id, run_id, status, detalhes, usuario)
+            client.execute_insert(sql, params)
         except Exception as e:
             # Não falha se o log der erro (operação principal já foi executada)
             logger.warning(f"Falha ao registrar log de auditoria: {e}")

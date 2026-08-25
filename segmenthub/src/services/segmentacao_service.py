@@ -6,9 +6,12 @@ Gerencia CRUD, ciclo de vida, validações e geração de IDs/slugs.
 import uuid
 import re
 import json
+import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from fastapi import HTTPException
+
+logger = logging.getLogger(__name__)
 
 from src.models.regras import RegrasJson
 from src.models.dto.segmentacao_dto import (
@@ -73,27 +76,21 @@ class SegmentacaoService:
     def criar(self, dados: SegmentacaoCreateDTO, usuario: str) -> Dict[str, str]:
         """Cria uma nova segmentação."""
         try:
-            print(f"🔍 CRIAR: Iniciando criação")
-            print(f"🔍 CRIAR: dados.regras_json = {dados.regras_json}, type = {type(dados.regras_json)}")
+            logger.debug(f"criar: iniciando para usuario={usuario}")
             
             # 1. Valida regras
-            print(f"🔍 CRIAR: Validando regras...")
             erros = self._validar_regras(dados.regras_json)
-            print(f"🔍 CRIAR: erros = {erros}")
             if erros:
-                erro_msg = f"Regras inválidas: {erros}"
-                print(f"❌ CRIAR: {erro_msg}")
-                raise ValueError(erro_msg)
+                logger.warning(f"criar: regras inválidas: {erros}")
+                raise ValueError(f"Regras inválidas: {erros}")
 
             # 2. Gera IDs
-            print(f"🔍 CRIAR: Gerando IDs...")
             seg_id = self._gerar_seg_id()
             seg_codigo = self._gerar_seg_codigo(dados.nome)
             seg_slug = self._gerar_seg_slug(dados.nome)
-            print(f"🔍 CRIAR: seg_id={seg_id}, seg_codigo={seg_codigo}")
+            logger.debug(f"criar: seg_id={seg_id}, seg_codigo={seg_codigo}")
 
             # 3. Prepara dados para inserção
-            print(f"🔍 CRIAR: Preparando dados para inserção...")
             now = datetime.now()
             dados_insert = {
                 "seg_id": seg_id,
@@ -108,27 +105,26 @@ class SegmentacaoService:
                 "publico_alvo_descricao": dados.publico_alvo_descricao,
                 "observacoes": dados.observacoes,
                 "documentacao_md": dados.documentacao_md,
-                "owner": dados.owner,
+                # Auto-fill: se owner vazio, usa o usuário que está criando (OBO)
+                "owner": dados.owner if dados.owner else usuario,
                 "area_responsavel": dados.area_responsavel,
                 "email_contato": dados.email_contato,
                 "criado_por": usuario,
                 "publico_base_id": dados.publico_base_id,
                 "regras_json": json.dumps(dados.regras_json),
                 "tipo": dados.tipo or "direta",
+                "seg_origem_id": getattr(dados, 'seg_origem_id', None),
+                "tipo_origem": getattr(dados, 'tipo_origem', 'nova'),
                 "status": "rascunho",
                 "versao_atual": 1,
                 "criado_em": now,
                 "atualizado_em": now,
             }
-            print(f"🔍 CRIAR: dados_insert preparados")
-
             # 4. Insere no banco
-            print(f"🔍 CRIAR: Inserindo no banco...")
             self.repository.inserir(dados_insert)
-            print(f"✅ CRIAR: Inserido com sucesso")
+            logger.info(f"criar: segmentação {seg_id} inserida")
 
             # 5. Insere versão inicial
-            print(f"🔍 CRIAR: Inserindo versão inicial...")
             self.repository.inserir_versao(
                 seg_id=seg_id,
                 versao=1,
@@ -136,17 +132,12 @@ class SegmentacaoService:
                 motivo="Versão inicial",
                 alterado_por=usuario,
             )
-            print(f"✅ CRIAR: Versão inserida com sucesso")
-
             result = {"seg_id": seg_id, "seg_codigo": seg_codigo, "seg_slug": seg_slug}
-            print(f"✅ CRIAR: Concluído com sucesso! result={result}")
+            logger.info(f"criar: concluído {seg_id}")
             return result
             
         except Exception as e:
-            erro = f"{type(e).__name__}: {str(e)}"
-            print(f"❌ CRIAR ERROR: {erro}")
-            import traceback
-            print(f"❌ CRIAR TRACEBACK:\n{traceback.format_exc()}")
+            logger.error(f"criar: erro {type(e).__name__}: {e}", exc_info=True)
             raise
 
     def buscar_por_id(self, seg_id: str) -> Optional[Dict]:
@@ -182,8 +173,7 @@ class SegmentacaoService:
         """Lista segmentações com paginação."""
         offset = (page - 1) * size
 
-        # 🔍 DEBUG: exibe os valores no log do app
-        print(f"🔍 listar: page={page}, size={size}, offset={offset}")
+        logger.debug(f"listar: page={page}, size={size}, offset={offset}")
 
         resultados = self.repository.listar(
             status=status,
@@ -392,12 +382,22 @@ class SegmentacaoService:
         if not job_id:
             raise ValueError(f"Segmentação '{seg_id}' não possui job configurado. Ative-a primeiro.")
 
-        # Dispara run_now no Databricks
-        run_id = self.job_manager.executar_agora(seg_id, job_id, origem, usuario)
+        # RF-01/RF-02: Gera exec_id ANTES de disparar o job.
+        # Registra com status 'em_execucao' no banco.
+        # Passa exec_id ao job via widget param — job fará UPDATE (não INSERT).
+        # Se job falhar sem atualizar, consolidador detecta como travada (>2h em em_execucao).
+        exec_id = f"exec_{uuid.uuid4().hex[:12]}"
+        versao_usada = atual.get("versao_atual", 1)
+        self.repository.executar_segmentacao(seg_id, exec_id, versao_usada=versao_usada, origem=origem)
 
-        # Registra execução localmente (status será atualizado pelo notebook ao finalizar)
-        exec_id = f"exec_{seg_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        self.repository.executar_segmentacao(seg_id, exec_id)
+        # Dispara run_now no Databricks com exec_id propagado
+        run_id = self.job_manager.executar_agora(
+            seg_id=seg_id,
+            job_id=job_id,
+            origem=origem,
+            usuario=usuario,
+            exec_id=exec_id,
+        )
 
         return {"exec_id": exec_id, "run_id": run_id, "job_id": job_id}
 
@@ -417,8 +417,11 @@ class SegmentacaoService:
 
     def atualizar_vigencia(self, seg_id: str, dados: Dict, usuario: str = "system") -> bool:
         """Atualiza vigência e agendamento. Se o cron mudar, atualiza o job."""
-        # Validar cron se fornecido
-        novo_cron = dados.get("agendamento_cron")
+        # Normaliza chave: front envia 'cron_expression', banco usa 'agendamento_cron'
+        novo_cron = dados.get("agendamento_cron") or dados.get("cron_expression")
+        if novo_cron and "cron_expression" in dados:
+            dados["agendamento_cron"] = novo_cron
+            dados.pop("cron_expression", None)
 
         # Persiste no banco
         resultado = self.repository.atualizar_vigencia(seg_id, dados)
@@ -437,34 +440,31 @@ class SegmentacaoService:
     def clonar(self, seg_id: str, dados: CloneSegmentacaoDTO, usuario: str) -> Dict[str, str]:
         """Clona uma segmentação existente."""
         try:
-            print(f"🔍 CLONE: Iniciando clone de {seg_id}")
+            logger.debug(f"clonar: iniciando clone de {seg_id}")
             
             original = self.buscar_por_id(seg_id)
             if not original:
                 raise ValueError("Segmentação original não encontrada")
-            
-            print(f"🔍 CLONE: Original encontrado: {original.get('nome')}")
 
             # Garante que regras_json seja um dict válido
             regras_json = original.get("regras_json")
-            print(f"🔍 CLONE: regras_json = {regras_json}, type = {type(regras_json)}")
-            
-            # Se for lista ou None ou não for dict, usa dict vazio
             if isinstance(regras_json, list):
-                print(f"⚠️ CLONE: regras_json é LISTA, convertendo para dict vazio")
+                logger.warning(f"clonar: regras_json é lista, convertendo para dict vazio")
                 regras_json = {}
             elif not regras_json or not isinstance(regras_json, dict):
-                print(f"🔍 CLONE: regras_json não é dict, usando dict vazio")
                 regras_json = {}
 
             # Prepara dados do clone
             nome_clone = dados.nome or f"{original['nome']} (Clone)"
-            print(f"🔍 CLONE: Criando DTO com nome={nome_clone}")
             
             create_dto = SegmentacaoCreateDTO(
                 nome=nome_clone,
                 descricao=dados.descricao or original.get("descricao"),
-                objetivo=original["objetivo"],
+                # Fallback para segs legadas com objetivo vazio (pré-validator)
+                objetivo=original.get("objetivo") or "AQUISICAO",
+                # Rastreabilidade de origem
+                seg_origem_id=seg_id,
+                tipo_origem="clone",
                 seg_tags=original.get("seg_tags"),
                 resumo=original.get("resumo"),
                 objetivo_negocio=original.get("objetivo_negocio"),
@@ -479,16 +479,12 @@ class SegmentacaoService:
                 tipo="clone",
             )
             
-            print(f"🔍 CLONE: DTO criado, chamando criar()")
             result = self.criar(create_dto, usuario)
-            print(f"🔍 CLONE: Sucesso! seg_id={result.get('seg_id')}")
+            logger.info(f"clonar: clone de {seg_id} criado como {result.get('seg_id')}")
             return result
             
         except Exception as e:
-            erro = f"{type(e).__name__}: {str(e)}"
-            print(f"❌ CLONE ERROR: {erro}")
-            import traceback
-            print(f"❌ CLONE TRACEBACK:\n{traceback.format_exc()}")
+            logger.error(f"clonar: erro ao clonar {seg_id}: {e}", exc_info=True)
             raise
 
     def listar_versoes(self, seg_id: str) -> List[Dict]:
@@ -538,5 +534,6 @@ class SegmentacaoService:
             })
 
         # Ordena por data (mais recente primeiro)
-        timeline.sort(key=lambda x: x["data"], reverse=True)
+        # Execuções em andamento (data=None) aparecem no topo (datetime.max)
+        timeline.sort(key=lambda x: x["data"] or datetime.max, reverse=True)
         return timeline

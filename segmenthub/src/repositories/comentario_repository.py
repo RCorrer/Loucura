@@ -51,13 +51,13 @@ class ComentarioRepository:
     def atualizar_comentario(self, comentario_id: str, texto: Optional[str] = None, resolvido: Optional[bool] = None) -> bool:
         """Atualiza texto e/ou resolvido de um comentário."""
         set_parts = []
-        params = [comentario_id]
+        set_params = []  # SET values primeiro (ordem posicional)
         if texto is not None:
             set_parts.append("texto = ?")
-            params.append(texto)
+            set_params.append(texto)
         if resolvido is not None:
             set_parts.append("resolvido = ?")
-            params.append(resolvido)
+            set_params.append(resolvido)
         if not set_parts:
             return True
         set_parts.append("editado_em = current_timestamp()")
@@ -66,7 +66,9 @@ class ComentarioRepository:
             SET {", ".join(set_parts)}
             WHERE comentario_id = ?
         """
-        rows = self.client.execute_insert(sql, tuple(params))
+        # WHERE param (comentario_id) vai no FINAL — após os SET values
+        params = tuple(set_params) + (comentario_id,)
+        rows = self.client.execute_insert(sql, params)
         return rows > 0
 
     def criar_notificacao(self, dados: Dict) -> str:

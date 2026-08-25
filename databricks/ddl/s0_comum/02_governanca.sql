@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS plataforma.governanca.usuarios_perfil (
   revogado_por   STRING,
   revogado_em    TIMESTAMP
 ) USING DELTA
+TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported')
 COMMENT 'RBAC unificado dos 4 sistemas (1 usuário = N linhas, granular por sistema)';
 
 CREATE TABLE IF NOT EXISTS plataforma.governanca.consentimento (
@@ -21,4 +22,5 @@ CREATE TABLE IF NOT EXISTS plataforma.governanca.consentimento (
   origem         STRING   COMMENT 'quem/qual sistema alterou',
   atualizado_em  TIMESTAMP DEFAULT current_timestamp()
 ) USING DELTA
+TBLPROPERTIES('delta.feature.allowColumnDefaults' = 'supported')
 COMMENT 'Consentimento por canal. Escrito pelo S2 (não-perturbe); aplicado pelo S3 (filtro de disp';

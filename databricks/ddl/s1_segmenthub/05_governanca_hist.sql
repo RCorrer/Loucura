@@ -13,4 +13,6 @@ CREATE TABLE IF NOT EXISTS plataforma.metadata.catalogo_governanca_hist (
     alterado_por      STRING NOT NULL,
     alterado_em       TIMESTAMP NOT NULL
 ) USING DELTA
+CLUSTER BY (caracteristica_id)
+TBLPROPERTIES ('delta.autoOptimize.optimizeWrite' = 'true')
 COMMENT 'Histórico de governança do catálogo: quem liberou/retirou acesso de característica ao S2/S3 e quando';
