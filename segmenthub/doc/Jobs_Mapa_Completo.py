@@ -119,7 +119,7 @@
 # MAGIC
 # MAGIC | Step | Descrição | Tabelas Lê | Campos Lidos | Tabelas Escreve | Campos Escritos |
 # MAGIC |------|-----------|------------|--------------|-----------------|----------------|
-# MAGIC | **1** | Identifica segs ativas + detecta atrasos (SQL puro, sem .collect() de todas) | `segmentacao.seg_definicao` | `seg_id`, `nome`, `owner`, `email_contato`, `recorrencia`, `status`, `habilitado` | — | — |
+# MAGIC | **1** | Identifica segs ativas + detecta atrasos (SQL puro, sem .collect() de todas) | `segmentacao.seg_definicao` | `seg_id`, `nome`, `owner`, `recorrencia`, `status`, `habilitado` | — | — |
 # MAGIC | | LEFT JOIN com saúde e última execução | `segmentacao.seg_saude` | `ultima_verificacao` | | |
 # MAGIC | | | `segmentacao.seg_execucao` | MAX(`executado_em`) WHERE status='sucesso' | | |
 # MAGIC | | **Regras de atraso:** | | | | |

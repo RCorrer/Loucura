@@ -23,18 +23,10 @@ class SegmentacaoCreateDTO(BaseModel):
         if v_upper not in OBJETIVOS_VALIDOS:
             raise ValueError(f'objetivo deve ser um de: {OBJETIVOS_VALIDOS}')
         return v_upper
-    seg_tags: Optional[List[str]] = None
-    resumo: Optional[str] = None
-    objetivo_negocio: Optional[str] = None
-    publico_alvo_descricao: Optional[str] = None
-    observacoes: Optional[str] = None
-    documentacao_md: Optional[str] = None
     owner: str
     area_responsavel: Optional[str] = None
-    email_contato: Optional[str] = None
     publico_base_id: str
     regras_json: Dict[str, Any]  # será validado pelo RegrasJson
-    tipo: Optional[str] = "direta"  # direta/composta
     seg_origem_id: Optional[str] = None  # link com segmentação pai (clone/derivada)
     tipo_origem: Optional[str] = "nova"  # nova/clone/derivada/chatbot
 
@@ -54,18 +46,10 @@ class SegmentacaoUpdateDTO(BaseModel):
         if v_upper not in OBJETIVOS_VALIDOS:
             raise ValueError(f'objetivo deve ser um de: {OBJETIVOS_VALIDOS}')
         return v_upper
-    seg_tags: Optional[List[str]] = None
-    resumo: Optional[str] = None
-    objetivo_negocio: Optional[str] = None
-    publico_alvo_descricao: Optional[str] = None
-    observacoes: Optional[str] = None
-    documentacao_md: Optional[str] = None
     owner: Optional[str] = None
     area_responsavel: Optional[str] = None
-    email_contato: Optional[str] = None
     publico_base_id: Optional[str] = None
     regras_json: Optional[Dict[str, Any]] = None
-    tipo: Optional[str] = None
 
 
 class SegmentacaoResponseDTO(BaseModel):
@@ -76,10 +60,6 @@ class SegmentacaoResponseDTO(BaseModel):
     nome: str
     descricao: Optional[str] = None
     objetivo: str
-    seg_tags: Optional[List[str]] = None
-    resumo: Optional[str] = None
-    objetivo_negocio: Optional[str] = None
-    publico_alvo_descricao: Optional[str] = None
     status: str
     versao_atual: int
     criado_por: str
@@ -88,15 +68,11 @@ class SegmentacaoResponseDTO(BaseModel):
     owner: str
     area_responsavel: Optional[str] = None
     publico_base_id: str
-    tipo: str
 
 
 class SegmentacaoDetalheDTO(SegmentacaoResponseDTO):
     """DTO para detalhe completo de uma segmentação."""
     regras_json: Optional[Dict[str, Any]] = None
-    observacoes: Optional[str] = None
-    documentacao_md: Optional[str] = None
-    email_contato: Optional[str] = None
     seg_origem_id: Optional[str] = None  # link com segmentação pai (clone/derivada)
     tipo_origem: Optional[str] = None  # nova/clone/derivada/chatbot
     vigencia_inicio: Optional[datetime] = None

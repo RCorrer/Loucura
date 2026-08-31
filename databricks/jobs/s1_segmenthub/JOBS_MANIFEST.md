@@ -67,9 +67,6 @@ O `seg_codigo` é gerado pelo backend em `segmentacao_service._gerar_seg_codigo(
     "area": "{area_responsavel}",
     "owner": "{owner}"
   },
-  "email_notifications": {
-    "on_failure": ["{email_contato}"]
-  },
   "queue": {
     "enabled": true
   }

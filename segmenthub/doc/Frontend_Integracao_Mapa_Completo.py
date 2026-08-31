@@ -69,9 +69,9 @@
 # MAGIC Query params: { page: int, size: int, status?: string, busca?: string }
 # MAGIC Response: {
 # MAGIC   data: [{
-# MAGIC     seg_id, nome, status, owner, area_responsavel,
-# MAGIC     criado_em, atualizado_em, seg_tags, tipo,
-# MAGIC     qtd_ultimo_resultado, recorrencia
+# MAGIC     seg_id, seg_codigo, seg_slug, nome, descricao, objetivo,
+# MAGIC     status, versao_atual, criado_por, criado_em, atualizado_em,
+# MAGIC     owner, area_responsavel, publico_base_id
 # MAGIC   }],
 # MAGIC   meta: { page, size, total, total_pages }
 # MAGIC }
@@ -85,9 +85,7 @@
 # MAGIC
 # MAGIC ### Dados Consumidos do Response
 # MAGIC - `seg_id` → usado como `id` na DataTable + navegação
-# MAGIC - `nome`, `status`, `owner`, `area_responsavel`, `tipo` → colunas da tabela
-# MAGIC - `criado_em`, `atualizado_em` → formatados com toLocaleString
-# MAGIC - `seg_tags` → renderizados como Chips
+# MAGIC - `seg_codigo`, `nome`, `status`, `objetivo`, `owner`, `criado_em` → colunas da tabela
 # MAGIC - `meta.total` → paginação + badge "Pendentes" (filtra status=em_aprovacao)
 
 # COMMAND ----------
@@ -120,14 +118,6 @@
 # MAGIC   "objetivo": "string",
 # MAGIC   "owner": "string",
 # MAGIC   "area_responsavel": "string",
-# MAGIC   "email_contato": "string",
-# MAGIC   "seg_tags": ["tag1", "tag2"],
-# MAGIC   "resumo": "string",
-# MAGIC   "objetivo_negocio": "string",
-# MAGIC   "publico_alvo_descricao": "string",
-# MAGIC   "observacoes": "string",
-# MAGIC   "documentacao_md": "string",
-# MAGIC   "tipo": "direta",
 # MAGIC   "publico_base_id": "string",
 # MAGIC   "regras_json": {
 # MAGIC     "inclusao": { "operator": "AND|OR", "rules": [...] },
@@ -202,11 +192,9 @@
 # MAGIC ```
 # MAGIC {
 # MAGIC   seg_id, nome, descricao, objetivo, status, owner, area_responsavel,
-# MAGIC   email_contato, seg_tags, regras_json, versao_atual, tipo,
-# MAGIC   publico_base_id, criado_em, atualizado_em, criado_por,
-# MAGIC   qtd_ultimo_resultado, recorrencia, agendamento_cron,
-# MAGIC   vigencia_inicio, vigencia_fim, resumo, objetivo_negocio,
-# MAGIC   publico_alvo_descricao, observacoes, documentacao_md
+# MAGIC   regras_json, versao_atual, publico_base_id, criado_em, atualizado_em,
+# MAGIC   criado_por, recorrencia, agendamento_cron,
+# MAGIC   vigencia_inicio, vigencia_fim
 # MAGIC }
 # MAGIC ```
 # MAGIC
@@ -468,7 +456,7 @@
 # MAGIC | Dimensão | Front | Back | Status |
 # MAGIC |----------|-------|------|--------|
 # MAGIC | Endpoints chamados/expostos | 43 | 43 | ✅ Match perfeito |
-# MAGIC | Payload POST/PUT segmentação | 19 campos | 20 campos | ✅ (1 campo auto-preenchido) |
+# MAGIC | Payload POST/PUT segmentação | 9 campos | 9 campos | ✅ Match perfeito |
 # MAGIC | Response campos consumidos | Todos existem | Retorna extras | ✅ |
 # MAGIC | Estimativa (req/resp) | 3/4 | 3/4 | ✅ Perfeito |
 # MAGIC | Comentários (req) | 4 | 4 | ✅ Perfeito |
@@ -488,7 +476,7 @@
 # MAGIC - Cobertura de 100%: cada função do frontend tem um endpoint correspondente no backend
 # MAGIC
 # MAGIC **2. Payloads enviados:**
-# MAGIC - POST/PUT /segmentacoes: front envia 19 campos, back aceita 20. O campo extra (`natureza`) é auto-preenchido pelo backend a partir dos destinos selecionados — o front não precisa enviá-lo.
+# MAGIC - POST/PUT /segmentacoes: front envia 9 campos (nome, descricao, objetivo, owner, area_responsavel, publico_base_id, regras_json + destinos e vigência via endpoints separados), back aceita exatamente esses campos via SegmentacaoCreateDTO/UpdateDTO.
 # MAGIC - Todos os outros payloads têm match perfeito (campo-a-campo).
 # MAGIC
 # MAGIC **3. Responses consumidos:**

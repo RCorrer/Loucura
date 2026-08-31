@@ -41,12 +41,10 @@ class SegmentacaoRepository:
         sql = """
             INSERT INTO plataforma.segmentacao.seg_definicao (
                 seg_id, seg_codigo, seg_slug, nome, descricao, objetivo,
-                seg_tags, resumo, objetivo_negocio, publico_alvo_descricao,
-                observacoes, documentacao_md, owner, area_responsavel,
-                email_contato, criado_por, publico_base_id, regras_json,
-                tipo, seg_origem_id, tipo_origem,
+                owner, area_responsavel, criado_por, publico_base_id,
+                regras_json, seg_origem_id, tipo_origem,
                 status, versao_atual, criado_em, atualizado_em
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         # Converte regras_json para string se for dict
         regras_json = dados.get("regras_json")
@@ -61,19 +59,11 @@ class SegmentacaoRepository:
             dados["nome"],
             dados.get("descricao"),
             dados["objetivo"],
-            dados.get("seg_tags", []),
-            dados.get("resumo"),
-            dados.get("objetivo_negocio"),
-            dados.get("publico_alvo_descricao"),
-            dados.get("observacoes"),
-            dados.get("documentacao_md"),
             dados["owner"],
             dados.get("area_responsavel"),
-            dados.get("email_contato"),
             dados["criado_por"],
             dados["publico_base_id"],
             regras_json,
-            dados.get("tipo", "direta"),
             dados.get("seg_origem_id"),
             dados.get("tipo_origem", "nova"),
             dados.get("status", "rascunho"),
@@ -89,33 +79,27 @@ class SegmentacaoRepository:
         sql = """
             SELECT 
                 seg_id, seg_codigo, seg_slug, nome, descricao, objetivo,
-                seg_tags, resumo, objetivo_negocio, publico_alvo_descricao,
-                observacoes, documentacao_md, owner, area_responsavel,
-                email_contato, criado_por, criado_em, seg_origem_id,
-                tipo_origem, tipo, publico_base_id, regras_json, status,
-                vigencia_inicio, vigencia_fim, agendamento_cron, recorrencia,
-                aprovado_por, aprovado_em, checklist_validacao_json,
-                versao_atual, atualizado_em, habilitado, job_id_databricks
+                owner, area_responsavel, criado_por, criado_em,
+                seg_origem_id, tipo_origem, publico_base_id, regras_json,
+                status, vigencia_inicio, vigencia_fim, agendamento_cron,
+                recorrencia, aprovado_por, aprovado_em,
+                checklist_validacao_json, versao_atual, atualizado_em,
+                habilitado, job_id_databricks
             FROM plataforma.segmentacao.seg_definicao
             WHERE seg_id = ?
         """
         rows = self.client.execute_query(sql, (seg_id,))
         columns = [
             "seg_id", "seg_codigo", "seg_slug", "nome", "descricao", "objetivo",
-            "seg_tags", "resumo", "objetivo_negocio", "publico_alvo_descricao",
-            "observacoes", "documentacao_md", "owner", "area_responsavel",
-            "email_contato", "criado_por", "criado_em", "seg_origem_id",
-            "tipo_origem", "tipo", "publico_base_id", "regras_json", "status",
-            "vigencia_inicio", "vigencia_fim", "agendamento_cron", "recorrencia",
-            "aprovado_por", "aprovado_em", "checklist_validacao_json",
-            "versao_atual", "atualizado_em", "habilitado", "job_id_databricks"
+            "owner", "area_responsavel", "criado_por", "criado_em",
+            "seg_origem_id", "tipo_origem", "publico_base_id", "regras_json",
+            "status", "vigencia_inicio", "vigencia_fim", "agendamento_cron",
+            "recorrencia", "aprovado_por", "aprovado_em",
+            "checklist_validacao_json", "versao_atual", "atualizado_em",
+            "habilitado", "job_id_databricks"
         ]
         if rows:
             row = list(rows[0])
-            # Converte seg_tags de array para lista Python se necessário
-            idx = columns.index("seg_tags")
-            if len(row) > idx and hasattr(row[idx], "tolist"):
-                row[idx] = row[idx].tolist()
             # Converte regras_json de string para dict
             idx_regras = columns.index("regras_json")
             if len(row) > idx_regras and row[idx_regras]:
@@ -140,9 +124,8 @@ class SegmentacaoRepository:
         sql = """
             SELECT 
                 seg_id, seg_codigo, seg_slug, nome, descricao, objetivo,
-                seg_tags, resumo, objetivo_negocio, status, versao_atual,
-                criado_por, criado_em, atualizado_em, owner, area_responsavel,
-                publico_base_id, tipo
+                status, versao_atual, criado_por, criado_em, atualizado_em,
+                owner, area_responsavel, publico_base_id
             FROM plataforma.segmentacao.seg_definicao
             WHERE habilitado = true
         """
@@ -168,17 +151,12 @@ class SegmentacaoRepository:
         rows = self.client.execute_query(sql, tuple(params))
         columns = [
             "seg_id", "seg_codigo", "seg_slug", "nome", "descricao", "objetivo",
-            "seg_tags", "resumo", "objetivo_negocio", "status", "versao_atual",
-            "criado_por", "criado_em", "atualizado_em", "owner", "area_responsavel",
-            "publico_base_id", "tipo"
+            "status", "versao_atual", "criado_por", "criado_em", "atualizado_em",
+            "owner", "area_responsavel", "publico_base_id"
         ]
         results = []
         for row in rows:
-            row_list = list(row)
-            idx = columns.index("seg_tags")
-            if len(row_list) > idx and hasattr(row_list[idx], "tolist"):
-                row_list[idx] = row_list[idx].tolist()
-            results.append(dict(zip(columns, row_list)))
+            results.append(dict(zip(columns, row)))
         return results
 
     def contar(self, **filtros) -> int:

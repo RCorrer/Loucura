@@ -76,7 +76,7 @@ class JobManagerService:
     # ==================== OPERAÇÕES PRINCIPAIS ====================
 
     def criar_job(self, seg_id: str, seg_codigo: str, agendamento_cron: str,
-                  owner: str = "", email_contato: str = "",
+                  owner: str = "",
                   area_responsavel: str = "") -> str:
         """
         Cria um Databricks Job para a segmentação.
@@ -86,7 +86,6 @@ class JobManagerService:
             seg_codigo: Código amigável (ex: SEG-ALTA-RENDA-3F2A)
             agendamento_cron: Expressão cron quartz (6 campos)
             owner: Dono da segmentação
-            email_contato: Email para notificações de falha
             area_responsavel: Área do owner
 
         Returns:
@@ -108,12 +107,7 @@ class JobManagerService:
                     timezone_id=self.TIMEZONE,
                 )
 
-            # Configura notificações
-            notifications = None
-            if email_contato:
-                notifications = JobEmailNotifications(
-                    on_failure=[email_contato],
-                )
+            # Notificações removidas (email_contato descontinuado)
 
             # Cria o job
             job = self.client.jobs.create(
@@ -141,7 +135,7 @@ class JobManagerService:
                     "area": area_responsavel,
                     "owner": owner,
                 },
-                email_notifications=notifications,
+
                 queue=QueueSettings(enabled=True),
             )
 

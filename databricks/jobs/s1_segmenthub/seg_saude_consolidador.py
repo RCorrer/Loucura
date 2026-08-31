@@ -60,7 +60,6 @@ df_problematicas = spark.sql(f"""
     d.seg_id,
     d.nome,
     d.owner,
-    d.email_contato,
     COALESCE(d.recorrencia, 'diario') AS recorrencia,
     e.ultimo_sucesso,
     s.ultima_verificacao,
@@ -144,7 +143,6 @@ for row in df_problematicas.collect():
         "seg_id": row["seg_id"],
         "nome": row["nome"],
         "owner": row["owner"] or "",
-        "email_contato": row["email_contato"] or "",
         "problemas": problemas,
     })
 
@@ -163,7 +161,6 @@ if travadas_count > 0:
                 "seg_id": row["seg_id"],
                 "nome": "(timeout detectado)",
                 "owner": "",
-                "email_contato": "",
                 "problemas": problema_trav,
             })
 

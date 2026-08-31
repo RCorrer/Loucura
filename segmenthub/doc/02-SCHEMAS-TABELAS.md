@@ -139,20 +139,12 @@ Tabela principal. Cada linha = 1 segmentação.
 | `nome` | STRING | Nome da segmentação |
 | `descricao` | STRING | Descrição |
 | `objetivo` | STRING | AQUISICAO/RENTABILIZACAO/RETENCAO/ENGAJAMENTO/COBRANCA |
-| `seg_tags` | ARRAY\<STRING\> | Tags livres |
-| `resumo` | STRING | Resumo funcional |
-| `objetivo_negocio` | STRING | Contexto de negócio |
-| `publico_alvo_descricao` | STRING | Descrição do público |
-| `observacoes` | STRING | Notas adicionais |
-| `documentacao_md` | STRING | Markdown explicativo |
 | `owner` | STRING | Responsável |
 | `area_responsavel` | STRING | Área |
-| `email_contato` | STRING | E-mail para alertas |
 | `criado_por` | STRING | Criador |
 | `criado_em` | TIMESTAMP | Data de criação |
 | `seg_origem_id` | STRING | Link com segmentação pai (clone) |
 | `tipo_origem` | STRING | `nova` / `clone` / `derivada` / `chatbot` |
-| `tipo` | STRING | `direta` / `composta` |
 | `publico_base_id` | STRING FK | Público-base selecionado |
 | `regras_json` | STRING | Árvore de regras (JSON) |
 | `status` | STRING | `rascunho` / `em_aprovacao` / `aprovada` / `ativa` / `pausada` / `encerrada` / `arquivada` |

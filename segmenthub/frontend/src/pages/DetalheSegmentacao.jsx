@@ -10,7 +10,6 @@ import {
   Alert,
   Chip,
   Grid,
-  Divider,
   Table,
   TableBody,
   TableCell,
@@ -24,7 +23,7 @@ import {
   ListItemText,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
-import DescriptionIcon from '@mui/icons-material/Description';
+
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import StopIcon from '@mui/icons-material/Stop';
@@ -185,14 +184,7 @@ export default function DetalheSegmentacao() {
         >
           Editar
         </Button>
-        <Button
-          variant="outlined"
-          startIcon={<DescriptionIcon />}
-          onClick={() => navigate(`/segmentacoes/${id}/documentacao`)}
-          sx={{ mr: 1 }}
-        >
-          Documentação
-        </Button>
+
         <Button
           variant="outlined"
           startIcon={<TimelineIcon />}
@@ -557,16 +549,7 @@ export default function DetalheSegmentacao() {
               <Typography variant="caption" color="text.secondary">Atualizado em</Typography>
               <Typography variant="body2">{seg.atualizado_em || '-'}</Typography>
             </Grid>
-            {seg.seg_tags?.length > 0 && (
-              <Grid item xs={12}>
-                <Typography variant="caption" color="text.secondary">Tags</Typography>
-                <Box sx={{ mt: 0.5, display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                  {seg.seg_tags.map((tag) => (
-                    <Chip key={tag} label={tag} size="small" variant="outlined" />
-                  ))}
-                </Box>
-              </Grid>
-            )}
+
           </Grid>
         </Paper>
 

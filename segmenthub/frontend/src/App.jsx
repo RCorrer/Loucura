@@ -8,7 +8,6 @@ import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import ChatIcon from '@mui/icons-material/Chat';
 import BuilderSegmentacao from './pages/BuilderSegmentacao';
 import ListaSegmentacoes from './pages/ListaSegmentacoes';
-import DocumentacaoSegmentacao from './pages/DocumentacaoSegmentacao';
 import DetalheSegmentacao from './pages/DetalheSegmentacao';
 import TimelineSegmentacao from './pages/TimelineSegmentacao';
 import DashboardSaude from './pages/DashboardSaude';
@@ -87,7 +86,6 @@ function App() {
         <Route path="/segmentacoes/:id" element={<DetalheSegmentacao />} />
         <Route path="/segmentacoes/:id/timeline" element={<TimelineSegmentacao />} />
         <Route path="/segmentacoes/:id/validar" element={<DetalheSegmentacao />} />
-        <Route path="/segmentacoes/:id/documentacao" element={<DocumentacaoSegmentacao />} />
 
         {/* Outras seções */}
         <Route path="/saude" element={<DashboardSaude />} />

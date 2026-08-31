@@ -99,20 +99,12 @@ class SegmentacaoService:
                 "nome": dados.nome,
                 "descricao": dados.descricao,
                 "objetivo": dados.objetivo,
-                "seg_tags": dados.seg_tags or [],
-                "resumo": dados.resumo,
-                "objetivo_negocio": dados.objetivo_negocio,
-                "publico_alvo_descricao": dados.publico_alvo_descricao,
-                "observacoes": dados.observacoes,
-                "documentacao_md": dados.documentacao_md,
                 # Auto-fill: se owner vazio, usa o usuário que está criando (OBO)
                 "owner": dados.owner if dados.owner else usuario,
                 "area_responsavel": dados.area_responsavel,
-                "email_contato": dados.email_contato,
                 "criado_por": usuario,
                 "publico_base_id": dados.publico_base_id,
                 "regras_json": json.dumps(dados.regras_json),
-                "tipo": dados.tipo or "direta",
                 "seg_origem_id": getattr(dados, 'seg_origem_id', None),
                 "tipo_origem": getattr(dados, 'tipo_origem', 'nova'),
                 "status": "rascunho",
@@ -313,7 +305,6 @@ class SegmentacaoService:
                         seg_codigo=atual.get("seg_codigo", seg_id),
                         agendamento_cron=atual.get("agendamento_cron", "0 0 0 * * ?"),
                         owner=atual.get("owner", ""),
-                        email_contato=atual.get("email_contato", ""),
                         area_responsavel=atual.get("area_responsavel", ""),
                     )
                     self.repository.atualizar(seg_id, {"job_id_databricks": job_id})
@@ -465,18 +456,10 @@ class SegmentacaoService:
                 # Rastreabilidade de origem
                 seg_origem_id=seg_id,
                 tipo_origem="clone",
-                seg_tags=original.get("seg_tags"),
-                resumo=original.get("resumo"),
-                objetivo_negocio=original.get("objetivo_negocio"),
-                publico_alvo_descricao=original.get("publico_alvo_descricao"),
-                observacoes=original.get("observacoes"),
-                documentacao_md=original.get("documentacao_md"),
                 owner=dados.owner or usuario,
                 area_responsavel=dados.area_responsavel or original.get("area_responsavel"),
-                email_contato=original.get("email_contato"),
                 publico_base_id=original["publico_base_id"],
                 regras_json=regras_json,
-                tipo="clone",
             )
             
             result = self.criar(create_dto, usuario)

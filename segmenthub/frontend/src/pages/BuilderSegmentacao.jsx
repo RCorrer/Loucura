@@ -25,7 +25,7 @@ import EstimativaBadge from '../components/EstimativaBadge';
 import DestinoSelector from '../components/DestinoSelector';
 import VigenciaAgendamento from '../components/VigenciaAgendamento';
 
-const STEPS = ['Público', 'Regras de Inclusão', 'Regras de Exclusão', 'Destino & Vigência', 'Metadados'];
+const STEPS = ['Público', 'Regras de Inclusão', 'Regras de Exclusão', 'Destino & Vigência'];
 
 export default function BuilderSegmentacao() {
   const navigate = useNavigate();
@@ -40,14 +40,6 @@ export default function BuilderSegmentacao() {
     objetivo: '',
     owner: '',
     area_responsavel: '',
-    email_contato: '',
-    seg_tags: [],
-    resumo: '',
-    objetivo_negocio: '',
-    publico_alvo_descricao: '',
-    observacoes: '',
-    documentacao_md: '',
-    tipo: 'direta',
   });
 
   const [publicoSelecionado, setPublicoSelecionado] = useState('');
@@ -81,14 +73,6 @@ export default function BuilderSegmentacao() {
             objetivo: data.objetivo || '',
             owner: data.owner || '',  // vazio → backend auto-fill com OBO user
             area_responsavel: data.area_responsavel || '',
-            email_contato: data.email_contato || '',
-            seg_tags: data.seg_tags || [],
-            resumo: data.resumo || '',
-            objetivo_negocio: data.objetivo_negocio || '',
-            publico_alvo_descricao: data.publico_alvo_descricao || '',
-            observacoes: data.observacoes || '',
-            documentacao_md: data.documentacao_md || '',
-            tipo: data.tipo || 'direta',
           });
           setPublicoSelecionado(data.publico_base_id || '');
 
@@ -159,14 +143,6 @@ export default function BuilderSegmentacao() {
         objetivo: '',
         owner: '',  // vazio → backend auto-fill com OBO user
         area_responsavel: '',
-        email_contato: '',
-        seg_tags: [],
-        resumo: '',
-        objetivo_negocio: '',
-        publico_alvo_descricao: '',
-        observacoes: '',
-        documentacao_md: '',
-        tipo: 'direta',
       });
       setPublicoSelecionado('');
       setRegrasInclusao({ operator: 'AND', rules: [{ campo_id: '', op: '', value: '' }] });
@@ -490,107 +466,6 @@ export default function BuilderSegmentacao() {
           </Paper>
         )}
 
-        {activeStep === 4 && (
-          <Paper sx={{ p: 3, overflow: 'auto' }}>
-            <Typography variant="h6" gutterBottom>
-              Metadados e Documentação
-            </Typography>
-            <Divider sx={{ mb: 3 }} />
-            
-            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2 }}>
-              Informações Básicas
-            </Typography>
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 3 }}>
-              <TextField
-                label="Tipo"
-                value={dadosBasicos.tipo}
-                onChange={(e) => setDadosBasicos({ ...dadosBasicos, tipo: e.target.value })}
-                select
-                fullWidth
-              >
-                <MenuItem value="direta">Direta</MenuItem>
-                <MenuItem value="composta">Composta</MenuItem>
-              </TextField>
-              <TextField
-                label="Email de Contato"
-                value={dadosBasicos.email_contato}
-                onChange={(e) => setDadosBasicos({ ...dadosBasicos, email_contato: e.target.value })}
-                type="email"
-                fullWidth
-              />
-            </Box>
-
-            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2 }}>
-              Tags e Categorização
-            </Typography>
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 2, mb: 3 }}>
-              <TextField
-                label="Tags (separadas por vírgula)"
-                value={dadosBasicos.seg_tags.join(', ')}
-                onChange={(e) => setDadosBasicos({ 
-                  ...dadosBasicos, 
-                  seg_tags: e.target.value.split(',').map(t => t.trim()).filter(t => t) 
-                })}
-                fullWidth
-                helperText="Ex: marketing, cliente-novo, campanha-2024"
-              />
-            </Box>
-
-            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2 }}>
-              Descrições Detalhadas
-            </Typography>
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 3 }}>
-              <TextField
-                label="Resumo"
-                value={dadosBasicos.resumo}
-                onChange={(e) => setDadosBasicos({ ...dadosBasicos, resumo: e.target.value })}
-                fullWidth
-                multiline
-                rows={2}
-              />
-              <TextField
-                label="Objetivo de Negócio"
-                value={dadosBasicos.objetivo_negocio}
-                onChange={(e) => setDadosBasicos({ ...dadosBasicos, objetivo_negocio: e.target.value })}
-                fullWidth
-                multiline
-                rows={2}
-              />
-              <TextField
-                label="Descrição do Público-Alvo"
-                value={dadosBasicos.publico_alvo_descricao}
-                onChange={(e) => setDadosBasicos({ ...dadosBasicos, publico_alvo_descricao: e.target.value })}
-                fullWidth
-                multiline
-                rows={2}
-                sx={{ gridColumn: 'span 2' }}
-              />
-            </Box>
-
-            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2 }}>
-              Notas e Documentação
-            </Typography>
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 2 }}>
-              <TextField
-                label="Observações"
-                value={dadosBasicos.observacoes}
-                onChange={(e) => setDadosBasicos({ ...dadosBasicos, observacoes: e.target.value })}
-                fullWidth
-                multiline
-                rows={3}
-              />
-              <TextField
-                label="Documentação (Markdown)"
-                value={dadosBasicos.documentacao_md}
-                onChange={(e) => setDadosBasicos({ ...dadosBasicos, documentacao_md: e.target.value })}
-                fullWidth
-                multiline
-                rows={6}
-                helperText="Use Markdown para documentação técnica detalhada"
-              />
-            </Box>
-          </Paper>
-        )}
       </Box>
 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2, pt: 2, borderTop: `1px solid ${tokens.neutral.gray10}` }}>
@@ -601,13 +476,23 @@ export default function BuilderSegmentacao() {
         >
           Voltar
         </Button>
-        <Button
-          variant="contained"
-          onClick={() => setActiveStep((prev) => Math.min(prev + 1, STEPS.length - 1))}
-          disabled={activeStep === STEPS.length - 1}
-        >
-          Avançar
-        </Button>
+        {activeStep === STEPS.length - 1 ? (
+          <Button
+            variant="contained"
+            color="success"
+            onClick={handleSalvar}
+            disabled={apiLoading}
+          >
+            {apiLoading ? <CircularProgress size={24} /> : (isEdit ? 'Salvar Segmentação' : 'Criar Segmentação')}
+          </Button>
+        ) : (
+          <Button
+            variant="contained"
+            onClick={() => setActiveStep((prev) => Math.min(prev + 1, STEPS.length - 1))}
+          >
+            Avançar
+          </Button>
+        )}
       </Box>
     </Box>
   );
