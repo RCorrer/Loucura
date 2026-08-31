@@ -21,11 +21,10 @@
 # MAGIC   │   ├── chat.js            (1 função — não usado, page usa useChat)
 # MAGIC   │   ├── saude.js           (2 funções)
 # MAGIC   │   └── notificacoes.js    (2 funções)
-# MAGIC   ├── pages/            ← 8 pages (telas)
+# MAGIC   ├── pages/            ← 7 pages (telas)
 # MAGIC   │   ├── ListaSegmentacoes.jsx
 # MAGIC   │   ├── BuilderSegmentacao.jsx
 # MAGIC   │   ├── DetalheSegmentacao.jsx
-# MAGIC   │   ├── DocumentacaoSegmentacao.jsx
 # MAGIC   │   ├── TimelineSegmentacao.jsx
 # MAGIC   │   ├── DashboardSaude.jsx
 # MAGIC   │   ├── AdminCatalogo.jsx
@@ -39,13 +38,12 @@
 # MAGIC 1. [ListaSegmentações](#lista)
 # MAGIC 2. [BuilderSegmentação](#builder)
 # MAGIC 3. [DetalheSegmentação](#detalhe)
-# MAGIC 4. [DocumentaçãoSegmentação](#documentacao)
-# MAGIC 5. [TimelineSegmentação](#timeline)
-# MAGIC 6. [DashboardSaúde](#saude)
-# MAGIC 7. [AdminCatálogo](#admin)
-# MAGIC 8. [ChatSegmentação](#chat)
-# MAGIC 9. [Componentes Globais](#globais)
-# MAGIC 10. [Validação Front ↔ Back](#validacao)
+# MAGIC 4. [TimelineSegmentação](#timeline)
+# MAGIC 5. [DashboardSaúde](#saude)
+# MAGIC 6. [AdminCatálogo](#admin)
+# MAGIC 7. [ChatSegmentação](#chat)
+# MAGIC 8. [Componentes Globais](#globais)
+# MAGIC 9. [Validação Front ↔ Back](#validacao)
 
 # COMMAND ----------
 
@@ -218,41 +216,12 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,4-5. DocumentacaoSegmentacao + TimelineSegmentacao
+# DBTITLE 1,4. TimelineSegmentacao
 # MAGIC %md
-# MAGIC ## 4. DocumentaçãoSegmentação <a id="documentacao"></a>
+# MAGIC ## 4. TimelineSegmentação <a id="timeline"></a>
 # MAGIC
-# MAGIC **Rota:** `/segmentacoes/:id/documentacao` · **Page:** `DocumentacaoSegmentacao.jsx` · **Card:** S1-FRONT-04
-# MAGIC
-# MAGIC | Método | Endpoint | Função | Quando |
-# MAGIC |--------|----------|--------|--------|
-# MAGIC | GET | `/api/segmentacoes/{id}` | `buscar(id)` | onMount |
-# MAGIC | PUT | `/api/segmentacoes/{id}` | `atualizar(id, dados)` | Salvar doc |
-# MAGIC | GET | `/api/segmentacoes/{id}/destinos` | `buscarDestinos(id)` | onMount |
-# MAGIC | PUT | `/api/segmentacoes/{id}/destinos` | `atualizarDestinos(id, d)` | Salvar destinos |
-# MAGIC | PUT | `/api/segmentacoes/{id}/vigencia` | `atualizarVigencia(id, v)` | Salvar vigência |
-# MAGIC
-# MAGIC **Payload PUT /vigencia:**
-# MAGIC ```json
-# MAGIC {
-# MAGIC   "vigencia_inicio": "ISO datetime",
-# MAGIC   "vigencia_fim": "ISO datetime|null",
-# MAGIC   "recorrencia": "once|hourly|daily|weekly|monthly|custom",
-# MAGIC   "agendamento_cron": "string|null"
-# MAGIC }
-# MAGIC ```
-# MAGIC
-# MAGIC **Payload PUT /destinos:**
-# MAGIC ```json
-# MAGIC [
-# MAGIC   { "destino": "sistema2", "habilitado": true },
-# MAGIC   { "destino": "sistema3", "habilitado": false }
-# MAGIC ]
-# MAGIC ```
-# MAGIC
-# MAGIC ---
-# MAGIC
-# MAGIC ## 5. TimelineSegmentação <a id="timeline"></a>
+# MAGIC > **Nota:** A antiga página `DocumentacaoSegmentacao.jsx` (rota `/segmentacoes/:id/documentacao`) foi **removida**.
+# MAGIC > Destino & Vigência agora vivem no **Step 4 do Builder** (`BuilderSegmentacao.jsx`).
 # MAGIC
 # MAGIC **Rota:** `/segmentacoes/:id/timeline` · **Page:** `TimelineSegmentacao.jsx` · **Card:** S1-FRONT-06
 # MAGIC
