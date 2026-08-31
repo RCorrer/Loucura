@@ -19,3 +19,5 @@ env:
     value: "production"
   - name: SEG_EXEC_NOTEBOOK_PATH
     value: "/Workspace/Users/rafael.correr@bradesco.com.br/Testes/Loucura/databricks/jobs/s1_segmenthub/seg_exec"
+  - name: SEG_EXEC_NOTEBOOK_PATH
+    value: "/Workspace/Users/rafael.correr@bradesco.com.br/Testes/Loucura/databricks/jobs/s1_segmenthub/seg_exec"

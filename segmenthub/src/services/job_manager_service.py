@@ -41,6 +41,11 @@ def _resolve_notebook_path() -> str:
             "Configure no app.yaml ou .env com o path absoluto do notebook seg_exec. "
             "Ex: /Workspace/Users/.../databricks/jobs/s1_segmenthub/seg_exec"
         )
+    if not path.startswith("/Workspace"):
+        raise EnvironmentError(
+            f"SEG_EXEC_NOTEBOOK_PATH deve ser um path absoluto de workspace. "
+            f"Recebido: '{path}'"
+        )
     return path
 
 
@@ -54,8 +59,15 @@ class JobManagerService:
       Schedule: cron da segmentação
     """
 
-    # Path do notebook de execução — obrigatório via env var
-    NOTEBOOK_PATH = _resolve_notebook_path()
+    # Path do notebook de execução — resolvido lazy (não no import time)
+    _notebook_path_cache = None
+
+    @classmethod
+    def _get_notebook_path(cls) -> str:
+        """Resolve e cacheia o path do notebook seg_exec na primeira chamada."""
+        if cls._notebook_path_cache is None:
+            cls._notebook_path_cache = _resolve_notebook_path()
+        return cls._notebook_path_cache
 
     # Timezone padrão para schedules
     TIMEZONE = "America/Sao_Paulo"
@@ -125,7 +137,7 @@ class JobManagerService:
                     Task(
                         task_key="executar_segmentacao",
                         notebook_task=NotebookTask(
-                            notebook_path=self.NOTEBOOK_PATH,
+                            notebook_path=self._get_notebook_path(),
                             base_parameters={
                                 "seg_id": seg_id,
                                 "origem_execucao": "agendada",
