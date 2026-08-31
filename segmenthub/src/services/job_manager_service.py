@@ -25,11 +25,23 @@ from databricks.sdk.service.jobs import (
     NotebookTask,
     CronSchedule,
     JobSettings,
-    JobEmailNotifications,
     QueueSettings,
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_notebook_path() -> str:
+    """Resolve o path do notebook seg_exec via env var.
+    Fail-fast: levanta erro claro se não configurado."""
+    path = os.getenv("SEG_EXEC_NOTEBOOK_PATH", "").strip()
+    if not path:
+        raise EnvironmentError(
+            "SEG_EXEC_NOTEBOOK_PATH não definida. "
+            "Configure no app.yaml ou .env com o path absoluto do notebook seg_exec. "
+            "Ex: /Workspace/Users/.../databricks/jobs/s1_segmenthub/seg_exec"
+        )
+    return path
 
 
 class JobManagerService:
@@ -42,11 +54,8 @@ class JobManagerService:
       Schedule: cron da segmentação
     """
 
-    # Path do notebook de execução (relativo ao workspace)
-    NOTEBOOK_PATH = os.getenv(
-        "SEG_EXEC_NOTEBOOK_PATH",
-        "/Workspace/Users/rafael.correr@bradesco.com.br/Loucura/databricks/jobs/s1_segmenthub/seg_exec"
-    )
+    # Path do notebook de execução — obrigatório via env var
+    NOTEBOOK_PATH = _resolve_notebook_path()
 
     # Timezone padrão para schedules
     TIMEZONE = "America/Sao_Paulo"
