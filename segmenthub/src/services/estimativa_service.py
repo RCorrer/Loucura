@@ -24,6 +24,11 @@ class EstimativaService:
         """
         Calcula a estimativa de público para as regras fornecidas.
         Retorna: { estimativa, inclusao, exclusao, tempo_ms }
+
+        Estratégia:
+          - Sempre roda query de inclusão-only (sem exclusão) → contagem bruta
+          - Se há regras de exclusão, roda query líquida (inclusão AND NOT exclusão)
+          - Deriva exclusão = inclusão_bruta − líquida
         """
         start_time = time.time()
 
@@ -32,19 +37,24 @@ class EstimativaService:
         if erros:
             raise ValueError(f"Regras inválidas: {erros}")
 
-        # 2. Gera SQL para estimativa (approx_count_distinct)
-        sql_estimativa, params = self.engine.generate_estimativa_query(regras)
-        estimativa = self.repository.executar_estimativa(sql_estimativa, tuple(params))
+        # 2. Contagem só com inclusão (sem exclusão)
+        sql_inclusao, params_inc = self.engine.generate_inclusao_only_query(regras)
+        contagem_inclusao = self.repository.executar_estimativa(sql_inclusao, tuple(params_inc))
 
-        # 3. (Opcional) Calcula contagem de inclusão e exclusão separadamente
-        # Para simplificar, vamos retornar a estimativa total
-        # Em uma versão mais completa, poderíamos calcular inclusão e exclusão separadamente
+        # 3. Se há exclusão, calcula líquido e deriva o delta
+        contagem_liquida = contagem_inclusao
+        contagem_exclusao = 0
+
+        if regras.exclusao and regras.exclusao.rules:
+            sql_liquida, params_liq = self.engine.generate_estimativa_query(regras)
+            contagem_liquida = self.repository.executar_estimativa(sql_liquida, tuple(params_liq))
+            contagem_exclusao = max(0, contagem_inclusao - contagem_liquida)
 
         elapsed_ms = int((time.time() - start_time) * 1000)
 
         return {
-            "estimativa": estimativa,
-            "inclusao": estimativa,  # Simplificado: a estimativa total é a inclusão
-            "exclusao": 0,           # Simplificado
+            "estimativa": contagem_liquida,
+            "inclusao": contagem_inclusao,
+            "exclusao": contagem_exclusao,
             "tempo_ms": elapsed_ms,
         }

@@ -239,3 +239,14 @@ class QueryEngine:
         return self._build_full_query(
             regras, "approx_count_distinct({tabela_base}.{join_key}) AS estimativa"
         )
+
+    def generate_inclusao_only_query(self, regras: RegrasJson) -> Tuple[str, List[Any]]:
+        """Gera query de contagem apenas com regras de inclusão (sem exclusão)."""
+        regras_sem_exclusao = RegrasJson(
+            publico_base=regras.publico_base,
+            inclusao=regras.inclusao,
+            exclusao=None,
+        )
+        return self._build_full_query(
+            regras_sem_exclusao, "approx_count_distinct({tabela_base}.{join_key}) AS estimativa"
+        )
