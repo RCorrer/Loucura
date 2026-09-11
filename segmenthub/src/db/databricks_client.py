@@ -1,3 +1,8 @@
+"""
+Cliente SQL para Databricks via databricks-sql-connector.
+Conecta ao SQL Warehouse usando Config() + credentials_provider (OAuth no Databricks Apps).
+"""
+
 import os
 import logging
 from databricks import sql
@@ -29,20 +34,18 @@ class DatabricksSQLClient:
             credentials_provider=lambda: self.cfg.authenticate,
         )
 
-    def execute_query(self, sql: str, params: tuple = None) -> list:
+    def execute_query(self, sql_text: str, params: tuple = None) -> list:
         try:
             with self._get_connection() as conn:
                 with conn.cursor() as cursor:
-                    # Mantém ? como placeholder (não converte!)
-                    logger.info(f"SQL: {sql}")
-                    logger.info(f"Params: {params}")
+                    logger.debug(f"SQL: {sql_text}")
+                    logger.debug(f"Params: {params}")
                     if params:
-                        # Garante que params é uma tupla
                         if not isinstance(params, tuple):
                             params = tuple(params)
-                        cursor.execute(sql, params)
+                        cursor.execute(sql_text, params)
                     else:
-                        cursor.execute(sql)
+                        cursor.execute(sql_text)
 
                     # Usa PyArrow para evitar erro de parsing com nulos
                     try:
@@ -63,41 +66,31 @@ class DatabricksSQLClient:
             logger.error(f"Erro na query: {e}")
             raise
 
-    def fetch_one(self, sql: str, params: tuple = None) -> list:
-        rows = self.execute_query(sql, params)
+    def fetch_one(self, sql_text: str, params: tuple = None) -> list:
+        rows = self.execute_query(sql_text, params)
         return rows[0] if rows else None
 
-    def fetch_all(self, sql: str, params: tuple = None) -> list:
-        return self.execute_query(sql, params)
+    def fetch_all(self, sql_text: str, params: tuple = None) -> list:
+        return self.execute_query(sql_text, params)
 
-    def execute_insert(self, sql: str, params: tuple = None) -> int:
+    def execute_insert(self, sql_text: str, params: tuple = None) -> int:
         with self._get_connection() as conn:
             with conn.cursor() as cursor:
                 if params:
                     if not isinstance(params, tuple):
                         params = tuple(params)
-                    cursor.execute(sql, params)
+                    cursor.execute(sql_text, params)
                 else:
-                    cursor.execute(sql)
+                    cursor.execute(sql_text)
                 return cursor.rowcount or 0
 
 
 _default_client = None
 
-def get_client():
-    """Return the appropriate DB client based on environment.
 
-    - ENV=local  → FakeSQLiteClient (SQLite, no Databricks needed)
-    - Otherwise  → DatabricksSQLClient (production)
-    """
+def get_client() -> DatabricksSQLClient:
+    """Retorna instância singleton do DatabricksSQLClient."""
     global _default_client
     if _default_client is None:
-        env = os.getenv("ENV", "production").lower()
-        if env == "local":
-            from src.db.fake_client import FakeSQLiteClient
-            _default_client = FakeSQLiteClient()
-            logger.info("🔧 Usando FakeSQLiteClient (modo local)")
-        else:
-            _default_client = DatabricksSQLClient()
-            logger.info("☁️ Usando DatabricksSQLClient (Databricks)")
+        _default_client = DatabricksSQLClient()
     return _default_client

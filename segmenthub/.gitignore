@@ -11,9 +11,6 @@ venv/
 # Environment
 .env
 
-# SQLite local database
-src/db/local.db
-
 # Node
 node_modules/
 frontend/node_modules/

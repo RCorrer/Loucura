@@ -4,6 +4,7 @@ Gerencia flags, histórico e regras de negócio.
 """
 
 import uuid
+import json
 from typing import List, Dict, Optional, Any
 from fastapi import HTTPException
 
@@ -143,8 +144,8 @@ class MetadataAdminService:
             bloco_visao360=row.get("bloco_visao360"),
             tabela_fisica=row["tabela_fisica"],
             campo_fisico=row["campo_fisico"],
-            operadores=row.get("operadores", []),
-            valores_dominio=row.get("valores_dominio"),
+            operadores=json.loads(row["operadores"]) if isinstance(row.get("operadores"), str) else (row.get("operadores") or []),
+            valores_dominio=json.loads(row["valores_dominio"]) if isinstance(row.get("valores_dominio"), str) else row.get("valores_dominio"),
             descricao=row.get("descricao"),
         ).model_dump()
 
