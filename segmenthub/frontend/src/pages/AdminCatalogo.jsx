@@ -37,6 +37,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import { useMetadataAdminApi } from '../api/metadataAdmin';
 import { useMetadataApi } from '../api/metadata';
 import { useUser } from '@shared/hooks/useUser';
+import TableSkeleton from '../components/TableSkeleton';
 
 /**
  * AdminCatalogo — S1-FRONT-10 (adendo)
@@ -332,7 +333,7 @@ export default function AdminCatalogo() {
           {/* Tabela */}
           <Paper sx={{ flex: 1, overflow: 'auto' }}>
             {loading ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress /></Box>
+              <Box sx={{ px: 2, py: 2 }}><TableSkeleton rows={8} cols={9} withHeader={false} /></Box>
             ) : (
               <>
                 <TableContainer>

@@ -31,6 +31,7 @@ import WarningIcon from '@mui/icons-material/Warning';
 import ErrorIcon from '@mui/icons-material/Error';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { useSaudeApi } from '../api/saude';
+import TableSkeleton from '../components/TableSkeleton';
 
 const STATUS_ICON = {
   verde: <CheckCircleIcon fontSize="small" sx={{ color: '#2E7D32' }} />,
@@ -99,10 +100,11 @@ export default function DashboardSaude() {
     }
   };
 
+  // FX-14: Skeleton loading em vez de spinner central
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-        <CircularProgress />
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', p: 2 }}>
+        <TableSkeleton rows={6} cols={7} withCards withCardCount={4} />
       </Box>
     );
   }

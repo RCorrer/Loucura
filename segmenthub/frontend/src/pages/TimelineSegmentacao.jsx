@@ -17,6 +17,7 @@ import CommentIcon from '@mui/icons-material/Comment';
 import { useSegmentacoesApi } from '../api/segmentacoes';
 import Timeline from '../components/Timeline';
 import Comentarios from '../components/Comentarios';
+import AppBreadcrumbs from '../components/AppBreadcrumbs';
 
 /**
  * TimelineSegmentacao — S1-FRONT-06
@@ -96,6 +97,9 @@ export default function TimelineSegmentacao() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* FX-13 */}
+      <AppBreadcrumbs segName={segNome} />
+
       <PageHeader
         title={`Timeline: ${segNome}`}
         subtitle="Histórico unificado e comentários"

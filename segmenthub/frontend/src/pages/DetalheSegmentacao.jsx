@@ -41,6 +41,8 @@ import ValidationModal from '../components/ValidationModal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import Comentarios from '../components/Comentarios';
 import RuleViewer from '../components/RuleViewer';
+import VersionDiffDialog from '../components/VersionDiffDialog';
+import AppBreadcrumbs from '../components/AppBreadcrumbs';
 import { useUser } from '@shared/hooks/useUser';
 
 const STATUS_COLORS = {
@@ -70,6 +72,7 @@ export default function DetalheSegmentacao() {
     buscarDestinos,
     listarExecucoes,
     listarVersoes,
+    obterVersao,
     ativar,
     pausar,
     reativar,
@@ -93,6 +96,7 @@ export default function DetalheSegmentacao() {
   const [validationOpen, setValidationOpen] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', severity: 'warning', confirmText: 'Confirmar', onConfirm: null });
+  const [diffOpen, setDiffOpen] = useState(false);
 
   const abrirConfirmacao = (title, message, severity, confirmText, acao, label) => {
     setMenuAnchor(null);
@@ -176,6 +180,9 @@ export default function DetalheSegmentacao() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* FX-13: Breadcrumbs */}
+      <AppBreadcrumbs segName={seg.nome} />
+
       <PageHeader
         title={seg.nome}
         subtitle={`${seg.seg_codigo} • ${seg.objetivo}`}
@@ -535,6 +542,12 @@ export default function DetalheSegmentacao() {
                 </TableBody>
               </Table>
             </TableContainer>
+            {/* FX-11: Botão comparar versões */}
+            {versoes.length >= 2 && (
+              <Box sx={{ mt: 1, textAlign: 'right' }}>
+                <Button size="small" onClick={() => setDiffOpen(true)}>Comparar versões</Button>
+              </Box>
+            )}
           ) : (
             <Typography variant="body2" color="text.secondary">Apenas versão atual</Typography>
           )}
@@ -572,6 +585,15 @@ export default function DetalheSegmentacao() {
           <Comentarios segId={id} />
         </Paper>
       </Box>
+
+      {/* FX-11: Dialog de comparação de versões */}
+      <VersionDiffDialog
+        open={diffOpen}
+        onClose={() => setDiffOpen(false)}
+        segId={id}
+        versoes={versoes}
+        obterVersao={obterVersao}
+      />
 
       {/* Modal de Validação */}
       <ValidationModal

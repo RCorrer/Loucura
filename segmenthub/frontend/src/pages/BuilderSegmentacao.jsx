@@ -24,6 +24,7 @@ import ExclusaoBuilder from '../components/ExclusaoBuilder';
 import EstimativaBadge from '../components/EstimativaBadge';
 import DestinoSelector from '../components/DestinoSelector';
 import VigenciaAgendamento from '../components/VigenciaAgendamento';
+import AppBreadcrumbs from '../components/AppBreadcrumbs';
 
 const STEPS = ['Público', 'Regras de Inclusão', 'Regras de Exclusão', 'Destino & Vigência'];
 
@@ -52,9 +53,7 @@ export default function BuilderSegmentacao() {
     { operator: 'OR', rules: [] }
   );
 
-  // Compat legado (não mais usados, mantidos para evitar breaking)
-  const [interGroupOpInclusao, setInterGroupOpInclusao] = useState('OR');
-  const [interGroupOpExclusao, setInterGroupOpExclusao] = useState('OR');
+  // FX-16: interGroupOp* legado removido — operator vive na árvore (node.operator)
 
   const [carregandoDados, setCarregandoDados] = useState(false);
   const [carregandoMetadata, setCarregandoMetadata] = useState(true);
@@ -148,8 +147,6 @@ export default function BuilderSegmentacao() {
       setPublicoSelecionado('');
       setRegrasInclusao({ operator: 'AND', rules: [{ campo_id: '', op: '', value: '' }] });
       setRegrasExclusao({ operator: 'OR', rules: [] });
-      setInterGroupOpInclusao('OR');
-      setInterGroupOpExclusao('OR');
       setDestinos([
         { destino: 'sistema2', habilitado: false },
         { destino: 'sistema3', habilitado: false },
@@ -334,6 +331,9 @@ export default function BuilderSegmentacao() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* FX-13: Breadcrumbs (só no modo edição) */}
+      {isEdit && <AppBreadcrumbs />}
+
       <PageHeader
         title={isEdit ? 'Editar Segmentação' : 'Nova Segmentação'}
         subtitle={isEdit ? 'Edite os detalhes da segmentação' : 'Crie uma nova segmentação no-code'}
@@ -362,12 +362,11 @@ export default function BuilderSegmentacao() {
 
       {/* S1-FRONT-03: Estimativa em tempo real */}
       <Box sx={{ mb: 2 }}>
+        {/* FX-16: interGroupOp props removidos */}
         <EstimativaBadge
           publicoBase={publicoSelecionado}
           regrasInclusao={regrasInclusao}
           regrasExclusao={regrasExclusao}
-          interGroupOpInclusao={interGroupOpInclusao}
-          interGroupOpExclusao={interGroupOpExclusao}
         />
       </Box>
 
@@ -435,8 +434,6 @@ export default function BuilderSegmentacao() {
                 <RuleBuilder
                   value={regrasInclusao}
                   onChange={setRegrasInclusao}
-                  interGroupOperator={interGroupOpInclusao}
-                  onInterGroupOperatorChange={setInterGroupOpInclusao}
                 />
               </Box>
             </Box>
@@ -453,8 +450,6 @@ export default function BuilderSegmentacao() {
                 <ExclusaoBuilder
                   value={regrasExclusao}
                   onChange={setRegrasExclusao}
-                  interGroupOperator={interGroupOpExclusao}
-                  onInterGroupOperatorChange={setInterGroupOpExclusao}
                 />
               </Box>
             </Box>

@@ -10,6 +10,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import SearchIcon from '@mui/icons-material/Search';
 import PendingActionsIcon from '@mui/icons-material/PendingActions';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import TableSkeleton from '../components/TableSkeleton';
 
 export default function ListaSegmentacoes() {
   const navigate = useNavigate();

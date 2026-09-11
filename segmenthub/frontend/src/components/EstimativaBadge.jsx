@@ -26,17 +26,16 @@ const DEBOUNCE_MS = 800;
  *
  * Props:
  *   - publicoBase: string (publico_id selecionado)
- *   - regrasInclusao: array de grupos [{operator, rules}, ...]
- *   - regrasExclusao: array de grupos [{operator, rules}, ...]
- *   - interGroupOpInclusao: 'AND' | 'OR'
- *   - interGroupOpExclusao: 'AND' | 'OR'
+ *   - regrasInclusao: RegraNo {operator, rules}
+ *   - regrasExclusao: RegraNo {operator, rules}
+ *
+ * FX-16: Props interGroupOp* removidos — buildRegraNo já lia operator
+ *        diretamente da árvore via cleanTreeForEstimate, nunca usava o param.
  */
 export default function EstimativaBadge({
   publicoBase,
   regrasInclusao,
   regrasExclusao,
-  interGroupOpInclusao = 'OR',
-  interGroupOpExclusao = 'OR',
 }) {
   const { calcularPreview } = useEstimativaApi();
 
@@ -147,13 +146,14 @@ export default function EstimativaBadge({
       return;
     }
 
-    const inclusaoNo = buildRegraNo(regrasInclusao, interGroupOpInclusao);
+    // FX-16: operator lido direto da árvore (node.operator)
+    const inclusaoNo = buildRegraNo(regrasInclusao);
     if (!inclusaoNo) {
       setResultado(null);
       return;
     }
 
-    const exclusaoNo = buildRegraNo(regrasExclusao, interGroupOpExclusao);
+    const exclusaoNo = buildRegraNo(regrasExclusao);
 
     const payload = {
       publico_base: publicoBase,
@@ -179,7 +179,7 @@ export default function EstimativaBadge({
     } finally {
       setLoading(false);
     }
-  }, [publicoBase, regrasInclusao, regrasExclusao, interGroupOpInclusao, interGroupOpExclusao, buildRegraNo, podEstimar, calcularPreview]);
+  }, [publicoBase, regrasInclusao, regrasExclusao, buildRegraNo, podEstimar, calcularPreview]);
 
   // =============================================
   // Effect com debounce — reage a mudanças nas regras
