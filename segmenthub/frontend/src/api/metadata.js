@@ -13,11 +13,7 @@ export const useMetadataApi = () => {
   const listarCamposEmUso = useCallback(() => request(`${BASE_URL}/caracteristicas-em-uso`), [request]);
   const obterCampo = useCallback((id) => request(`${BASE_URL}/caracteristicas/${id}`), [request]);
 
-  // Funções admin (se existirem)
-  const listarCamposAdmin = useCallback((filtros) => request(`${BASE_URL}/admin/campos?${new URLSearchParams(filtros)}`), [request]);
-  const atualizarFlags = useCallback((id, data) => request(`${BASE_URL}/admin/campos/${id}/flags`, { method: 'PUT', body: JSON.stringify(data) }), [request]);
-  const atualizarStatus = useCallback((id, data) => request(`${BASE_URL}/admin/campos/${id}/status`, { method: 'PUT', body: JSON.stringify(data) }), [request]);
-  const listarHistorico = useCallback((filtros) => request(`${BASE_URL}/admin/historico?${new URLSearchParams(filtros)}`), [request]);
+  // FX-04: Funções admin removidas (duplicadas em metadataAdmin.js)
 
   return useMemo(() => ({
     listarTemas,
@@ -26,11 +22,7 @@ export const useMetadataApi = () => {
     listarPublicos,
     listarCamposEmUso,
     obterCampo,
-    listarCamposAdmin,
-    atualizarFlags,
-    atualizarStatus,
-    listarHistorico,
     loading,
     error,
-  }), [listarTemas, listarTemasCompletos, listarCampos, listarPublicos, listarCamposEmUso, obterCampo, listarCamposAdmin, atualizarFlags, atualizarStatus, listarHistorico, loading, error]);
+  }), [listarTemas, listarTemasCompletos, listarCampos, listarPublicos, listarCamposEmUso, obterCampo, loading, error]);
 };

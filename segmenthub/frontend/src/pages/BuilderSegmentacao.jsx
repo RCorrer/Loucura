@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { PageHeader } from '@shared';
 import {
   Box,
@@ -30,6 +30,7 @@ const STEPS = ['Público', 'Regras de Inclusão', 'Regras de Exclusão', 'Destin
 export default function BuilderSegmentacao() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const location = useLocation();
   const isEdit = !!id;
 
   const { buscar, criar, atualizar, buscarDestinos, atualizarDestinos, atualizarVigencia, loading: apiLoading } = useSegmentacoesApi();
@@ -157,8 +158,23 @@ export default function BuilderSegmentacao() {
       setActiveStep(0);
       setError(null);
       setCarregandoMetadata(true);
+
+      // FX-01: Importar regras vindas do Chat (navigate state)
+      const importadas = location.state?.regrasImportadas;
+      if (importadas) {
+        if (importadas.publico_base) setPublicoSelecionado(importadas.publico_base);
+        if (importadas.inclusao?.operator && importadas.inclusao?.rules) {
+          setRegrasInclusao(importadas.inclusao);
+          setActiveStep(1);
+        }
+        if (importadas.exclusao?.operator && importadas.exclusao?.rules?.length > 0) {
+          setRegrasExclusao(importadas.exclusao);
+        }
+        // Limpa o state para evitar re-import em re-renders
+        window.history.replaceState({}, document.title);
+      }
     }
-  }, [isEdit]);
+  }, [isEdit, location.state]);
 
   // Adiciona campo no root da árvore (catálogo → click)
   const handleSelectCampoInclusao = (campo) => {

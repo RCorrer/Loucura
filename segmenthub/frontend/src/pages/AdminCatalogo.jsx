@@ -35,6 +35,8 @@ import HistoryIcon from '@mui/icons-material/History';
 import SearchIcon from '@mui/icons-material/Search';
 // CheckCircleIcon e BlockIcon removidos — S2/S3 agora usam Switch inline
 import { useMetadataAdminApi } from '../api/metadataAdmin';
+import { useMetadataApi } from '../api/metadata';
+import { useUser } from '@shared/hooks/useUser';
 
 /**
  * AdminCatalogo — S1-FRONT-10 (adendo)
@@ -57,6 +59,21 @@ export default function AdminCatalogo() {
     listarHistorico,
     listarHistoricoCampo,
   } = useMetadataAdminApi();
+  const { listarTemas } = useMetadataApi();
+  const { isAdmin, loading: userLoading } = useUser();
+
+  // FX-07: Temas dinâmicos
+  const [temasDisponiveis, setTemasDisponiveis] = useState([]);
+
+  useEffect(() => {
+    const carregarTemas = async () => {
+      try {
+        const temas = await listarTemas();
+        setTemasDisponiveis(Array.isArray(temas) ? temas : []);
+      } catch { /* fallback para lista vazia */ }
+    };
+    carregarTemas();
+  }, [listarTemas]);
 
   // Filtros
   const [filtros, setFiltros] = useState({ tema: '', sistema: '', status: '', busca: '' });
@@ -210,6 +227,18 @@ export default function AdminCatalogo() {
     }
   }, [tabPrincipal]);
 
+  // FX-03: Guard de role — só admin acessa esta página
+  if (!userLoading && !isAdmin) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+        <Alert severity="warning" sx={{ maxWidth: 400 }}>
+          <Typography variant="subtitle1" fontWeight="bold">Acesso Restrito</Typography>
+          <Typography variant="body2">Esta página é exclusiva para usuários com perfil admin.</Typography>
+        </Alert>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <PageHeader
@@ -252,11 +281,10 @@ export default function AdminCatalogo() {
                     onChange={(e) => setFiltros({ ...filtros, tema: e.target.value })}
                   >
                     <MenuItem value="">Todos</MenuItem>
-                    <MenuItem value="cadastral">Cadastral</MenuItem>
-                    <MenuItem value="financeiro">Financeiro</MenuItem>
-                    <MenuItem value="comportamental">Comportamental</MenuItem>
-                    <MenuItem value="digital">Digital</MenuItem>
-                    <MenuItem value="credito">Crédito</MenuItem>
+                    {/* FX-07: Temas carregados dinamicamente */}
+                    {temasDisponiveis.map((tema) => (
+                      <MenuItem key={tema} value={tema}>{tema.charAt(0).toUpperCase() + tema.slice(1)}</MenuItem>
+                    ))}
                   </Select>
                 </FormControl>
               </Grid>

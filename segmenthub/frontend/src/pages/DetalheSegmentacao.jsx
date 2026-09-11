@@ -40,6 +40,8 @@ import { useSaudeApi } from '../api/saude';
 import ValidationModal from '../components/ValidationModal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import Comentarios from '../components/Comentarios';
+import RuleViewer from '../components/RuleViewer';
+import { useUser } from '@shared/hooks/useUser';
 
 const STATUS_COLORS = {
   rascunho: 'default',
@@ -78,6 +80,7 @@ export default function DetalheSegmentacao() {
     loading,
   } = useSegmentacoesApi();
   const { obterDetalhe: obterSaude } = useSaudeApi();
+  const { isAdmin } = useUser();
 
   const [seg, setSeg] = useState(null);
   const [destinos, setDestinos] = useState([]);
@@ -158,6 +161,7 @@ export default function DetalheSegmentacao() {
 
   if (!seg) return null;
 
+  // FX-09: renderRegrasResumo mantido para compact mode
   const renderRegrasResumo = () => {
     const regras = seg.regras_json;
     if (!regras) return 'Não definidas';
@@ -219,7 +223,8 @@ export default function DetalheSegmentacao() {
             </Button>
           </>
         )}
-        {seg.status === 'em_aprovacao' && (
+        {/* FX-03: Só admin pode aprovar */}
+        {seg.status === 'em_aprovacao' && isAdmin && (
           <Button
             variant="contained"
             startIcon={<CheckCircleIcon />}
@@ -413,6 +418,12 @@ export default function DetalheSegmentacao() {
             </Paper>
           </Grid>
         </Grid>
+
+        {/* FX-09: Visualização detalhada das regras */}
+        <Paper sx={{ p: 2, mb: 2 }}>
+          <Typography variant="subtitle1" fontWeight="bold" gutterBottom>Regras de Segmentação</Typography>
+          <RuleViewer regrasJson={seg.regras_json} />
+        </Paper>
 
         {/* Destinos */}
         <Paper sx={{ p: 2, mb: 2 }}>

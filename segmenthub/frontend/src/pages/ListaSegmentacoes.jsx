@@ -9,6 +9,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import EditIcon from '@mui/icons-material/Edit';
 import SearchIcon from '@mui/icons-material/Search';
 import PendingActionsIcon from '@mui/icons-material/PendingActions';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
 
 export default function ListaSegmentacoes() {
   const navigate = useNavigate();
@@ -160,6 +161,27 @@ export default function ListaSegmentacoes() {
         title="Segmentações"
         subtitle="Gerencie suas segmentações de clientes"
       >
+        {/* FX-10: Export CSV */}
+        <Button
+          variant="outlined"
+          startIcon={<FileDownloadIcon />}
+          onClick={() => {
+            const headers = ['Código', 'Nome', 'Status', 'Objetivo', 'Owner', 'Criado em'];
+            const csvRows = [headers.join(';')];
+            segmentacoes.forEach(s => {
+              csvRows.push([s.seg_codigo, s.nome, s.status, s.objetivo, s.owner, s.criado_em].map(v => `"${(v || '').toString().replace(/"/g, '""')}"`).join(';'));
+            });
+            const blob = new Blob([`\uFEFF${csvRows.join('\n')}`], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'segmentacoes.csv'; a.click();
+            URL.revokeObjectURL(url);
+          }}
+          disabled={segmentacoes.length === 0}
+          sx={{ mr: 1 }}
+        >
+          Exportar
+        </Button>
         <Button
           variant="contained"
           startIcon={<AddIcon />}

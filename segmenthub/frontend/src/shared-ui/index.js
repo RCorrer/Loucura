@@ -15,5 +15,6 @@ export { default as ChatPanel } from './components/ChatPanel';
 export * from './hooks/useApi';
 export * from './hooks/useNotifications';
 export * from './hooks/useChat';
+export * from './hooks/useUser';
 export * from './utils/formatters';
 export * from './utils/constants';

@@ -13,45 +13,62 @@ import PersonIcon from '@mui/icons-material/Person';
 import CampaignIcon from '@mui/icons-material/Campaign';
 
 /**
- * DestinoSelector — S1-FRONT-04
+ * DestinoSelector — S1-FRONT-04 (FX-15: config extensível)
  *
- * Permite selecionar a natureza da segmentação:
- * - sistema2 = Atendimento Humano (ClientView 360)
- * - sistema3 = Digital (EngagementHub)
- * - ambos = os dois habilitados
+ * Permite selecionar a natureza da segmentação.
+ * FX-15: Sistema de destinos configurado via DESTINOS_CONFIG.
+ *        Para adicionar S4, basta incluir um entry.
  *
  * Props:
  *   - value: [{destino: 'sistema2'|'sistema3', habilitado: bool}]
  *   - onChange: (newDestinos) => void
  *   - disabled: bool
  */
-export default function DestinoSelector({ value = [], onChange, disabled = false }) {
-  const getSistema2 = () => value.find((d) => d.destino === 'sistema2');
-  const getSistema3 = () => value.find((d) => d.destino === 'sistema3');
 
-  const isHumanoAtivo = getSistema2()?.habilitado || false;
-  const isDigitalAtivo = getSistema3()?.habilitado || false;
+const DESTINOS_CONFIG = [
+  {
+    key: 'sistema2',
+    label: 'Atendimento Humano (ClientView 360)',
+    description: 'Segmento aparece como ação do gerente na carteira',
+    icon: PersonIcon,
+    color: 'info',
+  },
+  {
+    key: 'sistema3',
+    label: 'Digital (EngagementHub)',
+    description: 'Segmento é associado a campanhas e jornadas digitais',
+    icon: CampaignIcon,
+    color: 'success',
+  },
+  // FX-15: Adicionar novos sistemas aqui:
+  // { key: 'sistema4', label: 'Analytics (DataHub)', description: '...', icon: ..., color: 'secondary' },
+];
+
+export default function DestinoSelector({ value = [], onChange, disabled = false }) {
+  // FX-15: Lógica genérica baseada em DESTINOS_CONFIG
+  const getDestino = (key) => value.find((d) => d.destino === key);
+  const isAtivo = (key) => getDestino(key)?.habilitado || false;
 
   const handleToggle = (sistema, checked) => {
-    const novosDestinos = [
-      { destino: 'sistema2', habilitado: sistema === 'sistema2' ? checked : isHumanoAtivo },
-      { destino: 'sistema3', habilitado: sistema === 'sistema3' ? checked : isDigitalAtivo },
-    ];
+    const novosDestinos = DESTINOS_CONFIG.map(({ key }) => ({
+      destino: key,
+      habilitado: key === sistema ? checked : isAtivo(key),
+    }));
     onChange(novosDestinos);
   };
 
+  const ativos = DESTINOS_CONFIG.filter(({ key }) => isAtivo(key));
+
   const getNaturezaLabel = () => {
-    if (isHumanoAtivo && isDigitalAtivo) return 'Mista (Humano + Digital)';
-    if (isHumanoAtivo) return 'Atendimento Humano';
-    if (isDigitalAtivo) return 'Digital';
-    return 'Nenhum destino selecionado';
+    if (ativos.length === 0) return 'Nenhum destino selecionado';
+    if (ativos.length === DESTINOS_CONFIG.length) return 'Mista (Todos)';
+    return ativos.map(d => d.label.split(' (')[0]).join(' + ');
   };
 
   const getNaturezaColor = () => {
-    if (isHumanoAtivo && isDigitalAtivo) return 'primary';
-    if (isHumanoAtivo) return 'info';
-    if (isDigitalAtivo) return 'success';
-    return 'default';
+    if (ativos.length === 0) return 'default';
+    if (ativos.length > 1) return 'primary';
+    return ativos[0].color;
   };
 
   return (
@@ -72,57 +89,34 @@ export default function DestinoSelector({ value = [], onChange, disabled = false
         Define para quais sistemas este segmento será encaminhado.
       </Typography>
 
+      {/* FX-15: Render dinâmico baseado em config */}
       <FormGroup>
-        <FormControlLabel
-          control={
-            <Switch
-              checked={isHumanoAtivo}
-              onChange={(e) => handleToggle('sistema2', e.target.checked)}
-              disabled={disabled}
-              color="info"
-            />
-          }
-          label={
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <PersonIcon fontSize="small" color="info" />
-              <Box>
-                <Typography variant="body2" fontWeight="medium">
-                  Atendimento Humano (ClientView 360)
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Segmento aparece como ação do gerente na carteira
-                </Typography>
+        {DESTINOS_CONFIG.map(({ key, label, description, icon: IconComp, color }, idx) => (
+          <FormControlLabel
+            key={key}
+            control={
+              <Switch
+                checked={isAtivo(key)}
+                onChange={(e) => handleToggle(key, e.target.checked)}
+                disabled={disabled}
+                color={color}
+              />
+            }
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <IconComp fontSize="small" color={color} />
+                <Box>
+                  <Typography variant="body2" fontWeight="medium">{label}</Typography>
+                  <Typography variant="caption" color="text.secondary">{description}</Typography>
+                </Box>
               </Box>
-            </Box>
-          }
-          sx={{ mb: 1 }}
-        />
-        <FormControlLabel
-          control={
-            <Switch
-              checked={isDigitalAtivo}
-              onChange={(e) => handleToggle('sistema3', e.target.checked)}
-              disabled={disabled}
-              color="success"
-            />
-          }
-          label={
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <CampaignIcon fontSize="small" color="success" />
-              <Box>
-                <Typography variant="body2" fontWeight="medium">
-                  Digital (EngagementHub)
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Segmento é associado a campanhas e jornadas digitais
-                </Typography>
-              </Box>
-            </Box>
-          }
-        />
+            }
+            sx={{ mb: idx < DESTINOS_CONFIG.length - 1 ? 1 : 0 }}
+          />
+        ))}
       </FormGroup>
 
-      {!isHumanoAtivo && !isDigitalAtivo && (
+      {ativos.length === 0 && (
         <Alert severity="warning" sx={{ mt: 2 }}>
           Selecione ao menos um destino para que o segmento seja utilizado.
         </Alert>

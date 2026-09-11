@@ -13,26 +13,26 @@ class SaudeRepository:
         self.client = get_client()
 
     def listar_saude(self) -> List[Dict]:
-        """Retorna saúde de todas as segmentações."""
+        """Retorna saúde de todas as segmentações (FX-05: com nome via JOIN)."""
         sql = """
-            SELECT seg_id, health_status, ultima_verificacao,
-                   variacao_publico_pct, taxa_sucesso_exec,
-                   tempo_medio_exec_seg, alertas_json, publico_atual
-            FROM plataforma.segmentacao.seg_saude
-            ORDER BY ultima_verificacao DESC
+            SELECT s.seg_id, s.health_status, s.ultima_verificacao,
+                   s.variacao_publico_pct, s.taxa_sucesso_exec,
+                   s.tempo_medio_exec_seg, s.alertas_json, s.publico_atual,
+                   d.nome, d.seg_codigo
+            FROM plataforma.segmentacao.seg_saude s
+            LEFT JOIN plataforma.segmentacao.seg_definicao d ON s.seg_id = d.seg_id
+            ORDER BY s.ultima_verificacao DESC
         """
         rows = self.client.execute_query(sql)
         columns = [
             "seg_id", "health_status", "ultima_verificacao",
             "variacao_publico_pct", "taxa_sucesso_exec",
-            "tempo_medio_exec_seg", "alertas_json", "publico_atual"
+            "tempo_medio_exec_seg", "alertas_json", "publico_atual",
+            "nome", "seg_codigo"
         ]
-        # Converte cada lista em dicionário
         results = []
         for row in rows:
             row_list = list(row)
-            # alertas_json pode ser um dict ou string; mantém como está
-            # Se for string, podemos tentar parsear, mas não é obrigatório
             results.append(dict(zip(columns, row_list)))
         return results
 

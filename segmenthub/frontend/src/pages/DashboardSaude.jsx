@@ -181,9 +181,13 @@ export default function DashboardSaude() {
                     </Tooltip>
                   </TableCell>
                   <TableCell>
+                    {/* FX-05: Exibir nome real em vez de UUID truncado */}
                     <Typography variant="body2" fontWeight="medium">
-                      {item.seg_id?.slice(0, 16)}
+                      {item.nome || item.seg_codigo || item.seg_id?.slice(0, 16)}
                     </Typography>
+                    {item.seg_codigo && item.nome && (
+                      <Typography variant="caption" color="text.secondary">{item.seg_codigo}</Typography>
+                    )}
                   </TableCell>
                   <TableCell align="right">
                     {item.publico_atual?.toLocaleString('pt-BR') || '-'}

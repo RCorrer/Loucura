@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AppShell } from '@shared';
+import { UserProvider, useUser } from '@shared/hooks/useUser';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import AddIcon from '@mui/icons-material/Add';
 import HealthAndSafetyIcon from '@mui/icons-material/HealthAndSafety';
@@ -14,15 +15,17 @@ import DashboardSaude from './pages/DashboardSaude';
 import NotificacoesPainel from './components/NotificacoesPainel';
 import ChatSegmentacao from './pages/ChatSegmentacao';
 import AdminCatalogo from './pages/AdminCatalogo';
+import ErrorBoundary from './components/ErrorBoundary';
 
 function App() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { usuarioId, perfil, isAdmin, loading: userLoading } = useUser();
 
   // Verifica se a rota atual corresponde ao caminho do menu
   const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/');
 
-  // Itens do menu com ícones e rota
+  // FX-03: Menu condicional por role — Admin Catálogo só para admin
   const menuItems = [
     {
       text: 'Segmentações',
@@ -36,19 +39,20 @@ function App() {
       path: '/segmentacoes/nova',
       onClick: () => navigate('/segmentacoes/nova'),
     },
-    { divider: true }, // linha separadora
+    { divider: true },
     {
       text: 'Dashboard de Saúde',
       icon: <HealthAndSafetyIcon />,
       path: '/saude',
       onClick: () => navigate('/saude'),
     },
-    {
+    // FX-03: Só admin vê Admin Catálogo
+    ...(isAdmin ? [{
       text: 'Admin Catálogo',
       icon: <AdminPanelSettingsIcon />,
       path: '/admin/catalogo',
       onClick: () => navigate('/admin/catalogo'),
-    },
+    }] : []),
     {
       text: 'Chat',
       icon: <ChatIcon />,
@@ -66,11 +70,18 @@ function App() {
     };
   });
 
+  // FX-06: Nome real do usuário + badge do perfil
+  const userDisplay = userLoading
+    ? 'Carregando...'
+    : usuarioId
+      ? `${usuarioId.split('@')[0]} (${perfil || 'sem perfil'})`
+      : 'Não autenticado';
+
   return (
     <AppShell
       title="SegmentHub"
       menuItems={menuItemsWithActive}
-      user="Analista"
+      user={userDisplay}
       headerActions={<NotificacoesPainel />}
     >
       <Routes>
@@ -99,7 +110,11 @@ function App() {
 export default function WrappedApp() {
   return (
     <BrowserRouter>
-      <App />
+      <ErrorBoundary>
+        <UserProvider>
+          <App />
+        </UserProvider>
+      </ErrorBoundary>
     </BrowserRouter>
   );
 }
