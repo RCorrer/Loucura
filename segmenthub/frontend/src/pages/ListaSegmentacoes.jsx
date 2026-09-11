@@ -91,9 +91,6 @@ export default function ListaSegmentacoes() {
     try {
       setErrorMessage(null);
       const response = await clonar(id, {});  // owner vazio → backend auto-fill com OBO user
-      
-      console.log('Clone response:', response);
-      
       if (response && response.seg_id) {
         await carregar();
         navigate(`/segmentacoes/${response.seg_id}`);

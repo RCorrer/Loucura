@@ -353,34 +353,34 @@ except Exception as e:
 try:
     # RF-01: Reutiliza exec_id do service (se propagado) ou gera novo (execução agendada)
     exec_id = EXEC_ID_PARAM or f"exec_{SEG_ID}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-exec_timestamp = datetime.utcnow()
+    exec_timestamp = datetime.utcnow()
 
-# 4a. MERGE em seg_resultado_corrente (snapshot atual)
-df_resultado.createOrReplaceTempView("resultado_novo")
+    # 4a. MERGE em seg_resultado_corrente (snapshot atual)
+    df_resultado.createOrReplaceTempView("resultado_novo")
 
-spark.sql(
-    f"""MERGE INTO {CATALOG}.{SCHEMA_SEG}.seg_resultado_corrente AS target
-    USING (
-      SELECT :seg_id AS seg_id, cpf_cnpj
-      FROM resultado_novo
-    ) AS source
-    ON target.seg_id = source.seg_id AND target.cpf_cnpj = source.cpf_cnpj
-    WHEN NOT MATCHED THEN INSERT (seg_id, cpf_cnpj, exec_id, entrou_em)
-      VALUES (source.seg_id, source.cpf_cnpj, :exec_id, current_timestamp())
-    WHEN NOT MATCHED BY SOURCE AND target.seg_id = :seg_id THEN DELETE""",
-    args={"seg_id": SEG_ID, "exec_id": exec_id}
-)
+    spark.sql(
+        f"""MERGE INTO {CATALOG}.{SCHEMA_SEG}.seg_resultado_corrente AS target
+        USING (
+          SELECT :seg_id AS seg_id, cpf_cnpj
+          FROM resultado_novo
+        ) AS source
+        ON target.seg_id = source.seg_id AND target.cpf_cnpj = source.cpf_cnpj
+        WHEN NOT MATCHED THEN INSERT (seg_id, cpf_cnpj, exec_id, entrou_em)
+          VALUES (source.seg_id, source.cpf_cnpj, :exec_id, current_timestamp())
+        WHEN NOT MATCHED BY SOURCE AND target.seg_id = :seg_id THEN DELETE""",
+        args={"seg_id": SEG_ID, "exec_id": exec_id}
+    )
 
-print(f"✓ seg_resultado_corrente atualizado (MERGE)")
+    print(f"✓ seg_resultado_corrente atualizado (MERGE)")
 
-# 4b. INSERT em seg_resultado_historico (auditoria)
-spark.sql(
-    f"""INSERT INTO {CATALOG}.{SCHEMA_SEG}.seg_resultado_historico
-    (exec_id, seg_id, versao_usada, cpf_cnpj, snapshot_em)
-    SELECT :exec_id, :seg_id, :versao, cpf_cnpj, current_timestamp()
-    FROM resultado_novo""",
-    args={"exec_id": exec_id, "seg_id": SEG_ID, "versao": seg["versao_atual"]}
-)
+    # 4b. INSERT em seg_resultado_historico (auditoria)
+    spark.sql(
+        f"""INSERT INTO {CATALOG}.{SCHEMA_SEG}.seg_resultado_historico
+        (exec_id, seg_id, versao_usada, cpf_cnpj, snapshot_em)
+        SELECT :exec_id, :seg_id, :versao, cpf_cnpj, current_timestamp()
+        FROM resultado_novo""",
+        args={"exec_id": exec_id, "seg_id": SEG_ID, "versao": seg["versao_atual"]}
+    )
 
     print(f"✓ seg_resultado_historico inserido ({qtd_clientes} registros)")
 except Exception as e:
