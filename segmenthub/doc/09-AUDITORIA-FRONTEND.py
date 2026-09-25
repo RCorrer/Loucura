@@ -5,9 +5,12 @@
 # MAGIC
 # MAGIC **Data**: 2026-09-11  
 # MAGIC **Escopo**: 7 pages, 13 components, 7 API clients, 3 hooks, 11 shared-ui components  
-# MAGIC **Commit**: `fix(s1): frontend audit — 16 fixes`  
+# MAGIC **Commits**:  
+# MAGIC • `fix(s1): frontend audit — 16 fixes` (15 arquivos)  
+# MAGIC • `fix(s1): complete remaining 4 frontend items (FX-11/13/14/16)` (10 arquivos)  
 # MAGIC **Branch**: `main`  
-# MAGIC **Arquivos alterados**: 15 (10 modificados, 3 criados, 2 refatorados)
+# MAGIC **Total arquivos alterados**: 25 operações (17 modificações, 6 criações, 2 refatorações)  
+# MAGIC **Status final**: **16/16 itens implementados — ZERO pendentes**
 # MAGIC
 # MAGIC ---
 # MAGIC
@@ -64,27 +67,32 @@
 
 # DBTITLE 1,Features Adicionadas
 # MAGIC %md
-# MAGIC ## Features Adicionadas (2)
+# MAGIC ## Features Adicionadas (5)
 # MAGIC
 # MAGIC | ID | Prior. | Descrição | Status |
 # MAGIC |-----|--------|-----------|--------|
 # MAGIC | **FEAT-1** | ALTA | **RuleViewer read-only** — `RuleViewer.jsx` exibe árvore de regras completa no DetalheSegmentacao (antes só mostrava contagem) | ✅ **IMPLEMENTADO (FX-09)** |
 # MAGIC | **FEAT-2** | MÉDIA | **Export CSV** — botão "Exportar" na ListaSegmentacoes (client-side, BOM UTF-8, separador `;`) | ✅ **IMPLEMENTADO (FX-10)** |
+# MAGIC | **FEAT-3** | MÉDIA | **Comparação de versões** — `VersionDiffDialog.jsx` mostra diff lado a lado (campos básicos + regras via RuleViewer). Botão "Comparar versões" no DetalheSegmentacao. | ✅ **IMPLEMENTADO (FX-11)** |
+# MAGIC | **FEAT-4** | BAIXA | **Breadcrumbs** — `AppBreadcrumbs.jsx` auto-gerado pela rota. Integrado em DetalheSegmentacao, TimelineSegmentacao, BuilderSegmentacao (modo edição). | ✅ **IMPLEMENTADO (FX-13)** |
+# MAGIC | **FEAT-5** | BAIXA | **Skeleton Loading** — `TableSkeleton.jsx` reutilizável. Aplicado em DashboardSaude (com cards skeleton) e AdminCatalogo (tabela skeleton). | ✅ **IMPLEMENTADO (FX-14)** |
 
 # COMMAND ----------
 
-# DBTITLE 1,Pendentes (baixa prioridade)
+# DBTITLE 1,Itens Finalizados — Anteriormente Pendentes
 # MAGIC %md
-# MAGIC ## Pendentes (baixa prioridade)
+# MAGIC ## Itens Anteriormente Pendentes — TODOS RESOLVIDOS ✅
 # MAGIC
-# MAGIC Itens identificados mas **não implementados** neste ciclo por serem de baixa prioridade ou exigirem mais discussão:
+# MAGIC Os 4 itens deferidos no primeiro ciclo foram implementados no segundo commit:
 # MAGIC
-# MAGIC | ID | Tipo | Descrição | Justificativa |
-# MAGIC |-----|------|-----------|---------------|
-# MAGIC | **FX-11** | FEAT-3 | **Comparação de versões** — Dialog com diff entre versões no DetalheSegmentacao | Complexidade média, API já existe (`obterVersao`), falta definir UX do diff |
-# MAGIC | **FX-13** | FEAT-4 | **Breadcrumbs** — Componente MUI Breadcrumbs no topo de cada page | Puramente cosmético, baixa prioridade |
-# MAGIC | **FX-14** | FEAT-5 | **Skeleton Loading** — Substituir `CircularProgress` central por MUI Skeleton | UX improvement, não funcional |
-# MAGIC | **FX-16** | DEAD-3 | **Refactor interGroupOp** — EstimativaBadge precisa ler `operator` direto da árvore | Requer refactor cuidadoso do `buildRegraNo()` |
+# MAGIC | ID | Tipo | Descrição | Resolução |
+# MAGIC |-----|------|-----------|----------|
+# MAGIC | **FX-11** | FEAT-3 | **Comparação de versões** | `VersionDiffDialog.jsx` criado. Seletor de versão A/B, diff de campos + regras lado a lado via RuleViewer. |
+# MAGIC | **FX-13** | FEAT-4 | **Breadcrumbs** | `AppBreadcrumbs.jsx` criado. Auto-parse de rota, UUIDs mostram nome da seg, integrado em 3 pages. |
+# MAGIC | **FX-14** | FEAT-5 | **Skeleton Loading** | `TableSkeleton.jsx` criado. Suporta rows/cols/cards configuráveis. Aplicado em DashboardSaude + AdminCatalogo. |
+# MAGIC | **FX-16** | DEAD-3 | **Refactor interGroupOp** | Confirmado que `buildRegraNo` já ignorava o param (chamava `cleanTreeForEstimate` direto). Props removidos de EstimativaBadge + state/props removidos de BuilderSegmentacao + RuleBuilder + ExclusaoBuilder. |
+# MAGIC
+# MAGIC **Status final: 16/16 itens implementados. Zero pendentes.**
 
 # COMMAND ----------
 

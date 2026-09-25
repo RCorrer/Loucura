@@ -724,127 +724,86 @@ print("  OK")
 
 # COMMAND ----------
 
-# DBTITLE 1,11. Segmentação S1 (regras_json alinhado com RegrasJson model)
-# 11. DADOS INICIAIS DE SEGMENTAÇÃO (S1)
-# Formato correto: RegrasJson { publico_base, inclusao: RegraNo, exclusao: RegraNo|null }
-# RegraNo: { operator: AND|OR, rules: [RegraFolha|RegraNo] }
-# RegraFolha: { campo_id, op, value }
-print("11. Segmentação (S1)...")
-import json as _json
+# DBTITLE 1,11. Tabelas de segmentação S1 (VAZIAS — sem segmentações pré-criadas)
+# 11. TABELAS DE SEGMENTAÇÃO (S1) — VAZIAS COM SCHEMA CORRETO
+# Nenhuma segmentação pré-criada. Todas as tabelas começam vazias,
+# prontas para receber dados via API/Builder.
+print("11. Tabelas de segmentação S1 (vazias)...")
 
-seg_ids = ["seg_alta_renda", "seg_digital"]
+# seg_definicao (tabela principal — sem dados pré-criados)
+spark.createDataFrame([], StructType([
+    StructField("seg_id", StringType(), False),
+    StructField("seg_codigo", StringType(), True),
+    StructField("seg_slug", StringType(), True),
+    StructField("nome", StringType(), True),
+    StructField("descricao", StringType(), True),
+    StructField("objetivo", StringType(), True),
+    StructField("owner", StringType(), True),
+    StructField("area_responsavel", StringType(), True),
+    StructField("criado_por", StringType(), True),
+    StructField("criado_em", TimestampType(), True),
+    StructField("seg_origem_id", StringType(), True),
+    StructField("tipo_origem", StringType(), True),
+    StructField("publico_base_id", StringType(), True),
+    StructField("regras_json", StringType(), True),
+    StructField("status", StringType(), True),
+    StructField("vigencia_inicio", TimestampType(), True),
+    StructField("vigencia_fim", TimestampType(), True),
+    StructField("agendamento_cron", StringType(), True),
+    StructField("recorrencia", StringType(), True),
+    StructField("aprovado_por", StringType(), True),
+    StructField("aprovado_em", TimestampType(), True),
+    StructField("checklist_validacao_json", StringType(), True),
+    StructField("versao_atual", IntegerType(), True),
+    StructField("atualizado_em", TimestampType(), True),
+    StructField("habilitado", BooleanType(), True),
+    StructField("job_id_databricks", StringType(), True)
+])).write.mode("overwrite").saveAsTable(f"{CATALOG}.segmentacao.seg_definicao")
+print("  seg_definicao: 0 registros (vazia)")
 
-# Regras no formato CORRETO do modelo RegrasJson
-regras_alta_renda = _json.dumps({
-    "publico_base": "pub_varejo",
-    "inclusao": {
-        "operator": "AND",
-        "rules": [
-            {"campo_id": "renda_mensal", "op": ">=", "value": 10000},
-            {"campo_id": "score", "op": ">", "value": 600}
-        ]
-    },
-    "exclusao": {
-        "operator": "OR",
-        "rules": [
-            {"campo_id": "inadimplente", "op": "=", "value": True}
-        ]
-    }
-})
-regras_digital = _json.dumps({
-    "publico_base": "pub_varejo",
-    "inclusao": {
-        "operator": "AND",
-        "rules": [
-            {"campo_id": "usa_app", "op": "=", "value": True},
-            {"campo_id": "engajamento_score", "op": ">", "value": 60}
-        ]
-    },
-    "exclusao": None
-})
+# seg_destino
+spark.createDataFrame([], StructType([
+    StructField("seg_id", StringType(), False),
+    StructField("destino", StringType(), True),
+    StructField("habilitado", BooleanType(), True),
+    StructField("criado_em", TimestampType(), True)
+])).write.mode("overwrite").saveAsTable(f"{CATALOG}.segmentacao.seg_destino")
+print("  seg_destino: 0 registros (vazia)")
 
-# Inserir definições
-seg_def_rows = [
-    Row(seg_id=seg_ids[0], seg_codigo="SEG-ALTA-RENDA", seg_slug="alta-renda", nome="Alta Renda Varejo", descricao="Clientes varejo com renda > 10k", objetivo="AQUISICAO", owner=MAIN_USER, area_responsavel="Marketing", criado_por=MAIN_USER, criado_em=datetime.now(), seg_origem_id=None, tipo_origem="nova", publico_base_id="pub_varejo", regras_json=regras_alta_renda, status="ativa", vigencia_inicio=datetime.now(), vigencia_fim=datetime.now()+timedelta(days=90), agendamento_cron=None, recorrencia="once", aprovado_por=MAIN_USER, aprovado_em=datetime.now(), checklist_validacao_json=None, versao_atual=1, atualizado_em=datetime.now(), habilitado=True),
-    Row(seg_id=seg_ids[1], seg_codigo="SEG-DIGITAL", seg_slug="digital", nome="Clientes Digitais", descricao="Clientes que usam app e têm alto engajamento", objetivo="ENGAJAMENTO", owner=MAIN_USER, area_responsavel="Digital", criado_por=MAIN_USER, criado_em=datetime.now(), seg_origem_id=None, tipo_origem="nova", publico_base_id="pub_varejo", regras_json=regras_digital, status="ativa", vigencia_inicio=datetime.now(), vigencia_fim=datetime.now()+timedelta(days=90), agendamento_cron=None, recorrencia="once", aprovado_por=MAIN_USER, aprovado_em=datetime.now(), checklist_validacao_json=None, versao_atual=1, atualizado_em=datetime.now(), habilitado=True),
-]
-schema_seg_def = StructType([StructField("seg_id", StringType(), False), StructField("seg_codigo", StringType(), True), StructField("seg_slug", StringType(), True), StructField("nome", StringType(), True), StructField("descricao", StringType(), True), StructField("objetivo", StringType(), True), StructField("owner", StringType(), True), StructField("area_responsavel", StringType(), True), StructField("criado_por", StringType(), True), StructField("criado_em", TimestampType(), True), StructField("seg_origem_id", StringType(), True), StructField("tipo_origem", StringType(), True), StructField("publico_base_id", StringType(), True), StructField("regras_json", StringType(), True), StructField("status", StringType(), True), StructField("vigencia_inicio", TimestampType(), True), StructField("vigencia_fim", TimestampType(), True), StructField("agendamento_cron", StringType(), True), StructField("recorrencia", StringType(), True), StructField("aprovado_por", StringType(), True), StructField("aprovado_em", TimestampType(), True), StructField("checklist_validacao_json", StringType(), True), StructField("versao_atual", IntegerType(), True), StructField("atualizado_em", TimestampType(), True), StructField("habilitado", BooleanType(), True), StructField("job_id_databricks", StringType(), True)])
-seg_def_tuples = [(r.seg_id, r.seg_codigo, r.seg_slug, r.nome, r.descricao, r.objetivo, r.owner, r.area_responsavel, r.criado_por, r.criado_em, r.seg_origem_id, r.tipo_origem, r.publico_base_id, r.regras_json, r.status, r.vigencia_inicio, r.vigencia_fim, r.agendamento_cron, r.recorrencia, r.aprovado_por, r.aprovado_em, r.checklist_validacao_json, r.versao_atual, r.atualizado_em, r.habilitado, None) for r in seg_def_rows]
-spark.createDataFrame(seg_def_tuples, schema_seg_def).write.mode("overwrite").saveAsTable(f"{CATALOG}.segmentacao.seg_definicao")
+# seg_execucao
+spark.createDataFrame([], StructType([
+    StructField("exec_id", StringType(), False),
+    StructField("seg_id", StringType(), True),
+    StructField("versao_usada", IntegerType(), True),
+    StructField("origem_execucao", StringType(), True),
+    StructField("executado_em", TimestampType(), True),
+    StructField("qtd_clientes", LongType(), True),
+    StructField("status", StringType(), True),
+    StructField("job_id", StringType(), True),
+    StructField("run_id", StringType(), True),
+    StructField("job_run_url", StringType(), True)
+])).write.mode("overwrite").saveAsTable(f"{CATALOG}.segmentacao.seg_execucao")
+print("  seg_execucao: 0 registros (vazia)")
 
-# Destino (seg_destino - conforme DDL: seg_id, destino, habilitado, criado_em)
-seg_dest_rows = [
-    Row(seg_id=seg_ids[0], destino="sistema2", habilitado=True, criado_em=datetime.now()),
-    Row(seg_id=seg_ids[0], destino="sistema3", habilitado=True, criado_em=datetime.now()),
-    Row(seg_id=seg_ids[1], destino="sistema2", habilitado=True, criado_em=datetime.now()),
-    Row(seg_id=seg_ids[1], destino="sistema3", habilitado=True, criado_em=datetime.now()),
-]
-schema_seg_dest = StructType([StructField("seg_id", StringType(), False), StructField("destino", StringType(), True), StructField("habilitado", BooleanType(), True), StructField("criado_em", TimestampType(), True)])
-seg_dest_tuples = [(r.seg_id, r.destino, r.habilitado, r.criado_em) for r in seg_dest_rows]
-spark.createDataFrame(seg_dest_tuples, schema_seg_dest).write.mode("overwrite").saveAsTable(f"{CATALOG}.segmentacao.seg_destino")
+# seg_resultado_corrente
+spark.createDataFrame([], StructType([
+    StructField("seg_id", StringType(), True),
+    StructField("cpf_cnpj", StringType(), True),
+    StructField("exec_id", StringType(), True),
+    StructField("entrou_em", TimestampType(), True)
+])).write.mode("overwrite").saveAsTable(f"{CATALOG}.segmentacao.seg_resultado_corrente")
+print("  seg_resultado_corrente: 0 registros (vazia)")
 
-# Execução (simulada) - para cada segmento, gerar resultado corrente
-print("  Gerando seg_execucao e seg_resultado_corrente...")
-exec_id1 = f"exec_{uuid.uuid4().hex[:12]}"
-exec_id2 = f"exec_{uuid.uuid4().hex[:12]}"
-
-# Simular execução: para cada segmento, selecionar CPFs que atendem às regras
-# Vamos fazer uma consulta simples no Spark, mas para simplificar, usamos a lógica manual baseada nos dados gerados.
-# Como temos os dados em clientes_data, podemos filtrar.
-# Para "Alta Renda": segmento varejo e renda > 10000
-# Filtro alinhado com regras_json: pub_varejo(segmento==varejo) + renda>=10000 + score>600 - inadimplentes
-alta_renda_cpfs = [d["cpf_cnpj"] for d in clientes_data if d["segmento"] == "varejo" and d["renda_mensal"] >= 10000 and d["score"] > 600 and not d["inadimplente"]]
-digital_cpfs = [d["cpf_cnpj"] for d in clientes_data if d["usa_app"] and d["engajamento_score"] > 60]
-
-# Inserir execuções
-exec_rows = [
-    Row(exec_id=exec_id1, seg_id=seg_ids[0], versao_usada=1, origem_execucao="manual", executado_em=datetime.now(), qtd_clientes=len(alta_renda_cpfs), status="sucesso", job_id=None, run_id=None, job_run_url=None),
-    Row(exec_id=exec_id2, seg_id=seg_ids[1], versao_usada=1, origem_execucao="manual", executado_em=datetime.now(), qtd_clientes=len(digital_cpfs), status="sucesso", job_id=None, run_id=None, job_run_url=None),
-]
-schema_exec = StructType([StructField("exec_id", StringType(), False), StructField("seg_id", StringType(), True), StructField("versao_usada", IntegerType(), True), StructField("origem_execucao", StringType(), True), StructField("executado_em", TimestampType(), True), StructField("qtd_clientes", LongType(), True), StructField("status", StringType(), True), StructField("job_id", StringType(), True), StructField("run_id", StringType(), True), StructField("job_run_url", StringType(), True)])
-exec_tuples = [(r.exec_id, r.seg_id, r.versao_usada, r.origem_execucao, r.executado_em, r.qtd_clientes, r.status, r.job_id, r.run_id, r.job_run_url) for r in exec_rows]
-spark.createDataFrame(exec_tuples, schema_exec).write.mode("overwrite").saveAsTable(f"{CATALOG}.segmentacao.seg_execucao")
-
-# Inserir resultado corrente
-result_rows = []
-for cpf in alta_renda_cpfs:
-    result_rows.append(Row(seg_id=seg_ids[0], cpf_cnpj=cpf, exec_id=exec_id1, entrou_em=datetime.now()))
-for cpf in digital_cpfs:
-    result_rows.append(Row(seg_id=seg_ids[1], cpf_cnpj=cpf, exec_id=exec_id2, entrou_em=datetime.now()))
-if result_rows:
-    spark.createDataFrame(result_rows).write.mode("overwrite").saveAsTable(f"{CATALOG}.segmentacao.seg_resultado_corrente")
-else:
-    # Caso não haja clientes, cria vazio com schema correto
-    spark.createDataFrame([], schema=StructType([
-        StructField("seg_id", StringType(), True),
-        StructField("cpf_cnpj", StringType(), True),
-        StructField("exec_id", StringType(), True),
-        StructField("entrou_em", TimestampType(), True)
-    ])).write.mode("overwrite").saveAsTable(f"{CATALOG}.segmentacao.seg_resultado_corrente")
-
-# Atualizar o gatilho_seg_id da jornada para o primeiro segmento (para testar S3)
-spark.sql(f"UPDATE {CATALOG}.engagement.jornada SET seg_entrada_id = '{seg_ids[0]}' WHERE jornada_id = 'jorn_001'")
-
-print("  OK")
+print("  OK — Nenhuma segmentação pré-criada")
 
 # COMMAND ----------
 
-# DBTITLE 1,12. Tabelas auxiliares S1 (saúde + histórico estado + versão)
-# 12. TABELAS AUXILIARES S1
-# Garantir que tabelas acessíveis pelo backend existam com dados mínimos.
-# Estas tabelas são lidas durante transições de estado e dashboards.
-print("12. Tabelas auxiliares S1...")
+# DBTITLE 1,12. Tabelas auxiliares S1 (todas vazias com schema correto)
+# 12. TABELAS AUXILIARES S1 — TODAS VAZIAS COM SCHEMA CORRETO
+print("12. Tabelas auxiliares S1 (vazias)...")
 
-# seg_saude (dashboard de saúde)
-saude_rows = [
-    Row(seg_id="seg_alta_renda", health_status="verde", ultima_verificacao=datetime.now(),
-        variacao_publico_pct=2.5, taxa_sucesso_exec=100.0, tempo_medio_exec_seg=15,
-        alertas_json=None, publico_atual=int(len(alta_renda_cpfs))),
-    Row(seg_id="seg_digital", health_status="verde", ultima_verificacao=datetime.now(),
-        variacao_publico_pct=-1.2, taxa_sucesso_exec=100.0, tempo_medio_exec_seg=12,
-        alertas_json=None, publico_atual=int(len(digital_cpfs))),
-]
-schema_saude = StructType([
+# seg_saude
+spark.createDataFrame([], StructType([
     StructField("seg_id", StringType(), False),
     StructField("health_status", StringType(), True),
     StructField("ultima_verificacao", TimestampType(), True),
@@ -853,21 +812,11 @@ schema_saude = StructType([
     StructField("tempo_medio_exec_seg", IntegerType(), True),
     StructField("alertas_json", StringType(), True),
     StructField("publico_atual", LongType(), True)
-])
-saude_tuples = [(r.seg_id, r.health_status, r.ultima_verificacao, r.variacao_publico_pct, r.taxa_sucesso_exec, r.tempo_medio_exec_seg, r.alertas_json, r.publico_atual) for r in saude_rows]
-spark.createDataFrame(saude_tuples, schema_saude).write.mode("overwrite").saveAsTable(f"{CATALOG}.segmentacao.seg_saude")
-print("  seg_saude: 2 registros")
+])).write.mode("overwrite").saveAsTable(f"{CATALOG}.segmentacao.seg_saude")
+print("  seg_saude: 0 registros")
 
-# seg_versao (histórico de versões)
-versao_rows = [
-    Row(versao_id=f"v_{uuid.uuid4().hex[:8]}", seg_id="seg_alta_renda", versao=1,
-        regras_json=regras_alta_renda, motivo="Criação inicial",
-        alterado_por=MAIN_USER, alterado_em=datetime.now()),
-    Row(versao_id=f"v_{uuid.uuid4().hex[:8]}", seg_id="seg_digital", versao=1,
-        regras_json=regras_digital, motivo="Criação inicial",
-        alterado_por=MAIN_USER, alterado_em=datetime.now()),
-]
-schema_versao = StructType([
+# seg_versao
+spark.createDataFrame([], StructType([
     StructField("versao_id", StringType(), False),
     StructField("seg_id", StringType(), True),
     StructField("versao", IntegerType(), True),
@@ -875,24 +824,11 @@ schema_versao = StructType([
     StructField("motivo", StringType(), True),
     StructField("alterado_por", StringType(), True),
     StructField("alterado_em", TimestampType(), True)
-])
-versao_tuples = [(r.versao_id, r.seg_id, r.versao, r.regras_json, r.motivo, r.alterado_por, r.alterado_em) for r in versao_rows]
-spark.createDataFrame(versao_tuples, schema_versao).write.mode("overwrite").saveAsTable(f"{CATALOG}.segmentacao.seg_versao")
-print("  seg_versao: 2 registros")
+])).write.mode("overwrite").saveAsTable(f"{CATALOG}.segmentacao.seg_versao")
+print("  seg_versao: 0 registros")
 
-# seg_historico_estado (auditoria de transições)
-hist_rows = [
-    Row(hist_id=f"h_{uuid.uuid4().hex[:8]}", seg_id="seg_alta_renda",
-        estado_anterior="rascunho", estado_novo="em_aprovacao",
-        motivo="Pronto para revisão", alterado_por=MAIN_USER, alterado_em=datetime.now() - timedelta(hours=2)),
-    Row(hist_id=f"h_{uuid.uuid4().hex[:8]}", seg_id="seg_alta_renda",
-        estado_anterior="em_aprovacao", estado_novo="aprovada",
-        motivo="Checklist OK", alterado_por=MAIN_USER, alterado_em=datetime.now() - timedelta(hours=1)),
-    Row(hist_id=f"h_{uuid.uuid4().hex[:8]}", seg_id="seg_alta_renda",
-        estado_anterior="aprovada", estado_novo="ativa",
-        motivo="Job criado", alterado_por=MAIN_USER, alterado_em=datetime.now()),
-]
-schema_hist = StructType([
+# seg_historico_estado
+spark.createDataFrame([], StructType([
     StructField("hist_id", StringType(), False),
     StructField("seg_id", StringType(), True),
     StructField("estado_anterior", StringType(), True),
@@ -900,12 +836,10 @@ schema_hist = StructType([
     StructField("motivo", StringType(), True),
     StructField("alterado_por", StringType(), True),
     StructField("alterado_em", TimestampType(), True)
-])
-hist_tuples = [(r.hist_id, r.seg_id, r.estado_anterior, r.estado_novo, r.motivo, r.alterado_por, r.alterado_em) for r in hist_rows]
-spark.createDataFrame(hist_tuples, schema_hist).write.mode("overwrite").saveAsTable(f"{CATALOG}.segmentacao.seg_historico_estado")
-print("  seg_historico_estado: 3 registros")
+])).write.mode("overwrite").saveAsTable(f"{CATALOG}.segmentacao.seg_historico_estado")
+print("  seg_historico_estado: 0 registros")
 
-# seg_comentario (vazio com schema)
+# seg_comentario
 spark.createDataFrame([], StructType([
     StructField("comentario_id", StringType(), False),
     StructField("seg_id", StringType(), True),
@@ -920,7 +854,7 @@ spark.createDataFrame([], StructType([
     StructField("editado_em", TimestampType(), True)
 ])).write.mode("overwrite").saveAsTable(f"{CATALOG}.segmentacao.seg_comentario")
 
-# seg_notificacao (vazio com schema)
+# seg_notificacao
 spark.createDataFrame([], StructType([
     StructField("notif_id", StringType(), False),
     StructField("destinatario", StringType(), True),
@@ -932,7 +866,7 @@ spark.createDataFrame([], StructType([
     StructField("criado_em", TimestampType(), True)
 ])).write.mode("overwrite").saveAsTable(f"{CATALOG}.segmentacao.seg_notificacao")
 
-# seg_job_log (vazio com schema)
+# seg_job_log
 spark.createDataFrame([], StructType([
     StructField("log_id", StringType(), False),
     StructField("seg_id", StringType(), True),
@@ -945,7 +879,7 @@ spark.createDataFrame([], StructType([
     StructField("criado_em", TimestampType(), True)
 ])).write.mode("overwrite").saveAsTable(f"{CATALOG}.segmentacao.seg_job_log")
 
-# seg_resultado_historico (vazio)
+# seg_resultado_historico
 spark.createDataFrame([], StructType([
     StructField("exec_id", StringType(), False),
     StructField("seg_id", StringType(), True),
@@ -954,7 +888,7 @@ spark.createDataFrame([], StructType([
     StructField("snapshot_em", TimestampType(), True)
 ])).write.mode("overwrite").saveAsTable(f"{CATALOG}.segmentacao.seg_resultado_historico")
 
-# seg_eventos (vazio)
+# seg_eventos
 spark.createDataFrame([], StructType([
     StructField("evento_id", StringType(), False),
     StructField("seg_id", StringType(), True),
@@ -965,7 +899,7 @@ spark.createDataFrame([], StructType([
     StructField("criado_em", TimestampType(), True)
 ])).write.mode("overwrite").saveAsTable(f"{CATALOG}.eventos.seg_eventos")
 
-# catalogo_governanca_hist (vazio)
+# catalogo_governanca_hist
 spark.createDataFrame([], StructType([
     StructField("hist_id", StringType(), False),
     StructField("caracteristica_id", StringType(), True),
@@ -979,7 +913,7 @@ spark.createDataFrame([], StructType([
     StructField("alterado_em", TimestampType(), True)
 ])).write.mode("overwrite").saveAsTable(f"{CATALOG}.metadata.catalogo_governanca_hist")
 
-print("  Tabelas auxiliares (vazias com schema): seg_comentario, seg_notificacao, seg_job_log, seg_resultado_historico, seg_eventos, catalogo_governanca_hist")
+print("  Todas tabelas auxiliares criadas vazias com schema correto")
 print("  OK")
 
 # COMMAND ----------

@@ -353,7 +353,7 @@ except Exception as e:
 try:
     # RF-01: Reutiliza exec_id do service (se propagado) ou gera novo (execução agendada)
     exec_id = EXEC_ID_PARAM or f"exec_{SEG_ID}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        exec_timestamp = datetime.utcnow()
+    exec_timestamp = datetime.utcnow()
 
     # 4a. MERGE em seg_resultado_corrente (snapshot atual)
     df_resultado.createOrReplaceTempView("resultado_novo")
