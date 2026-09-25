@@ -70,7 +70,7 @@ export default function ChatSegmentacao() {
       // Erro já tratado pelo useChat (exibe mensagem no painel)
       console.error('[ChatSegmentacao] Erro ao enviar:', err?.message);
     }
-  }, [sendMessage]);
+  }, [sendMessage, segIdContexto]);
 
   // Aplica regras sugeridas — navega para builder com regras
   const handleAplicarRegras = () => {

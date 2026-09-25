@@ -43,8 +43,26 @@ REGRAS:
 - Se não souber, diga que não tem essa informação.
 """
 
-    def _build_messages(self, user_message: str, historico: Optional[List[Dict]] = None) -> List[Dict]:
+    def _build_messages(self, user_message: str, historico: Optional[List[Dict]] = None, contexto: Optional[Dict[str, Any]] = None) -> List[Dict]:
         messages = [{"role": "system", "content": self._get_system_prompt()}]
+
+        # Injeta contexto da segmentação ativa (se houver seg_id)
+        if contexto and contexto.get("seg_id"):
+            seg_id = contexto["seg_id"]
+            try:
+                seg = self.segmentacao_service.buscar_por_id(seg_id)
+                if seg:
+                    ctx_msg = (
+                        f"Contexto: o usuário está visualizando a segmentação '{seg.get('nome', seg_id)}' "
+                        f"(ID: {seg_id}, status: {seg.get('status', '?')}, "
+                        f"objetivo: {seg.get('objetivo', '?')}, "
+                        f"público: {seg.get('publico_base_id', '?')}). "
+                        f"Use essas informações para contextualizar suas respostas."
+                    )
+                    messages.append({"role": "system", "content": ctx_msg})
+            except Exception as e:
+                logger.debug(f"Não foi possível carregar contexto de {seg_id}: {e}")
+
         if historico:
             messages.extend(historico)
         messages.append({"role": "user", "content": user_message})
@@ -70,8 +88,13 @@ REGRAS:
         if session_id in _sessions and _sessions[session_id].get("pending_action"):
             return self._processar_confirmacao(mensagem, session_id)
 
-        # Monta mensagens e chama LLM
-        messages = self._build_messages(mensagem, historico)
+        # Resolve contexto da sessão (pode ter sido armazenado em chamada anterior)
+        ctx = contexto
+        if not ctx and session_id in _sessions:
+            ctx = _sessions[session_id].get("contexto")
+
+        # Monta mensagens e chama LLM (com contexto de segmentação)
+        messages = self._build_messages(mensagem, historico, contexto=ctx)
         try:
             llm_response = self.llm.chat_completion(messages)
             resposta_bruta = llm_response.get("content", "")
@@ -91,10 +114,10 @@ REGRAS:
                     "publico_base_id": "pub_varejo",
                     "regras_json": regras
                 }
-                _sessions[session_id] = {
-                    "pending_action": "criar_segmentacao",
-                    "dados": dados
-                }
+                if session_id not in _sessions:
+                    _sessions[session_id] = {}
+                _sessions[session_id]["pending_action"] = "criar_segmentacao"
+                _sessions[session_id]["dados"] = dados
                 return {
                     "resposta": f"Vou criar um segmento com as seguintes regras:\n- Nome: {dados['nome']}\n- Objetivo: {dados['objetivo']}\n- Regras: {regras}\nConfirma a criação?",
                     "precisa_confirmacao": True,
