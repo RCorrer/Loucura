@@ -55,7 +55,7 @@ export default function ChatSegmentacao() {
   // Envia mensagem com contexto (se houver seg aberta)
   const handleSendMessage = useCallback(async (content) => {
     try {
-      const response = await sendMessage(content);
+      const response = await sendMessage(content, segIdContexto ? { seg_id: segIdContexto } : {});
 
       // Se retornou regras, mostra botão para visualizar/aplicar
       if (response?.regras_json) {

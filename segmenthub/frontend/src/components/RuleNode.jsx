@@ -50,7 +50,7 @@ function LeafRow({ rule, onChange, onRemove, operadores, catalogoCampos }) {
   };
 
   // Resolve nome legível do campo
-  const campoInfo = catalogoCampos?.find((c) => c.campo_id === rule.campo_id);
+  const campoInfo = catalogoCampos?.find((c) => (c.campo_id || c.caracteristica_id) === rule.campo_id);
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, pl: 1 }}>

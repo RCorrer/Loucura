@@ -16,6 +16,7 @@ import {
   Divider,
 } from '@mui/material';
 import { useSegmentacoesApi } from '../api/segmentacoes';
+import { useMetadataApi } from '../api/metadata';
 import { tokens } from '../shared-ui/theme/tokens';
 import PublicoSelector from '../components/PublicoSelector';
 import TemaMenu from '../components/TemaMenu';
@@ -35,6 +36,8 @@ export default function BuilderSegmentacao() {
   const isEdit = !!id;
 
   const { buscar, criar, atualizar, buscarDestinos, atualizarDestinos, atualizarVigencia, loading: apiLoading } = useSegmentacoesApi();
+  const { listarTemasCompletos } = useMetadataApi();
+  const [catalogoCampos, setCatalogoCampos] = useState([]);
 
   const [dadosBasicos, setDadosBasicos] = useState({
     nome: '',
@@ -121,6 +124,19 @@ export default function BuilderSegmentacao() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEdit, id]);
+
+  // Carrega catálogo de campos para RuleBuilder (label + helperText)
+  useEffect(() => {
+    const carregarCatalogo = async () => {
+      try {
+        const response = await listarTemasCompletos();
+        const temas = Array.isArray(response) ? response : response.data || [];
+        const campos = temas.flatMap(t => (t.campos || []).map(c => ({ ...c, campo_id: c.caracteristica_id })));
+        setCatalogoCampos(campos);
+      } catch { /* silent */ }
+    };
+    carregarCatalogo();
+  }, [listarTemasCompletos]);
 
   // State para destino e vigência
   const [destinos, setDestinos] = useState([
@@ -434,6 +450,7 @@ export default function BuilderSegmentacao() {
                 <RuleBuilder
                   value={regrasInclusao}
                   onChange={setRegrasInclusao}
+                  catalogoCampos={catalogoCampos}
                 />
               </Box>
             </Box>
@@ -450,6 +467,7 @@ export default function BuilderSegmentacao() {
                 <ExclusaoBuilder
                   value={regrasExclusao}
                   onChange={setRegrasExclusao}
+                  catalogoCampos={catalogoCampos}
                 />
               </Box>
             </Box>

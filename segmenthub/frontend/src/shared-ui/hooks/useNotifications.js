@@ -29,9 +29,10 @@ export function useNotifications() {
 
   const markAllAsRead = async () => {
     const unread = notifications.filter(n => !n.lida);
-    for (const notif of unread) {
-      await markAsRead(notif.notif_id);
-    }
+    await Promise.all(unread.map(notif =>
+      request(`/api/notificacoes/${notif.notif_id}/lida`, { method: 'PUT' })
+    ));
+    await fetchNotifications();
   };
 
   useEffect(() => {

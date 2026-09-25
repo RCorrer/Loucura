@@ -80,6 +80,7 @@ export default function AdminCatalogo() {
   const [filtros, setFiltros] = useState({ tema: '', sistema: '', status: '', busca: '' });
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(50);
+  const [filterTrigger, setFilterTrigger] = useState(0);
 
   // Dados
   const [campos, setCampos] = useState([]);
@@ -108,7 +109,7 @@ export default function AdminCatalogo() {
   // Carrega campos
   useEffect(() => {
     carregarCampos();
-  }, [page, rowsPerPage]);
+  }, [page, rowsPerPage, filterTrigger]);
 
   const carregarCampos = async () => {
     setLoading(true);
@@ -135,7 +136,7 @@ export default function AdminCatalogo() {
 
   const handleFiltrar = () => {
     setPage(0);
-    carregarCampos();
+    setFilterTrigger(prev => prev + 1);
   };
 
   // Toggle status (ativa/desativa campo geral)

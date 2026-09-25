@@ -6,7 +6,7 @@ export function useChat(endpoint = '/api/chat/mensagem') {
   const [messages, setMessages] = useState([]);
   const [sessionId, setSessionId] = useState(null);
 
-  const sendMessage = useCallback(async (content) => {
+  const sendMessage = useCallback(async (content, extra = {}) => {
     const userMsg = { role: 'user', content, timestamp: new Date() };
     setMessages(prev => [...prev, userMsg]);
 
@@ -14,7 +14,8 @@ export function useChat(endpoint = '/api/chat/mensagem') {
       const payload = {
         mensagem: content,
         session_id: sessionId,
-        historico: messages.map(m => ({ role: m.role, content: m.content }))
+        historico: messages.map(m => ({ role: m.role, content: m.content })),
+        ...extra,
       };
       
       const response = await request(endpoint, {

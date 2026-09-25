@@ -11,7 +11,7 @@ export default function PublicoSelector({ value, onChange, error, helperText, on
     const carregar = async () => {
       try {
         const response = await listarPublicos();
-        setPublicos(response.data || []);
+        setPublicos(Array.isArray(response) ? response : response.data || []);
       } catch (err) {
         console.error('Erro ao carregar públicos:', err);
       } finally {

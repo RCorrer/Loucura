@@ -67,6 +67,7 @@ export default function AppShell({ children, title, menuItems, user, headerActio
           <Typography variant="h6" noWrap sx={{ flexGrow: 1 }}>
             {title}
           </Typography>
+          {headerActions}
           {user && <Typography variant="body2">{user}</Typography>}
         </Toolbar>
       </AppBar>

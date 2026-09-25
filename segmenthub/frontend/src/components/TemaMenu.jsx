@@ -15,7 +15,7 @@ export default function TemaMenu({ onSelectCampo }) {
     const carregarTudo = async () => {
       try {
         const response = await listarTemasCompletos();
-        setTemasCompletos(response.data || []);
+        setTemasCompletos(Array.isArray(response) ? response : response.data || []);
         setLoaded(true);
       } catch (err) {
         console.error('Erro ao carregar temas/campos:', err);

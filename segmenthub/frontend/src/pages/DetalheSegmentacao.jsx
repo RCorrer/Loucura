@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { PageHeader } from '@shared';
 import {
   Box,
@@ -67,6 +67,7 @@ const STATUS_COLORS = {
 export default function DetalheSegmentacao() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     buscar,
     buscarDestinos,
@@ -80,6 +81,9 @@ export default function DetalheSegmentacao() {
     executar,
     enviarAprovacao,
     arquivar,
+    listarComentarios,
+    criarComentario,
+    editarComentario,
     loading,
   } = useSegmentacoesApi();
   const { obterDetalhe: obterSaude } = useSaudeApi();
@@ -89,6 +93,7 @@ export default function DetalheSegmentacao() {
   const [destinos, setDestinos] = useState([]);
   const [execucoes, setExecucoes] = useState([]);
   const [versoes, setVersoes] = useState([]);
+  const [comentarios, setComentarios] = useState([]);
   const [saude, setSaude] = useState(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
@@ -117,17 +122,19 @@ export default function DetalheSegmentacao() {
     setCarregando(true);
     setErro(null);
     try {
-      const [segData, destData, execData, versData, saudeData] = await Promise.all([
+      const [segData, destData, execData, versData, saudeData, comentariosData] = await Promise.all([
         buscar(id),
         buscarDestinos(id),
         listarExecucoes(id),
         listarVersoes(id),
         obterSaude(id).catch(() => null),
+        listarComentarios(id).catch(() => []),
       ]);
       setSeg(segData);
       setDestinos(destData || []);
       setExecucoes(Array.isArray(execData) ? execData : execData?.data || []);
       setVersoes(Array.isArray(versData) ? versData : versData?.data || []);
+      setComentarios(Array.isArray(comentariosData) ? comentariosData : comentariosData?.data || []);
       setSaude(saudeData);
     } catch (err) {
       setErro(err?.message || 'Erro ao carregar segmentação');
@@ -137,6 +144,13 @@ export default function DetalheSegmentacao() {
   };
 
   useEffect(() => { carregar(); }, [id]);
+
+  // BUG-9: Auto-abrir modal de validação quando rota termina em /validar
+  useEffect(() => {
+    if (location.pathname.endsWith('/validar') && !carregando && seg) {
+      setValidationOpen(true);
+    }
+  }, [location.pathname, carregando, seg]);
 
   // Ações de ciclo de vida
   const executarAcao = async (acao, label) => {
@@ -520,6 +534,7 @@ export default function DetalheSegmentacao() {
             Versões
           </Typography>
           {versoes.length > 0 ? (
+            <>
             <TableContainer>
               <Table size="small">
                 <TableHead>
@@ -548,6 +563,7 @@ export default function DetalheSegmentacao() {
                 <Button size="small" onClick={() => setDiffOpen(true)}>Comparar versões</Button>
               </Box>
             )}
+            </>
           ) : (
             <Typography variant="body2" color="text.secondary">Apenas versão atual</Typography>
           )}
@@ -582,7 +598,13 @@ export default function DetalheSegmentacao() {
           <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
             Comentários
           </Typography>
-          <Comentarios segId={id} />
+          <Comentarios
+            segId={id}
+            comentarios={comentarios}
+            onCriar={(payload) => criarComentario(id, payload)}
+            onEditar={(comentarioId, payload) => editarComentario(comentarioId, payload)}
+            onReload={() => listarComentarios(id).then(data => setComentarios(Array.isArray(data) ? data : data?.data || [])).catch(() => {})}
+          />
         </Paper>
       </Box>
 
