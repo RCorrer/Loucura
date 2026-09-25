@@ -14,7 +14,6 @@ class QueryEngine:
     """Constrói query SQL a partir de regras JSON, resolvendo campos via catálogo."""
 
     def __init__(self):
-        self._param_counter = 0
         self._cache_catalogo: Dict[str, Dict] = {}
         self._cache_publicos: Dict[str, Dict] = {}
         self._tabelas_usadas: Set[tuple] = set()  # {(tabela_fisica, join_key)}
@@ -69,7 +68,6 @@ class QueryEngine:
         return info.get("tipo_dado") == "categorical"
 
     def _get_param(self) -> str:
-        self._param_counter += 1
         return "?"
 
     def _build_condition(self, regra, params: List[Any]) -> str:
@@ -180,7 +178,6 @@ class QueryEngine:
         """Gera query completa com resolução de campos via catálogo e JOINs dinâmicos."""
         # Reset estado
         params: List[Any] = []
-        self._param_counter = 0
         self._tabelas_usadas = set()
 
         # Carrega metadados

@@ -33,6 +33,7 @@ async def enviar_mensagem(
             mensagem=request.mensagem,
             session_id=session_id,
             historico=historico,
+            contexto=request.contexto,
         )
         return {
             "resposta": resultado.get("resposta", ""),

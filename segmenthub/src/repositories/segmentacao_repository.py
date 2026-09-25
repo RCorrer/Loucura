@@ -264,6 +264,28 @@ class SegmentacaoRepository:
         ))
         return True
 
+    def upsert_versao(self, seg_id: str, versao: int, regras_json: Dict, motivo: str, alterado_por: str) -> bool:
+        """Insere ou atualiza uma versão via MERGE (evita duplicatas em edição de rascunho)."""
+        versao_id = f"ver_{uuid.uuid4().hex[:12]}"
+        import json
+        sql = """
+            MERGE INTO plataforma.segmentacao.seg_versao AS target
+            USING (SELECT ? AS seg_id, ? AS versao) AS source
+            ON target.seg_id = source.seg_id AND target.versao = source.versao
+            WHEN MATCHED THEN
+                UPDATE SET regras_json = ?, motivo = ?, alterado_por = ?, alterado_em = current_timestamp()
+            WHEN NOT MATCHED THEN
+                INSERT (versao_id, seg_id, versao, regras_json, motivo, alterado_por, alterado_em)
+                VALUES (?, ?, ?, ?, ?, ?, current_timestamp())
+        """
+        regras_str = json.dumps(regras_json)
+        self.client.execute_insert(sql, (
+            seg_id, versao,
+            regras_str, motivo, alterado_por,
+            versao_id, seg_id, versao, regras_str, motivo, alterado_por
+        ))
+        return True
+
     def executar_segmentacao(self, seg_id: str, exec_id: str, versao_usada: int = 1, origem: str = "manual") -> bool:
         """Cria um registro de execução com todos os campos obrigatórios do DDL."""
         sql = """
@@ -300,24 +322,28 @@ class SegmentacaoRepository:
         return [dict(zip(columns, row)) for row in rows]
 
     def atualizar_vigencia(self, seg_id: str, dados: Dict) -> bool:
-        """Atualiza vigência e agendamento."""
-        sql = """
+        """Atualiza vigência e agendamento (apenas campos presentes no dict)."""
+        campos_permitidos = ["vigencia_inicio", "vigencia_fim", "recorrencia", "agendamento_cron"]
+        set_parts = []
+        params = []
+
+        for campo in campos_permitidos:
+            if campo in dados:
+                set_parts.append(f"{campo} = ?")
+                params.append(dados[campo])
+
+        if not set_parts:
+            return False
+
+        set_parts.append("atualizado_em = current_timestamp()")
+        params.append(seg_id)
+
+        sql = f"""
             UPDATE plataforma.segmentacao.seg_definicao
-            SET vigencia_inicio = ?,
-                vigencia_fim = ?,
-                recorrencia = ?,
-                agendamento_cron = ?,
-                atualizado_em = current_timestamp()
+            SET {", ".join(set_parts)}
             WHERE seg_id = ?
         """
-        params = (
-            dados.get("vigencia_inicio"),
-            dados.get("vigencia_fim"),
-            dados.get("recorrencia"),
-            dados.get("agendamento_cron"),
-            seg_id,
-        )
-        rows = self.client.execute_insert(sql, params)
+        rows = self.client.execute_insert(sql, tuple(params))
         return rows > 0
 
     # ============================================================

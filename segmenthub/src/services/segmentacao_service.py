@@ -225,8 +225,8 @@ class SegmentacaoService:
                 "regras_json": json.dumps(dados.regras_json),
                 "atualizado_em": datetime.now(),
             })
-            # Atualiza também a versão corrente em seg_versao
-            self.repository.inserir_versao(
+            # Atualiza versão corrente via MERGE (evita duplicatas em seg_versao)
+            self.repository.upsert_versao(
                 seg_id=seg_id,
                 versao=atual["versao_atual"],
                 regras_json=dados.regras_json,
@@ -249,8 +249,9 @@ class SegmentacaoService:
         if atual["status"] == "arquivada":
             raise ValueError("Segmentação já está arquivada")
 
-        # Registra transição no histórico (auditoria)
-        self.repository.atualizar_status(seg_id, "arquivada", motivo="Arquivamento")
+        # Usa transicionar_status para garantir integração com JobManager
+        # (deleta job + limpa job_id_databricks + registra histórico)
+        self.transicionar_status(seg_id, "arquivada", motivo="Arquivamento")
         # Desabilita (soft delete — não aparece mais nas listagens)
         self.repository.atualizar(seg_id, {"habilitado": False})
         return True
@@ -320,8 +321,7 @@ class SegmentacaoService:
                 job_id = atual.get("job_id_databricks")
                 if job_id:
                     self.job_manager.deletar_job(seg_id, job_id)
-                    # Limpa referência (para arquivada, não vai reativar)
-                    if novo_status == "arquivada":
+                        # Limpa referência (job deletado, evita reativar job inexistente)
                         self.repository.atualizar(seg_id, {"job_id_databricks": None})
 
         except Exception as e:

@@ -8,21 +8,22 @@ import json
 import requests
 from typing import Optional, Dict, Any
 
-from src.core.config import AppConfig
+from databricks.sdk.core import Config
 
 logger = logging.getLogger(__name__)
 
 
 class LLMClient:
-    """Cliente para chamar Foundation Model via REST."""
+    """Cliente para chamar Foundation Model via REST.
+    Usa SDK Config para autenticação (compatível com OAuth em Databricks App)."""
 
     def __init__(self, model: str = "databricks-llama-4-maverick"):
         self.model = model
-        self.host = AppConfig.DATABRICKS_HOST.replace("https://", "")
-        self.token = AppConfig.DATABRICKS_TOKEN
+        self.cfg = Config()
+        self.host = self.cfg.host.rstrip("/")
 
         # Endpoint do modelo (via Model Serving ou AI Gateway)
-        self.endpoint = f"https://{self.host}/serving-endpoints/{self.model}/invocations"
+        self.endpoint = f"{self.host}/serving-endpoints/{self.model}/invocations"
 
     def chat_completion(
         self,
@@ -33,10 +34,9 @@ class LLMClient:
         """
         Envia uma lista de mensagens e retorna a resposta do modelo.
         """
-        headers = {
-            "Authorization": f"Bearer {self.token}",
-            "Content-Type": "application/json",
-        }
+        # Obtém headers OAuth via SDK Config (funciona em Databricks App)
+        headers = self.cfg.authenticate()
+        headers["Content-Type"] = "application/json"
 
         # Estrutura de payload para Foundation Model API (compatível com OpenAI)
         payload = {

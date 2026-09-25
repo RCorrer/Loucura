@@ -59,7 +59,13 @@ REGRAS:
                 return tema.capitalize()  # Retorna com primeira maiúscula
         return None
 
-    def processar_mensagem(self, mensagem: str, session_id: str, historico: Optional[List[Dict]] = None) -> Dict[str, Any]:
+    def processar_mensagem(self, mensagem: str, session_id: str, historico: Optional[List[Dict]] = None, contexto: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        # Armazena contexto na sessão (ex: seg_id vindo do frontend)
+        if contexto and session_id:
+            if session_id not in _sessions:
+                _sessions[session_id] = {}
+            _sessions[session_id]["contexto"] = contexto
+
         # Verifica ação pendente
         if session_id in _sessions and _sessions[session_id].get("pending_action"):
             return self._processar_confirmacao(mensagem, session_id)
