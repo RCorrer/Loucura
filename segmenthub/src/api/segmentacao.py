@@ -184,7 +184,7 @@ async def ativar_segmentacao(
     """
     service = SegmentacaoService()
     try:
-        service.transicionar_status(seg_id, "ativa", motivo="Ativação manual")
+        service.transicionar_status(seg_id, "ativa", motivo="Ativação manual", usuario=user["usuario_id"])
         return {"mensagem": "Segmentação ativada com sucesso"}
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
@@ -200,7 +200,7 @@ async def pausar_segmentacao(
     """
     service = SegmentacaoService()
     try:
-        service.transicionar_status(seg_id, "pausada", motivo="Pausa manual")
+        service.transicionar_status(seg_id, "pausada", motivo="Pausa manual", usuario=user["usuario_id"])
         return {"mensagem": "Segmentação pausada com sucesso"}
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
@@ -216,7 +216,7 @@ async def reativar_segmentacao(
     """
     service = SegmentacaoService()
     try:
-        service.transicionar_status(seg_id, "ativa", motivo="Reativação manual")
+        service.transicionar_status(seg_id, "ativa", motivo="Reativação manual", usuario=user["usuario_id"])
         return {"mensagem": "Segmentação reativada com sucesso"}
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
@@ -232,7 +232,7 @@ async def encerrar_segmentacao(
     """
     service = SegmentacaoService()
     try:
-        service.transicionar_status(seg_id, "encerrada", motivo="Encerramento manual")
+        service.transicionar_status(seg_id, "encerrada", motivo="Encerramento manual", usuario=user["usuario_id"])
         return {"mensagem": "Segmentação encerrada com sucesso"}
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
@@ -334,7 +334,7 @@ async def enviar_para_aprovacao(
 ):
     service = SegmentacaoService()
     try:
-        service.transicionar_status(seg_id, "em_aprovacao", motivo="Enviado para aprovação")
+        service.transicionar_status(seg_id, "em_aprovacao", motivo="Enviado para aprovação", usuario=user["usuario_id"])
         return {"mensagem": "Segmentação enviada para aprovação"}
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))

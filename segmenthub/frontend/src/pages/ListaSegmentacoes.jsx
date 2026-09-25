@@ -225,7 +225,6 @@ export default function ListaSegmentacoes() {
           <MenuItem value="ativa">Ativa</MenuItem>
           <MenuItem value="pausada">Pausada</MenuItem>
           <MenuItem value="encerrada">Encerrada</MenuItem>
-          <MenuItem value="arquivada">Arquivada</MenuItem>
         </TextField>
         <Button variant="outlined" onClick={handleLimparBusca}>
           Limpar

@@ -195,8 +195,15 @@ class SegmentacaoService:
         if not atual:
             raise ValueError("Segmentação não encontrada")
 
-        # 2. Se estiver ativa e alterar regras, criar nova versão (sem quebrar produção)
-        if atual["status"] == "ativa" and dados.regras_json:
+        # 2. Rejeita edição de regras em statuses que não permitem
+        if dados.regras_json and atual["status"] in ("aprovada", "encerrada", "arquivada"):
+            raise ValueError(
+                f"Não é possível alterar regras de uma segmentação com status '{atual['status']}'. "
+                f"Clone-a ou reative-a primeiro."
+            )
+
+        # 3. Se estiver ativa ou pausada e alterar regras, criar nova versão (sem quebrar produção)
+        if atual["status"] in ("ativa", "pausada") and dados.regras_json:
             # Valida novas regras
             erros = self._validar_regras(dados.regras_json)
             if erros:
@@ -204,7 +211,7 @@ class SegmentacaoService:
 
             # Cria nova versão draft em seg_versao (produção continua com versao_atual)
             nova_versao = atual["versao_atual"] + 1
-            motivo = getattr(dados, 'nota_versao', None) or "Edição de segmentação ativa"
+            motivo = getattr(dados, 'nota_versao', None) or f"Edição de segmentação {atual['status']}"
             self.repository.inserir_versao(
                 seg_id=seg_id,
                 versao=nova_versao,
@@ -216,7 +223,7 @@ class SegmentacaoService:
             # Produção continua rodando com a versão atual.
             # A nova versão só vira versao_atual quando for aprovada.
 
-        # 3. Se NÃO ativa e alterar regras, atualiza direto na seg_definicao
+        # 4. Se rascunho/em_aprovacao e alterar regras, atualiza direto na seg_definicao
         elif dados.regras_json and atual["status"] in ("rascunho", "em_aprovacao"):
             erros = self._validar_regras(dados.regras_json)
             if erros:
@@ -251,14 +258,14 @@ class SegmentacaoService:
 
         # Usa transicionar_status para garantir integração com JobManager
         # (deleta job + limpa job_id_databricks + registra histórico)
-        self.transicionar_status(seg_id, "arquivada", motivo="Arquivamento")
+        self.transicionar_status(seg_id, "arquivada", motivo="Arquivamento", usuario=usuario)
         # Desabilita (soft delete — não aparece mais nas listagens)
         self.repository.atualizar(seg_id, {"habilitado": False})
         return True
 
     # ==================== CICLO DE VIDA ====================
 
-    def transicionar_status(self, seg_id: str, novo_status: str, motivo: Optional[str] = None) -> bool:
+    def transicionar_status(self, seg_id: str, novo_status: str, motivo: Optional[str] = None, usuario: str = "system") -> bool:
         """Transiciona status validando regras de negócio."""
         atual = self.buscar_por_id(seg_id)
         if not atual:
@@ -288,7 +295,7 @@ class SegmentacaoService:
             pass
 
         # Realiza transição
-        result = self.repository.atualizar_status(seg_id, novo_status, motivo)
+        result = self.repository.atualizar_status(seg_id, novo_status, motivo, usuario=usuario)
 
         # ===== Integração com JobManager (pós-transição) =====
         try:
@@ -347,7 +354,7 @@ class SegmentacaoService:
             raise ValueError("Checklist de aprovação não preenchido")
 
         # 2. Atualiza status para 'aprovada'
-        self.repository.atualizar_status(seg_id, "aprovada", motivo="Aprovado com checklist")
+        self.repository.atualizar_status(seg_id, "aprovada", motivo="Aprovado com checklist", usuario=usuario)
 
         # 3. Registra aprovado_por e aprovado_em
         self.repository.atualizar(seg_id, {
