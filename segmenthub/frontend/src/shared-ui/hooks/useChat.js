@@ -15,7 +15,7 @@ export function useChat(endpoint = '/api/chat/mensagem') {
         mensagem: content,
         session_id: sessionId,
         historico: messages.map(m => ({ role: m.role, content: m.content })),
-        ...extra,
+        contexto: Object.keys(extra).length > 0 ? extra : undefined,
       };
       
       const response = await request(endpoint, {
