@@ -321,8 +321,8 @@ class SegmentacaoService:
                 job_id = atual.get("job_id_databricks")
                 if job_id:
                     self.job_manager.deletar_job(seg_id, job_id)
-                        # Limpa referência (job deletado, evita reativar job inexistente)
-                        self.repository.atualizar(seg_id, {"job_id_databricks": None})
+                    # Limpa referência (job deletado, evita reativar job inexistente)
+                    self.repository.atualizar(seg_id, {"job_id_databricks": None})
 
         except Exception as e:
             # Log do erro mas não reverte a transição de status
