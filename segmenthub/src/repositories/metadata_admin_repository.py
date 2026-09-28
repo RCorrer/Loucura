@@ -147,6 +147,10 @@ class MetadataAdminRepository:
         if not atual:
             raise ValueError(f"Característica '{caracteristica_id}' não encontrada")
 
+        # Normaliza bloco_visao360: string vazia → None (evita histórico fant. None→'')
+        if bloco_visao360 is not None and bloco_visao360.strip() == '':
+            bloco_visao360 = None
+
         alteracoes = {}
         updates = []
         set_params = []  # params para SET (ordem posicional antes do WHERE)
@@ -156,13 +160,20 @@ class MetadataAdminRepository:
             updates.append("usavel_em_visao360 = ?")
             set_params.append(usavel_em_visao360)
 
+        # Auto-clear: se desativou S2, limpa bloco_visao360 automaticamente
+        novo_v360 = alteracoes.get("usavel_em_visao360", {}).get("para", atual["usavel_em_visao360"])
+        if novo_v360 is False and atual.get("bloco_visao360"):
+            bloco_visao360 = None  # força limpeza
+
         if usavel_em_peca is not None and atual["usavel_em_peca"] != usavel_em_peca:
             alteracoes["usavel_em_peca"] = {"de": atual["usavel_em_peca"], "para": usavel_em_peca}
             updates.append("usavel_em_peca = ?")
             set_params.append(usavel_em_peca)
 
-        if bloco_visao360 is not None and atual["bloco_visao360"] != bloco_visao360:
-            alteracoes["bloco_visao360"] = {"de": atual["bloco_visao360"], "para": bloco_visao360}
+        # Compara bloco após normalização (ambos None = sem mudança)
+        bloco_atual = atual["bloco_visao360"] if atual["bloco_visao360"] else None
+        if bloco_visao360 != bloco_atual:
+            alteracoes["bloco_visao360"] = {"de": bloco_atual, "para": bloco_visao360}
             updates.append("bloco_visao360 = ?")
             set_params.append(bloco_visao360)
 
@@ -170,7 +181,6 @@ class MetadataAdminRepository:
             return {"alteracoes": {}}
 
         # Valida regra: bloco_visao360 só pode ser setado se usavel_em_visao360=true
-        novo_v360 = alteracoes.get("usavel_em_visao360", {}).get("para", atual["usavel_em_visao360"])
         if bloco_visao360 is not None and not novo_v360:
             raise ValueError("Não é possível definir bloco_visao360 sem usavel_em_visao360=true")
 
