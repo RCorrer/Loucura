@@ -26,7 +26,6 @@ class QueryEngine:
         sql = """
             SELECT caracteristica_id, campo_fisico, tabela_fisica, join_key, tipo_dado
             FROM plataforma.metadata.catalogo_caracteristicas
-            WHERE ativo = true
         """
         rows = client.execute_query(sql)
         columns = ["caracteristica_id", "campo_fisico", "tabela_fisica", "join_key", "tipo_dado"]

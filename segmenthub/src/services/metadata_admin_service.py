@@ -10,13 +10,11 @@ from fastapi import HTTPException
 
 from src.models.dto.metadata_admin_dto import (
     FlagUpdateDTO,
-    StatusUpdateDTO,
     CampoAdminDTO,
     CampoAdminDetalheDTO,
     HistoricoGovernancaDTO,
 )
 from src.repositories.metadata_admin_repository import MetadataAdminRepository
-from src.repositories.metadata_repository import MetadataRepository
 from src.core.security import get_current_user
 
 
@@ -25,7 +23,6 @@ class MetadataAdminService:
 
     def __init__(self):
         self.repository = MetadataAdminRepository()
-        self.metadata_repository = MetadataRepository()
 
     def _gerar_hist_id(self) -> str:
         return f"hist_{uuid.uuid4().hex[:12]}"
@@ -193,63 +190,6 @@ class MetadataAdminService:
             ],
             "estado_atual": resultado.get("estado_atual", {}),
         }
-
-    def _verificar_campo_em_uso(self, caracteristica_id: str) -> Optional[Dict]:
-        """Verifica se o campo está em uso em segmentações ativas via view campos_em_uso."""
-        try:
-            campos_em_uso = self.metadata_repository.get_campos_em_uso()
-            for campo in campos_em_uso:
-                if campo["campo_id"] == caracteristica_id:
-                    return campo  # {campo_id, qtd_segmentacoes_ativas, segmentacoes}
-        except Exception:
-            pass  # se a view não existir ainda, não bloqueia
-        return None
-
-    def atualizar_status(
-        self,
-        caracteristica_id: str,
-        status: StatusUpdateDTO,
-        alterado_por: str,
-    ) -> Dict:
-        """
-        Atualiza status ativo/inativo de uma característica e grava histórico.
-        Ao desativar, verifica se o campo está em uso em segmentações ativas.
-        """
-        atual = self.repository.buscar_campo_por_id(caracteristica_id)
-        if not atual:
-            raise ValueError(f"Característica '{caracteristica_id}' não encontrada")
-
-        # Guard: ao desativar, verifica se campo está em uso
-        em_uso = None
-        if not status.ativo and atual["ativo"]:
-            em_uso = self._verificar_campo_em_uso(caracteristica_id)
-            if em_uso:
-                qtd = em_uso["qtd_segmentacoes_ativas"]
-                segs = em_uso.get("segmentacoes", [])
-                nomes = ", ".join(segs[:5]) if isinstance(segs, list) else str(segs)
-                if qtd > 5:
-                    nomes += f" (+{qtd - 5} outras)"
-                raise ValueError(
-                    f"Campo '{atual['campo_label']}' está em uso em {qtd} segmentação(ões) ativa(s): "
-                    f"{nomes}. Remova-o das segmentações antes de desativá-lo, "
-                    f"ou encerre/pause as segmentações afetadas primeiro."
-                )
-
-        resultado = self.repository.atualizar_status(caracteristica_id, status.ativo)
-        alteracao = resultado.get("alteracao")
-
-        if alteracao:
-            self._gravar_historico(
-                caracteristica_id=caracteristica_id,
-                campo_label=atual["campo_label"],
-                flag="ativo",
-                de=alteracao["de"],
-                para=alteracao["para"],
-                alterado_por=alterado_por,
-            )
-            return {"ok": True, "alteracao": alteracao}
-        else:
-            return {"ok": True, "alteracao": None}
 
     # ============================================================
     # HISTÓRICO

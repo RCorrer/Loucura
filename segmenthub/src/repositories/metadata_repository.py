@@ -24,7 +24,6 @@ class MetadataRepository:
         sql = """
             SELECT DISTINCT tema, tema_ordem
             FROM plataforma.metadata.catalogo_caracteristicas
-            WHERE ativo = true
             ORDER BY tema_ordem, tema
         """
         rows = self.client.execute_query(sql)
@@ -41,7 +40,7 @@ class MetadataRepository:
                 operadores,
                 sensibilidade
             FROM plataforma.metadata.catalogo_caracteristicas
-            WHERE tema = ? AND ativo = true
+            WHERE tema = ?
             ORDER BY campo_label
         """
         rows = self.client.execute_query(sql, (tema,))
@@ -69,7 +68,7 @@ class MetadataRepository:
                 tabela_fisica,
                 sensibilidade
             FROM plataforma.metadata.catalogo_caracteristicas
-            WHERE caracteristica_id = ? AND ativo = true
+            WHERE caracteristica_id = ?
         """
         rows = self.client.execute_query(sql, (caracteristica_id,))
         if rows:

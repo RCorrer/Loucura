@@ -56,7 +56,6 @@ export default function AdminCatalogo() {
     listarCampos,
     obterCampo,
     atualizarFlags,
-    atualizarStatus,
     listarHistorico,
     listarHistoricoCampo,
   } = useMetadataAdminApi();
@@ -137,17 +136,6 @@ export default function AdminCatalogo() {
   const handleFiltrar = () => {
     setPage(0);
     setFilterTrigger(prev => prev + 1);
-  };
-
-  // Toggle status (ativa/desativa campo geral)
-  const handleToggleStatus = async (campo) => {
-    try {
-      await atualizarStatus(campo.caracteristica_id, !campo.ativo);
-      setSnackbar({ open: true, message: `Campo ${!campo.ativo ? 'ativado' : 'desativado'}` });
-      carregarCampos();
-    } catch (err) {
-      setSnackbar({ open: true, message: err?.message || 'Erro ao alterar status' });
-    }
   };
 
   // Toggle flag inline na tabela (S2/S3)
@@ -304,21 +292,7 @@ export default function AdminCatalogo() {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={6} sm={2}>
-                <FormControl size="small" fullWidth>
-                  <InputLabel>Status</InputLabel>
-                  <Select
-                    value={filtros.status}
-                    label="Status"
-                    onChange={(e) => setFiltros({ ...filtros, status: e.target.value })}
-                  >
-                    <MenuItem value="">Todos</MenuItem>
-                    <MenuItem value="ativo">Ativo</MenuItem>
-                    <MenuItem value="inativo">Inativo</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={6} sm={2}>
+              <Grid item xs={6} sm={3}>
                 <Button
                   variant="contained"
                   startIcon={<SearchIcon />}
@@ -341,7 +315,6 @@ export default function AdminCatalogo() {
                   <Table size="small" stickyHeader>
                     <TableHead>
                       <TableRow>
-                        <TableCell>Ativo</TableCell>
                         <TableCell>Label</TableCell>
                         <TableCell>Tema</TableCell>
                         <TableCell>Tipo</TableCell>
@@ -355,14 +328,6 @@ export default function AdminCatalogo() {
                     <TableBody>
                       {campos.map((campo) => (
                         <TableRow key={campo.caracteristica_id} hover>
-                          <TableCell>
-                            <Switch
-                              size="small"
-                              checked={campo.ativo}
-                              onChange={() => handleToggleStatus(campo)}
-                              color={campo.ativo ? 'success' : 'default'}
-                            />
-                          </TableCell>
                           <TableCell>
                             <Typography variant="body2" fontWeight="medium">
                               {campo.campo_label}
@@ -408,7 +373,7 @@ export default function AdminCatalogo() {
                       ))}
                       {campos.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={9} align="center">
+                          <TableCell colSpan={8} align="center">
                             <Typography variant="body2" color="text.secondary">Nenhum campo encontrado</Typography>
                           </TableCell>
                         </TableRow>
@@ -492,7 +457,6 @@ export default function AdminCatalogo() {
         ) : detalhe ? (
           <Box>
             <Typography variant="h6" gutterBottom>{detalhe.campo_label}</Typography>
-            <Chip label={detalhe.ativo ? 'Ativo' : 'Inativo'} color={detalhe.ativo ? 'success' : 'default'} size="small" sx={{ mb: 2 }} />
 
             <Tabs value={drawerTab} onChange={(_, v) => setDrawerTab(v)} sx={{ mb: 2 }}>
               <Tab label="Detalhe & Flags" />

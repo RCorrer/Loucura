@@ -203,26 +203,6 @@ class MetadataAdminRepository:
             },
         }
 
-    def atualizar_status(self, caracteristica_id: str, ativo: bool) -> Dict[str, Any]:
-        """Atualiza o status ativo/inativo de uma característica."""
-        atual = self.buscar_campo_por_id(caracteristica_id)
-        if not atual:
-            raise ValueError(f"Característica '{caracteristica_id}' não encontrada")
-
-        if atual["ativo"] == ativo:
-            return {"alteracao": None}
-
-        sql = """
-            UPDATE plataforma.metadata.catalogo_caracteristicas
-            SET ativo = ?
-            WHERE caracteristica_id = ?
-        """
-        self.client.execute_insert(sql, (ativo, caracteristica_id))
-
-        return {
-            "alteracao": {"de": atual["ativo"], "para": ativo}
-        }
-
     # ============================================================
     # HISTÓRICO
     # ============================================================

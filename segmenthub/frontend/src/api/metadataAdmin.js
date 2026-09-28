@@ -40,15 +40,6 @@ export const useMetadataAdminApi = () => {
     [request]
   );
 
-  const atualizarStatus = useCallback(
-    (caracteristicaId, ativo) =>
-      request(`${BASE_URL}/campos/${caracteristicaId}/status`, {
-        method: 'PUT',
-        body: JSON.stringify({ ativo }),
-      }),
-    [request]
-  );
-
   const listarHistorico = useCallback(
     (filtros = {}) => {
       const params = new URLSearchParams(
@@ -69,7 +60,6 @@ export const useMetadataAdminApi = () => {
     listarCampos,
     obterCampo,
     atualizarFlags,
-    atualizarStatus,
     listarHistorico,
     listarHistoricoCampo,
     loading,

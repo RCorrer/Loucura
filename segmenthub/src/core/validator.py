@@ -25,14 +25,12 @@ class RegraValidator:
                 caracteristica_id,
                 tipo_dado,
                 operadores,
-                valores_dominio,
-                ativo
+                valores_dominio
             FROM plataforma.metadata.catalogo_caracteristicas
-            WHERE ativo = true
         """
         results = self.client.execute_query(sql)
         catalogo = {}
-        columns = ["caracteristica_id", "tipo_dado", "operadores", "valores_dominio", "ativo"]
+        columns = ["caracteristica_id", "tipo_dado", "operadores", "valores_dominio"]
         
         for row in results:
             # Converte linha (lista) para dicionário
@@ -47,7 +45,6 @@ class RegraValidator:
                 "tipo_dado": row_dict["tipo_dado"],
                 "operadores": ops,
                 "valores_dominio": row_dict.get("valores_dominio"),
-                "ativo": row_dict["ativo"],
             }
         self._cache_campos = catalogo
         return catalogo

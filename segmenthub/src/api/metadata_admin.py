@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional
 
 from src.services.metadata_admin_service import MetadataAdminService
-from src.models.dto.metadata_admin_dto import FlagUpdateDTO, StatusUpdateDTO
+from src.models.dto.metadata_admin_dto import FlagUpdateDTO
 from src.core.security import require_perfil
 
 router = APIRouter(prefix="/metadata/admin", tags=["metadata_admin"])
@@ -65,28 +65,6 @@ async def atualizar_flags(
         resultado = service.atualizar_flags(
             caracteristica_id=caracteristica_id,
             flags=payload,
-            alterado_por=user["usuario_id"],
-        )
-        return resultado
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
-
-
-@router.put("/campos/{caracteristica_id}/status")
-async def atualizar_status(
-    caracteristica_id: str,
-    payload: StatusUpdateDTO,
-    user: dict = Depends(require_perfil(["admin"])),
-):
-    """
-    Ativa/desativa globalmente uma característica e grava histórico.
-    Apenas admin.
-    """
-    service = MetadataAdminService()
-    try:
-        resultado = service.atualizar_status(
-            caracteristica_id=caracteristica_id,
-            status=payload,
             alterado_por=user["usuario_id"],
         )
         return resultado
