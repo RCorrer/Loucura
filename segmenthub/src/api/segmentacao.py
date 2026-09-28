@@ -339,6 +339,27 @@ async def enviar_para_aprovacao(
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
+@router.post("/{seg_id}/promover-versao", response_model=dict)
+async def promover_versao(
+    seg_id: str,
+    dados: dict,
+    user: dict = Depends(require_perfil(["admin"])),
+):
+    """
+    Promove uma versão draft para produção.
+    Body: { "versao": int }
+    """
+    versao = dados.get("versao")
+    if not versao or not isinstance(versao, int):
+        raise HTTPException(status_code=422, detail="Campo 'versao' (int) é obrigatório")
+    service = SegmentacaoService()
+    try:
+        result = service.promover_versao(seg_id, versao, usuario=user["usuario_id"])
+        return {**result, "mensagem": f"Versão {versao} promovida com sucesso"}
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+
 @router.get("/{seg_id}/versoes", response_model=List[dict])
 async def listar_versoes(
     seg_id: str,

@@ -35,6 +35,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import CampaignIcon from '@mui/icons-material/Campaign';
 import TimelineIcon from '@mui/icons-material/Timeline';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import UpgradeIcon from '@mui/icons-material/Upgrade';
 import { useSegmentacoesApi } from '../api/segmentacoes';
 import { useSaudeApi } from '../api/saude';
 import ValidationModal from '../components/ValidationModal';
@@ -84,6 +85,7 @@ export default function DetalheSegmentacao() {
     listarComentarios,
     criarComentario,
     editarComentario,
+    promoverVersao,
     loading,
   } = useSegmentacoesApi();
   const { obterDetalhe: obterSaude } = useSaudeApi();
@@ -431,6 +433,45 @@ export default function DetalheSegmentacao() {
               <Typography variant="h5">{seg.versao_atual}</Typography>
             </Paper>
           </Grid>
+        </Grid>
+
+        {/* Banner de versão draft pendente */}
+        {(() => {
+          const drafts = versoes.filter(v => v.versao > seg.versao_atual);
+          if (drafts.length === 0 || !['ativa', 'pausada'].includes(seg.status)) return null;
+          const latest = drafts[0]; // listar_versoes retorna DESC, então [0] é a mais recente
+          return (
+            <Alert
+              severity="info"
+              icon={<UpgradeIcon />}
+              sx={{ mb: 2 }}
+              action={
+                isAdmin ? (
+                  <Button
+                    color="inherit"
+                    size="small"
+                    variant="outlined"
+                    onClick={() => abrirConfirmacao(
+                      'Promover versão',
+                      `A versão v${latest.versao} (por ${latest.alterado_por || '?'}) será promovida para produção, substituindo a v${seg.versao_atual} atual. As próximas execuções usarão as novas regras.`,
+                      'info',
+                      'Promover',
+                      () => promoverVersao(id, latest.versao),
+                      'Promoção de versão'
+                    )}
+                  >
+                    Promover v{latest.versao}
+                  </Button>
+                ) : null
+              }
+            >
+              <strong>{drafts.length} versão(s) draft</strong> pendente(s) de promoção.
+              Mais recente: <strong>v{latest.versao}</strong> por {latest.alterado_por || '?'} &mdash; “{latest.motivo || 'Sem motivo'}”
+            </Alert>
+          );
+        })()}
+
+        <Grid container spacing={2} sx={{ mb: 3 }}>
           {/* Público */}
           <Grid item xs={12} sm={4}>
             <Paper sx={{ p: 2, textAlign: 'center' }}>

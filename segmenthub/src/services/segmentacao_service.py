@@ -477,6 +477,61 @@ class SegmentacaoService:
             logger.error(f"clonar: erro ao clonar {seg_id}: {e}", exc_info=True)
             raise
 
+    def promover_versao(self, seg_id: str, versao: int, usuario: str = "system") -> Dict[str, Any]:
+        """Promove uma versão draft para produção (atualiza versao_atual + regras_json)."""
+        atual = self.buscar_por_id(seg_id)
+        if not atual:
+            raise ValueError("Segmentação não encontrada")
+
+        if atual["status"] not in ("ativa", "pausada"):
+            raise ValueError(
+                f"Promoção de versão só é permitida para segmentações ativas ou pausadas "
+                f"(status atual: '{atual['status']}')"
+            )
+
+        if versao <= atual["versao_atual"]:
+            raise ValueError(
+                f"Versão {versao} não é mais recente que a atual ({atual['versao_atual']}). "
+                f"Só é possível promover versões draft (> versao_atual)."
+            )
+
+        # Busca a versão draft
+        versao_data = self.repository.obter_versao(seg_id, versao)
+        if not versao_data:
+            raise ValueError(f"Versão {versao} não encontrada para esta segmentação")
+
+        novas_regras = versao_data["regras_json"]
+        if not novas_regras or not isinstance(novas_regras, dict):
+            raise ValueError(f"Versão {versao} não contém regras válidas")
+
+        # Valida as regras antes de promover
+        erros = self._validar_regras(novas_regras)
+        if erros:
+            raise ValueError(f"Regras da versão {versao} são inválidas: {erros}")
+
+        # Atualiza seg_definicao com novas regras + versao_atual
+        self.repository.atualizar(seg_id, {
+            "regras_json": json.dumps(novas_regras),
+            "versao_atual": versao,
+        })
+
+        # Registra no histórico
+        self.repository.registrar_historico_estado(
+            seg_id=seg_id,
+            estado_anterior=atual["status"],
+            estado_novo=atual["status"],  # status não muda
+            motivo=f"Versão {versao} promovida para produção (anterior: v{atual['versao_atual']})",
+            usuario=usuario,
+        )
+
+        logger.info(f"promover_versao: {seg_id} v{atual['versao_atual']} -> v{versao} por {usuario}")
+
+        return {
+            "versao_anterior": atual["versao_atual"],
+            "versao_nova": versao,
+            "seg_id": seg_id,
+        }
+
     def listar_versoes(self, seg_id: str) -> List[Dict]:
         return self.repository.listar_versoes(seg_id)
 

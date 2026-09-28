@@ -49,6 +49,11 @@ export const useSegmentacoesApi = () => {
 
   const obterVersao = useCallback((id, versao) => request(`${BASE_URL}/${id}/versoes/${versao}`), [request]);
 
+  const promoverVersao = useCallback(
+    (id, versao) => request(`${BASE_URL}/${id}/promover-versao`, { method: 'POST', body: JSON.stringify({ versao }) }),
+    [request]
+  );
+
   const listarEstados = useCallback((id) => request(`${BASE_URL}/${id}/estados`), [request]);
 
   // S1-FRONT-06: Timeline e Comentários
@@ -98,6 +103,7 @@ export const useSegmentacoesApi = () => {
     listarVersoes,
     obterVersao,
     listarEstados,
+    promoverVersao,
     obterTimeline,
     listarComentarios,
     criarComentario,
