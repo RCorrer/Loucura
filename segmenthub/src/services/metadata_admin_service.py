@@ -86,7 +86,6 @@ class MetadataAdminService:
         self,
         tema: Optional[str] = None,
         sistema: Optional[str] = None,
-        status: Optional[str] = None,
         busca: Optional[str] = None,
         page: int = 1,
         size: int = 50,
@@ -94,10 +93,10 @@ class MetadataAdminService:
         """Lista características com paginação e filtros."""
         offset = (page - 1) * size
         dados = self.repository.listar_campos(
-            tema=tema, sistema=sistema, status=status, busca=busca,
+            tema=tema, sistema=sistema, busca=busca,
             limit=size, offset=offset,
         )
-        total = self.repository.contar_campos(tema=tema, sistema=sistema, status=status, busca=busca)
+        total = self.repository.contar_campos(tema=tema, sistema=sistema, busca=busca)
         total_pages = (total + size - 1) // size if total > 0 else 0
 
         # Converte para DTO

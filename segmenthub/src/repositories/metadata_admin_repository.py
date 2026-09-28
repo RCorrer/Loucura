@@ -22,12 +22,11 @@ class MetadataAdminRepository:
         self,
         tema: Optional[str] = None,
         sistema: Optional[str] = None,
-        status: Optional[str] = None,
         busca: Optional[str] = None,
         limit: int = 50,
         offset: int = 0,
     ) -> List[Dict]:
-        """Lista características com filtros (inclui inativas)."""
+        """Lista todas as características com filtros."""
         sql = """
             SELECT 
                 caracteristica_id, campo_label, tema, tipo_dado, sensibilidade,
@@ -45,10 +44,6 @@ class MetadataAdminRepository:
             sql += " AND usavel_em_visao360 = true"
         elif sistema == "s3":
             sql += " AND usavel_em_peca = true"
-        if status == "ativo":
-            sql += " AND ativo = true"
-        elif status == "inativo":
-            sql += " AND ativo = false"
         if busca:
             sql += " AND (campo_label LIKE ? OR caracteristica_id LIKE ? OR descricao LIKE ?)"
             busca_param = f"%{busca}%"
@@ -80,7 +75,6 @@ class MetadataAdminRepository:
         self,
         tema: Optional[str] = None,
         sistema: Optional[str] = None,
-        status: Optional[str] = None,
         busca: Optional[str] = None,
     ) -> int:
         """Conta características com filtros."""
@@ -94,10 +88,6 @@ class MetadataAdminRepository:
             sql += " AND usavel_em_visao360 = true"
         elif sistema == "s3":
             sql += " AND usavel_em_peca = true"
-        if status == "ativo":
-            sql += " AND ativo = true"
-        elif status == "inativo":
-            sql += " AND ativo = false"
         if busca:
             sql += " AND (campo_label LIKE ? OR caracteristica_id LIKE ? OR descricao LIKE ?)"
             busca_param = f"%{busca}%"

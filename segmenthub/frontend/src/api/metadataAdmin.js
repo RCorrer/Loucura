@@ -9,7 +9,6 @@ const BASE_URL = '/api/metadata/admin';
  * GET  /api/metadata/admin/campos                     -> lista com filtros
  * GET  /api/metadata/admin/campos/{id}                -> detalhe
  * PUT  /api/metadata/admin/campos/{id}/flags          -> atualiza flags (S2/S3/bloco)
- * PUT  /api/metadata/admin/campos/{id}/status         -> ativa/desativa
  * GET  /api/metadata/admin/historico                   -> trilha geral
  * GET  /api/metadata/admin/campos/{id}/historico       -> histórico de um campo
  */

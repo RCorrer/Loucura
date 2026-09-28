@@ -17,19 +17,18 @@ router = APIRouter(prefix="/metadata/admin", tags=["metadata_admin"])
 async def listar_campos_admin(
     tema: Optional[str] = Query(None, description="Filtrar por tema"),
     sistema: Optional[str] = Query(None, description="s2 ou s3"),
-    status: Optional[str] = Query(None, description="ativo ou inativo"),
     busca: Optional[str] = Query(None, description="Busca textual"),
     page: int = Query(1, ge=1),
     size: int = Query(50, ge=1, le=100),
     user: dict = Depends(require_perfil(["admin"])),
 ):
     """
-    Lista todas as características (inclui inativas) com filtros.
+    Lista todas as características do catálogo com filtros.
     Apenas admin.
     """
     service = MetadataAdminService()
     return service.listar_campos(
-        tema=tema, sistema=sistema, status=status, busca=busca,
+        tema=tema, sistema=sistema, busca=busca,
         page=page, size=size,
     )
 
