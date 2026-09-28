@@ -152,7 +152,7 @@ OPS_VALIDOS = {"=", "!=", ">", "<", ">=", "<=", "in", "not_in",
                "is_null", "is_not_null"}
 
 # Materializa catálogo como dict para lookup O(1) (evita N filter().first())
-catalogo_df = spark.table(f"{CATALOG}.{SCHEMA_META}.catalogo_caracteristicas").filter("ativo = true")
+catalogo_df = spark.table(f"{CATALOG}.{SCHEMA_META}.catalogo_caracteristicas")
 _catalogo_rows = catalogo_df.collect()
 catalogo_dict = {row["caracteristica_id"]: row.asDict() for row in _catalogo_rows}
 
